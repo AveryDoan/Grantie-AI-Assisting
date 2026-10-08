@@ -9,6 +9,8 @@ import LetterScreen from "./screens/Letter";
 import Audit from "./screens/Audit";
 import Evaluation from "./screens/Evaluation";
 import "./officer.css";
+import grantieLogo from "./assets/grantie-logo.png";
+import studyNtLogo from "./assets/study-nt-logo.svg";
 
 // Hash routes keep deep links working without server configuration:
 //   #/queue  #/applications/:id  #/applications/:id/signoff
@@ -85,9 +87,8 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
   return (
     <div className="officer-shell">
       <aside className={open ? "workspace-sidebar open" : "workspace-sidebar"} aria-label="Workspace navigation">
-        <button className="workspace-brand" onClick={() => go({ name: "queue" })} aria-label="Go to applications">
-          <span className="logo-placeholder small">Study NT<br />logo here</span>
-          <span>Grant review<br />Officer workspace</span>
+        <button className="workspace-brand brand-grantie" onClick={() => go({ name: "queue" })} aria-label="Grantie – go to applications">
+          <img src={grantieLogo} alt="Grantie – AI solution for grants in NT" />
         </button>
         <p className="workspace-label">Workspace</p>
         <nav className="workspace-nav">
@@ -99,6 +100,7 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
           ))}
         </nav>
         <div className="workspace-sidebar-footer">
+          <div className="partner-tile"><small>Officer workspace for</small><img src={studyNtLogo} alt="Study NT" /></div>
           <button className="workspace-link" onClick={logout}><Icon name="left" />Sign out</button>
           <div className="sidebar-officer"><span className="avatar">{initials}</span><span><strong>{name}</strong><small>{roleLabel}</small></span></div>
         </div>
@@ -137,8 +139,11 @@ function Login() {
   return (
     <main className="page narrow login-page">
       <div className="panel login-panel">
-        <span className="logo-placeholder small">Study NT<br />logo here</span>
-        <p className="eyebrow">Officer workspace</p>
+        <div className="login-logos">
+          <img className="login-grantie" src={grantieLogo} alt="Grantie – AI solution for grants in NT" />
+          <span className="login-for">Officer workspace for</span>
+          <img className="login-studynt" src={studyNtLogo} alt="Study NT" />
+        </div>
         <h1>Sign in to review applications</h1>
         <p>AI suggests. You decide. Every finding needs your confirmation.</p>
         <ErrorNotice error={error ?? failure} />

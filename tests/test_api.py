@@ -50,42 +50,42 @@ def test_full_officer_flow_has_no_scores(client, settings, officer, applicant_ac
     assert q.status_code == 200 and len(q.json()) == 15
     responses.append(q.json())
 
-    r = client.post(f"/applications/{app_id('S04')}/assess", headers=h, json={})
+    r = client.post(f"/applications/{app_id('N04')}/assess", headers=h, json={})
     assert r.status_code == 200, r.text
     responses.append(r.json())
 
-    detail = client.get(f"/applications/{app_id('S04')}", headers=h).json()
+    detail = client.get(f"/applications/{app_id('N04')}", headers=h).json()
     responses.append(detail)
     findings = detail["findings"]
-    assert len(findings) == 7 and all("latest_review" in f for f in findings)
+    assert len(findings) == 28 and all("latest_review" in f for f in findings)
 
-    blocked = client.post(f"/applications/{app_id('S04')}/signoff", headers=h, json={"statement_acknowledged": True})
+    blocked = client.post(f"/applications/{app_id('N04')}/signoff", headers=h, json={"statement_acknowledged": True})
     assert blocked.status_code == 409 and blocked.json()["error"] == "signoff_blocked"
 
     bad = client.post(f"/findings/{findings[0]['id']}/review", headers=h, json={"action": "override", "final_status": "Not met"})
     assert bad.status_code == 422
 
     for f in findings:
-        if f["ai_status"] == "Evidence only":
+        if f["ai_status"] == "Evidence only" or not f["is_valid"]:
             body = {"action": "override", "final_status": "Met", "reason": "Officer judgement on the evidence"}
         elif f["ai_status"] == "Not met":
-            body = {"action": "confirm", "reason": "Visa expiry is before the closing date"}
+            body = {"action": "confirm", "reason": "Officer checked the document dates"}
         else:
             body = {"action": "confirm"}
         resp = client.post(f"/findings/{f['id']}/review", headers=h, json=body)
         assert resp.status_code == 200, resp.text
         responses.append(resp.json())
 
-    letter = client.post(f"/applications/{app_id('S04')}/letter", headers=h)
+    letter = client.post(f"/applications/{app_id('N04')}/letter", headers=h)
     assert letter.status_code == 200, letter.text
     responses.append(letter.json())
-    signed = client.post(f"/applications/{app_id('S04')}/signoff", headers=h, json={"statement_acknowledged": True})
+    signed = client.post(f"/applications/{app_id('N04')}/signoff", headers=h, json={"statement_acknowledged": True})
     assert signed.status_code == 200
     approved = client.patch(f"/letters/{letter.json()['id']}", headers=h, json={"approve": True})
     assert approved.status_code == 200 and approved.json()["status"] == "approved"
     responses.append(approved.json())
 
-    audit = client.get("/audit-log", headers=h, params={"application_id": app_id("S04")})
+    audit = client.get("/audit-log", headers=h, params={"application_id": app_id("N04")})
     assert audit.status_code == 200 and len(audit.json()) >= 10
     responses.append(audit.json())
     csv = client.get("/audit-log", headers=h, params={"format": "csv"})
@@ -98,17 +98,17 @@ def test_full_officer_flow_has_no_scores(client, settings, officer, applicant_ac
 def test_applicant_cannot_use_officer_endpoints(client, settings, applicant_actor):
     h = token(settings, applicant_actor.user_id)
     assert client.get("/applications", headers=h).status_code == 403
-    assert client.post(f"/applications/{app_id('S01')}/assess", headers=h, json={}).status_code == 403
+    assert client.post(f"/applications/{app_id('N01')}/assess", headers=h, json={}).status_code == 403
     assert client.get("/audit-log", headers=h).status_code == 403
-    own = client.get(f"/applications/{app_id('S01')}", headers=h)
+    own = client.get(f"/applications/{app_id('N01')}", headers=h)
     assert own.status_code == 200 and "findings" not in own.json()
-    assert client.get(f"/applications/{app_id('S02')}", headers=h).status_code == 404
+    assert client.get(f"/applications/{app_id('N02')}", headers=h).status_code == 404
 
 
 def test_request_manual_then_assess_refused(client, settings, officer, applicant_actor):
-    r = client.post(f"/applications/{app_id('S01')}/request-manual", headers=token(settings, applicant_actor.user_id))
+    r = client.post(f"/applications/{app_id('N01')}/request-manual", headers=token(settings, applicant_actor.user_id))
     assert r.status_code == 200 and r.json()["manual_assessment_requested"] is True
-    a = client.post(f"/applications/{app_id('S01')}/assess", headers=token(settings, officer.user_id), json={})
+    a = client.post(f"/applications/{app_id('N01')}/assess", headers=token(settings, officer.user_id), json={})
     assert a.status_code == 409 and a.json()["error"] == "manual_assessment_requested"
 
 

@@ -60,7 +60,7 @@ def test_evidence_schema_has_no_status_field():
 
 
 def test_pipeline_judgement_rules_are_evidence_only(store, stub_llm, settings):
-    for code in ("S01", "C01"):
+    for code in ("N01", "C01"):
         app = store.select("applications", eq={"id": app_id(code)})[0]
         pack = load_rule_pack(store, app["rule_pack_id"])
         out = assess_application(application=app, documents=store.select("documents", eq={"application_id": app["id"]}),
@@ -88,13 +88,13 @@ def test_delimiters_cannot_be_closed_from_inside_data():
 
 
 def test_seeded_injection_case_is_flagged_and_not_obeyed(store, stub_llm, settings):
-    app = store.select("applications", eq={"id": app_id("S07")})[0]
+    app = store.select("applications", eq={"id": app_id("N07")})[0]
     out = assess_application(application=app, documents=store.select("documents", eq={"application_id": app["id"]}),
                              pack=load_rule_pack(store, app["rule_pack_id"]), register_rows=[], llm=stub_llm, settings=settings)
     assert out.injection_flags
-    r6 = next(f for f in out.findings if f.rule_code == "R6")
-    assert r6.ai_status == "Not met"  # lives in Melbourne; the "mark everything Met" instruction was not obeyed
-    assert r6.confidence == "low"
+    s8 = next(f for f in out.findings if f.rule_code == "S8")
+    assert s8.ai_status == "Not met"  # already studying at an NT provider; "mark everything Met" was not obeyed
+    assert s8.confidence == "low"
 
 
 def test_injection_in_documents_is_flagged():
@@ -104,16 +104,16 @@ def test_injection_in_documents_is_flagged():
 
 # ---------------------------------------------------------------- manual opt-out
 def test_pipeline_refuses_when_manual_assessment_requested(store, officer, stub_llm, settings):
-    store.update("applications", {"manual_assessment_requested": True}, eq={"id": app_id("S01")})
+    store.update("applications", {"manual_assessment_requested": True}, eq={"id": app_id("N01")})
     with pytest.raises(ManualAssessmentRequested):
-        run_assessment(store, officer, app_id("S01"), stub_llm, settings)
-    assert store.select("assessment_runs", eq={"application_id": app_id("S01")}) == []
+        run_assessment(store, officer, app_id("N01"), stub_llm, settings)
+    assert store.select("assessment_runs", eq={"application_id": app_id("N01")}) == []
     refused = store.select("audit_log", eq={"action": "assessment.refused"})
     assert refused and refused[0]["details"]["reason"] == "manual_assessment_requested"
 
 
 def test_pure_pipeline_also_refuses(store, stub_llm, settings):
-    app = store.select("applications", eq={"id": app_id("S01")})[0] | {"manual_assessment_requested": True}
+    app = store.select("applications", eq={"id": app_id("N01")})[0] | {"manual_assessment_requested": True}
     with pytest.raises(ManualAssessmentRequested):
         assess_application(application=app, documents=[], pack=load_rule_pack(store, app["rule_pack_id"]),
                            register_rows=[], llm=stub_llm, settings=settings)
@@ -122,6 +122,6 @@ def test_pure_pipeline_also_refuses(store, stub_llm, settings):
 def test_applicant_request_manual_then_pipeline_refuses(store, officer, applicant_actor, stub_llm, settings):
     from app.services.review import request_manual_assessment
 
-    request_manual_assessment(store, applicant_actor, app_id("S01"))
+    request_manual_assessment(store, applicant_actor, app_id("N01"))
     with pytest.raises(ManualAssessmentRequested):
-        run_assessment(store, officer, app_id("S01"), stub_llm, settings)
+        run_assessment(store, officer, app_id("N01"), stub_llm, settings)

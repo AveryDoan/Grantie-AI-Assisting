@@ -103,7 +103,9 @@ cp .env.example .env          # then fill in SUPABASE_* and GEMINI_API_KEY / GEM
 supabase init                 # once; keeps the existing supabase/migrations
 supabase link --project-ref <your-project-ref>
 supabase db push              # applies 0001 to 0007
-#    (or paste each file in supabase/migrations/ into the SQL editor, in order)
+#    (or paste each file in supabase/migrations/ into the SQL editor, in order,
+#     or: for f in supabase/migrations/*.sql; do psql "$DATABASE_URL" -1 -f "$f"; done
+#     using the Session pooler connection string - the direct db.* host is IPv6-only)
 
 # 4. Seed SYNTHETIC data + demo users (officer / admin / applicant @example.com)
 SEED_DEMO_PASSWORD='choose-one' python -m seed.run
@@ -202,42 +204,28 @@ There is **no bulk-approve endpoint**. All endpoints are rate-limited (`RATE_LIM
 
 ---
 
-## Seed data
+## Rule packs and seed data
 
-Two fictional programs:
+**Study NT – rule pack v2** (the active pack; v1 was a placeholder and is retired) uses the rules supplied by the project owner:
 
-**Study NT-style grant (R1–R7)**
-- R1: required documents present.
-- R2: CoE course still running on [closing date].
-- R3: visa valid on [closing date].
-- R4: arrival date within the [arrival window].
-- R5: typed details match the documents.
-- R6: lives in the NT (LLM).
-- R7: community connection (judgement).
+| Section | Rules | Checked by |
+|---|---|---|
+| A. Eligibility | S1–S16 | Plain code. The exceptions: S8 (current study) is read by the LLM, and S4 (entry requirements) shows evidence only for the officer. |
+| B. Documents | D1–D7 | Code. For D4/D5 the LLM extracts referee-letter fields from **redacted** letter text, and code verifies every quote and date. Signature, letterhead and headshot are checked by eye. |
+| C. Merit | M1–M5 | The AI shows evidence only and never scores; the officer records the decision. Weights (40/30/20/10) are shown for reference only. M5 is a code check of length. |
 
-**NT Community Benefit Fund Minor Grants-style pack (C1–C6)**
-- C1: not-for-profit (LLM).
-- C2: NT presence (LLM).
-- C3: incorporated under an eligible Act (code).
-- C4: no more than 2 active grants, checked against the mock register (code).
-- C5: requested amount ≤ [maximum grant amount] (code).
-- C6: community benefit (judgement, human only).
+Interpretations still to confirm are listed in `seed/data.py` under `ASSUMPTIONS` (for example: S15 under-18 is flagged, not failed; D6 "about 150 words" is 120–180).
 
-15 synthetic applications:
+**Reference lists** (`reference_lists` table):
+- `nt_education_providers` (S1): loaded from the list supplied by the project owner.
+- `nt_skilled_occupation_priority_list` (S3): not loaded yet. Until it is, S3 returns "Unclear – list not loaded". nt.gov.au blocks automated downloads, so download the PDF in a browser, then run:
+  ```bash
+  python -m seed.load_lists --sopl ~/Downloads/nt-skilled-occupation-priority-list.pdf          # preview
+  python -m seed.load_lists --sopl ~/Downloads/nt-skilled-occupation-priority-list.pdf --save   # load
+  ```
+  Courses are linked to occupations by shared word stems ("Nursing" and "Nurse"). Anything without a clear link is "Unclear" for the officer, never "Not met".
 
-| Case | Scenario |
-|---|---|
-| S01 / S08 / S09 | Twin family A: clean eligible, written polished / plain / second-language |
-| S02 | Wrong document type (passport uploaded as visa) |
-| S03 | Missing document (no CoE) |
-| S04 | Expired document (visa ends before the closing date) |
-| S05 | Typed date of birth doesn't match the documents (needs verification, never "fraud") |
-| S06 | Ambiguous wording |
-| S07 | Injection attempt |
-| C01 / C02 / C03 | Twin family B: eligible community organisation, three styles |
-| C04 / C05 / C06 | Twin family C: wrong entity type (Pty Ltd), already holds 2 active grants, three styles |
-
-The answer key for every case and rule is in `seed/data.py`. It was written from the rule text and case facts, not from model output, and is marked **REVIEW REQUIRED** until an officer has checked it.
+**Synthetic test cases:** N01, N08 and N09 are a clean twin set written in three styles. N02–N07 each cover one or more failure scenarios (screenshot instead of a booking, one referee letter, out-of-range dates, a mismatched arrival date, an ambiguous study load, an untranslated document, register conflicts, and an injection attempt). The CBF-style program keeps cases C01–C06.
 
 ### Placeholders
 

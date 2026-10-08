@@ -39,7 +39,7 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
     seed(store)
     for role, u in DEMO_USERS.items():
         store.insert("profiles", {"id": u["id"], "role": role, "organisation_id": u["org"], "display_name": u["display_name"]})
-    store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:S01")})
+    store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
     demo_settings = settings.model_copy(update={"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48))})
 
     # Populate the evaluation dashboard (clearly labelled as the offline stub).

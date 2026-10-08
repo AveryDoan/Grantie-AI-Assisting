@@ -156,3 +156,28 @@ def redact(application_text: dict[str, Any], extra_names: list[str] | None = Non
         redacted.append(f"{key}: {text}")
 
     return RedactionResult(text="\n".join(redacted), mapping=r.mapping)
+
+
+LABELLED_NAME = re.compile(
+    r"^(?P<label>\s*(?:referee name|name|signed|signature|from|student name|applicant name)\s*:\s*)(?P<value>[^\n\[]+)$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def redact_text(text: str, extra_names: list[str] | None = None) -> RedactionResult:
+    """Redact free document text (e.g. a referee letter) before an LLM sees it.
+
+    Same patterns as `redact`, plus "Name: ..." style lines. Signature
+    placeholders such as "[signed]" are kept so presence can be checked.
+    """
+    r = _Redactor()
+    for part in sorted({n.strip() for n in (extra_names or []) if n and n.strip()}, key=len, reverse=True):
+        text = re.sub(rf"(?<![\[\w]){re.escape(part)}\b", lambda _m, t=r.token("PERSON", part): t, text)
+    text = LABELLED_NAME.sub(lambda m: m.group("label") + r.token("PERSON", m.group("value").strip()), text)
+    for pattern, kind, group in (
+        (EMAIL, "EMAIL", 0), (PHONE, "PHONE", 0), (ADDRESS, "ADDRESS", 0), (PO_BOX, "ADDRESS", 0),
+        (ID_LABELLED, "ID", 1), (ID_SHAPE, "ID", 0), (LONG_DIGITS, "ID", 0),
+        (HONORIFIC_NAME, "PERSON", 1), (INTRO_NAME, "PERSON", 1),
+    ):
+        text = r.sub(pattern, kind, text, group=group)
+    return RedactionResult(text=text, mapping=r.mapping)

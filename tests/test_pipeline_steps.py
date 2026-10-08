@@ -29,16 +29,17 @@ def test_loader_refuses_retired_pack(store):
 
 def test_loader_returns_version_and_ordered_rules(store):
     pack = load_rule_pack(store, data.SNT_PACK)
-    assert pack.version == "v1"
-    assert [r.rule_code for r in pack.rules] == ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
+    assert pack.version == "v2"
+    assert [r.rule_code for r in pack.rules] == [*(f"S{i}" for i in range(1, 17)), *(f"D{i}" for i in range(1, 8)),
+                                                *(f"M{i}" for i in range(1, 6))]
 
 
 def test_run_is_stamped_with_pack_version(store, officer, stub_llm, settings):
     from app.pipeline.orchestrator import run_assessment
     from tests.conftest import app_id
 
-    run = run_assessment(store, officer, app_id("S01"), stub_llm, settings)
-    assert run["rule_pack_version"] == "v1" and run["status"] == "complete"
+    run = run_assessment(store, officer, app_id("N01"), stub_llm, settings)
+    assert run["rule_pack_version"] == "v2" and run["status"] == "complete"
 
 
 # ---------------------------------------------------------------- redaction
@@ -74,15 +75,23 @@ def test_name_order_and_diacritics_tolerated():
     assert compare_names("Maria Garcia", "Kenji Sato", 85)[0] == "mismatch"
 
 
+PASSPORT = "Passport\nSurname: {family}\nGiven Names: {given}\nNationality: [fictional]\nDate of Birth: {dob}\nDocument Number: {num}\n"
+
+
 def test_document_classifier():
-    assert classify(data.coe("A B", "01/01/2000", "N1", "Course")) == "coe"
-    assert classify(data.visa("B", "A", "01/01/2000", "N1")) == "visa"
-    assert classify(data.passport_doc("B", "A", "2000-01-01", "N1")) == "travel_document"
+    assert classify(data.coe("A B")) == "coe"
+    assert classify(data.visa("B", "A")) == "visa"
+    assert classify(PASSPORT.format(family="B", given="A", dob="2000-01-01", num="N1")) == "travel_document"
+    assert classify(data.offer_letter("A B")) == "offer_letter"
+    assert classify(data.booking("A B")) == "travel_booking"
+    assert classify(data.flight_screenshot()) == "flight_screenshot"  # a screenshot is not a booking
+    assert classify(data.referee("A B", "Ms C", "Teacher", "School", "Teacher", "2 years", "1 May 2026")) == "referee_letter"
+    assert classify(data.headshot()) == "headshot"
     assert classify("Electricity bill for March") == "other"
 
 
 def test_typed_date_mismatch_needs_verification_not_fraud():
-    docs = [{"id": "d1", "declared_type": "passport", "extracted_text": data.passport_doc("Garcia", "Maria", "1998-08-21", "G1")}]
+    docs = [{"id": "d1", "declared_type": "passport", "extracted_text": PASSPORT.format(family="GARCIA", given="MARIA", dob="1998-08-21", num="G1")}]
     checks = check_documents({"applicant_name": "Maria Garcia", "date_of_birth": "1999-08-21"}, docs)
     assert checks.checks[0].needs_verification
     labels = {c["label"] for c in checks.checks[0].comparisons}
@@ -90,7 +99,7 @@ def test_typed_date_mismatch_needs_verification_not_fraud():
 
 
 def test_ambiguous_numeric_date_is_variant_not_mismatch():
-    docs = [{"id": "d1", "declared_type": "passport", "extracted_text": data.passport_doc("Lee", "Jo", "2000-04-03", "Q1")}]
+    docs = [{"id": "d1", "declared_type": "passport", "extracted_text": PASSPORT.format(family="LEE", given="JO", dob="2000-04-03", num="Q1")}]
     checks = check_documents({"date_of_birth": "04/03/2000"}, docs)  # typed month-first
     assert checks.checks[0].comparisons[0]["result"] == "variant"
 

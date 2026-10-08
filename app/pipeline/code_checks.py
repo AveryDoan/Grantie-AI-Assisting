@@ -26,7 +26,12 @@ from app.pipeline.facts import FactSet
 from app.pipeline.parsing import parse_amount, parse_date
 from app.pipeline.rules_loader import is_placeholder
 
-DOC_LABEL = {"coe": "Confirmation of Enrolment", "visa": "visa grant notice", "travel_document": "passport or travel document"}
+DOC_LABEL = {
+    "coe": "Confirmation of Enrolment", "visa": "visa grant notice", "travel_document": "passport or travel document",
+    "offer_letter": "letter of offer", "travel_booking": "travel booking or itinerary",
+    "flight_screenshot": "flight screenshot", "referee_letter": "referee letter", "headshot": "headshot photo",
+    "certified_translation": "certified translation",
+}
 
 
 @dataclass
@@ -36,6 +41,11 @@ class CodeContext:
     documents: DocumentChecks
     register_rows: list[dict[str, Any]] = field(default_factory=list)
     grant_program_id: str | None = None
+    application: dict[str, Any] = field(default_factory=dict)
+    # name -> items; None or [] means the official list has not been loaded.
+    reference_lists: dict[str, list[str] | None] = field(default_factory=dict)
+    referees: list[Any] | None = None  # list[RefereeLetter]
+    raw_documents: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _f(ctx: CodeContext, status: str, rationale: str, **kw: Any) -> Finding:
@@ -95,8 +105,13 @@ def _fact(ctx: CodeContext, key: str) -> tuple[str | None, Finding | None]:
 
 
 def _quote_kw(ctx: CodeContext, key: str) -> dict[str, Any]:
+    from app.domain import PERSONAL_FIELDS
+
     fact = ctx.facts.get(key)
-    return {"evidence_quote": fact.source_quote, "quote_verified": fact.quote_verified} if fact else {}
+    # Personal fields are tokenised in the text the AI saw, so they cannot be quoted as evidence.
+    if not fact or key in PERSONAL_FIELDS:
+        return {}
+    return {"evidence_quote": fact.source_quote, "quote_verified": fact.quote_verified}
 
 
 # ---------------------------------------------------------------------------
@@ -259,14 +274,20 @@ CHECKS: dict[str, Callable[[CodeContext], Finding]] = {
 }
 
 
+def _all_checks() -> dict[str, Callable[[CodeContext], Finding]]:
+    from app.pipeline.study_nt_checks import STUDY_NT_CHECKS
+
+    return {**CHECKS, **STUDY_NT_CHECKS}
+
+
 def run_code_check(ctx: CodeContext) -> Finding:
     name = ctx.rule.params.get("check")
-    fn = CHECKS.get(name or "")
+    fn = _all_checks().get(name or "")
     if fn is None:
         return _f(ctx, "Unclear", "This rule has no automatic check configured.", error_flag=True,
                   error_detail=f"Unknown code check: {name}", confidence="low", is_valid=False)
     try:
         return fn(ctx)
-    except (KeyError, ValueError, TypeError) as exc:
+    except (KeyError, ValueError, TypeError, AttributeError) as exc:
         return _f(ctx, "Unclear", "This rule could not be checked automatically.", error_flag=True,
                   error_detail=f"Check {name} failed: {type(exc).__name__}", confidence="low", is_valid=False)

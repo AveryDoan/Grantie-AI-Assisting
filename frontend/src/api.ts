@@ -42,6 +42,8 @@ export interface SupportingQuote {
   quote: string;
   verified?: boolean;
   method?: string;
+  source?: string; // "document:<id>" when the quote comes from an uploaded letter
+  label?: string;
 }
 
 export interface Finding {
@@ -66,6 +68,8 @@ export interface Finding {
   check_source: "llm" | "code" | "human_only";
   latest_review: Review | null;
   review_history: Review[];
+  section: "eligibility" | "documents" | "merit" | null;
+  weight: number | null;
 }
 
 export interface DocumentRow {

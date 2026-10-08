@@ -55,10 +55,10 @@ def other_officer(store: MemoryStore) -> Actor:
 
 @pytest.fixture
 def applicant_actor(store: MemoryStore) -> Actor:
-    """Owns case S01's applicant record."""
+    """Owns case N01's applicant record."""
     uid = sid("user:applicant")
     store.insert("profiles", {"id": uid, "role": "applicant"})
-    store.update("applicants", {"user_id": uid}, eq={"id": sid("applicant:S01")})
+    store.update("applicants", {"user_id": uid}, eq={"id": sid("applicant:N01")})
     return Actor(user_id=uid, role="applicant")
 
 

@@ -1,0 +1,191 @@
+# Redaction configuration (Study NT grant assistant).
+#
+# Everything the redaction pipeline detects, keeps or replaces is set here.
+# The SHA-256 of this file (config_hash) is stored on every redaction run.
+# Default stance: catch more rather than less - a missed name is worse than
+# an unnecessary redaction. Detection is local only (Presidio + spaCy + regex);
+# no cloud PII service and no LLM is ever used to redact.
+
+version: 1
+detector:
+  spacy_model: en_core_web_lg        # spaCy 3.8 compatible model (3.8.0)
+  language: en
+
+# Token format. {type} is the token type below, {n} a per-type counter that
+# is deterministic within one application (order of first appearance).
+token_format: "[{type}_{n}]"
+
+# Detections scoring below an entity's min_score are ignored. Detections
+# between flag_score and min_score are "low confidence": they are redacted
+# anyway when low_confidence_action is "redact" (default), or the run is
+# stopped for manual review when it is "block".
+default_min_score: 0.3
+flag_score: 0.15
+low_confidence_action: redact        # redact | block
+
+# Presidio / custom entity -> token type, and per-entity thresholds.
+entities:
+  PERSON:            {token: PERSON,  min_score: 0.3}
+  REFEREE:           {token: REFEREE, min_score: 0.3}   # a person named inside a referee letter
+  EMAIL_ADDRESS:     {token: EMAIL,   min_score: 0.3}
+  PHONE_NUMBER:      {token: PHONE,   min_score: 0.3}
+  STREET_ADDRESS:    {token: ADDRESS, min_score: 0.3}
+  AU_POSTCODE:       {token: ADDRESS, min_score: 0.3}
+  LOCATION:          {token: PLACE,   min_score: 0.3}   # sub-country places in free text (countries are kept)
+  DATE_OF_BIRTH:     {token: DOB,     min_score: 0.3}
+  PASSPORT_NUMBER:   {token: ID,      min_score: 0.3}
+  VISA_GRANT_NUMBER: {token: ID,      min_score: 0.3}
+  STUDENT_ID:        {token: ID,      min_score: 0.3}
+  COE_NUMBER:        {token: ID,      min_score: 0.3}
+  AU_ABN:            {token: ID,      min_score: 0.3}
+  AU_TFN:            {token: ID,      min_score: 0.3}
+  AU_ACN:            {token: ID,      min_score: 0.3}
+  SOCIAL_URL:        {token: URL,     min_score: 0.3}
+  SOCIAL_HANDLE:     {token: HANDLE,  min_score: 0.3}
+  KNOWN_VALUE:       {token: null,    min_score: 0.0}   # token comes from the known value's own type
+
+# Context words are matched one word at a time (Presidio compares single
+# lemmas), so list words, not phrases.
+# Broad, configurable patterns. Each regex is either a string (uses the
+# entity's score) or {pattern, score}. Context words near a match raise its
+# score. Generic number shapes get a low score so they need context; never
+# add a bare 4-digit pattern - it would swallow years such as 2026.
+patterns:
+  PASSPORT_NUMBER:
+    regex: ['\b[A-Z]{1,2}[0-9]{6,9}\b', {pattern: '\b[0-9]{9}\b', score: 0.2}]
+    context: [passport, travel, document]
+    score: 0.4
+  VISA_GRANT_NUMBER:
+    regex: ['\b[0-9]{13}\b', '\bTRN\s*[:#]?\s*[A-Z0-9]{8,13}\b']
+    context: [visa, grant, trn, vgn, transaction]
+    score: 0.4
+  STUDENT_ID:
+    regex: [{pattern: '\b[sS]?[0-9]{6,9}\b', score: 0.2}, '\b[A-Z]{2,3}[0-9]{5,8}\b']
+    context: [student, id, number]
+    score: 0.35
+  COE_NUMBER:
+    regex: ['\bE[0-9]{7,9}\b', '\bCOE[-\s]?[0-9]{6,10}\b']
+    context: [coe, enrolment, confirmation]
+    score: 0.5
+  AU_POSTCODE:
+    regex: [{pattern: '\b(?:NT|NSW|VIC|QLD|SA|WA|TAS|ACT)\s+[0-9]{4}\b', score: 0.6}, {pattern: '\b0[89][0-9]{2}\b', score: 0.2}]
+    context: [postcode, street, road, avenue, address, suburb, unit, nt, nsw, vic, qld, act, wa, sa, tas, australia]
+    score: 0.3
+  STREET_ADDRESS:
+    regex:
+      - '\b(?:(?:Unit|Apt|Apartment|Flat|Level)\s*[0-9A-Za-z]+[,/ ]\s*)?[0-9]{1,5}[A-Za-z]?\s+(?:[A-Z][A-Za-z''-]+\s){1,4}(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Lane|Ln|Court|Ct|Crescent|Cres|Place|Pl|Way|Terrace|Tce|Highway|Hwy|Parade|Pde|Boulevard|Blvd|Circuit|Cct|Close|Cl|Alley|Ward|District)\b\.?'
+      - '\b(?:PO|P\.O\.)\s*Box\s*[0-9]+\b'
+    context: [address, live, lives, living, street, residential, postal]
+    score: 0.6
+  EMAIL_ADDRESS:
+    # Presidio's EmailRecognizer validates the domain ending; this catches the rest
+    # (unusual or internal domains) so an email is never split into name parts.
+    regex: ['(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+']
+    context: [email, e-mail, contact]
+    score: 0.6
+  SOCIAL_HANDLE:
+    regex: ['(?<![\w.@])@[A-Za-z0-9_.]{3,30}\b']
+    context: [instagram, twitter, tiktok, x, telegram, handle, follow]
+    score: 0.5
+  SOCIAL_URL:
+    regex:
+      - '\b(?:https?://)?(?:www\.)?(?:linkedin\.com/in|facebook\.com|fb\.com|instagram\.com|x\.com|twitter\.com|tiktok\.com/@?|github\.com|youtube\.com/(?:@|c/|user/)|t\.me|wa\.me)/[A-Za-z0-9_.\-/%@]*[A-Za-z0-9_/%@-]'
+    context: []
+    score: 0.6
+  INTERNATIONAL_PHONE:
+    regex: ['(?<![\w])\+[1-9][0-9]{0,2}(?:[\s.-]?\(?[0-9]{1,5}\)?){2,6}(?![\w])', '(?<![\w])\(?0[2-478]\)?(?:[\s-]?[0-9]){8}(?![\w])', '(?<![\w])04[0-9]{2}(?:[\s-]?[0-9]{3}){2}(?![\w])']
+    context: [phone, mobile, tel, telephone, call, whatsapp, contact]
+    score: 0.5
+
+# Regions for Presidio's phonenumbers-based recogniser (international applicants).
+phone_regions: [AU, NZ, US, GB, CA, IN, VN, CN, HK, TW, PH, ID, MY, SG, TH, NP, BD, LK, PK, KR, JP, NG, KE, GH, ZA, BR, CO, MX, IR, AE, SA, EG, FR, DE, IT, ES]
+
+# Date-of-birth context: a date within this many characters after one of
+# these cues is a DOB. Other dates are KEPT (course, arrival, letter dates).
+dob_context:
+  window: 40
+  cues: [born, dob, d.o.b, date of birth, birth date, birthday]
+
+# Structured fields redacted directly by name (no detection needed).
+structured_fields:
+  PERSON: [applicant_name, given_name, given_names, family_name, surname, preferred_name, full_name,
+           declaration_name, declaration_signature, contact_name, contact_person, parent_name, guardian_name]
+  EMAIL: [email, contact_email, guardian_email]
+  PHONE: [phone, mobile, contact_phone, guardian_phone]
+  ADDRESS: [residential_address, postal_address, street_address, address]
+  DOB: [date_of_birth, dob]
+  ID: [passport_number, visa_grant_number, student_id, coe_number, coe_code, abn, tfn]
+
+# Fields used to compute the coarse location_class BEFORE redaction.
+location_fields:
+  address: [residential_address, address, street_address]
+  country: [residential_country, country_of_residence, country]
+
+# Never redact these (matched case-insensitively; a detection overlapping an
+# allowlisted phrase is dropped). Entries starting with "re:" are regexes.
+allowlist:
+  # NT education providers (S1 reference list)
+  - AUSTRALIAN CITY INTERNATIONAL COLLEGE
+  - Alana Kaye College
+  - Alice Springs College of Australia
+  - Canterbury Institute of Management
+  - Charles Darwin University
+  - CDU
+  - Darwin City College
+  - FLINDERS UNIVERSITY
+  - Fox Education and Consultancy
+  - INTERNATIONAL COLLEGE OF ADVANCED EDUCATION
+  - KORMILDA COLLEGE LTD
+  - Kormilda College
+  - Latitude College
+  - St John's Catholic College
+  - "St John’s Catholic College"
+  # Course names (any "Bachelor/Master/Diploma/Certificate of|in ...")
+  - 're:\b(?:Bachelor|Master|Graduate Diploma|Graduate Certificate|Advanced Diploma|Diploma|Certificate\s+[IV]+|Associate Degree|Doctor)\s+(?:of|in)\s+[A-Z][\w&()'' -]{2,60}'
+  # Visa and scholarships
+  - 're:\bsubclass\s+[0-9]{3}\b'
+  - Student Visa
+  - CDU Global Merit Scholarship
+  - "Study in Australia's Northern Territory Scholarship"
+  - International Student Accommodation Grant
+  - Study NT
+  # NT and Australian places (rules need them; they are not personal)
+  - Northern Territory
+  - Darwin
+  - Palmerston
+  - Alice Springs
+  - Katherine
+  - Tennant Creek
+  - Nhulunbuy
+  - Jabiru
+  - Casuarina
+  - Top End
+  - Australia
+  - New Zealand
+  # Common words the NER model sometimes tags as a person
+  - Year 12
+  - IELTS
+  - PTE
+  - TOEFL
+
+# Always redact these values wherever they appear (added by an officer if a
+# leak is found). Each entry: {value: "...", type: PERSON}.
+denylist: []
+
+# Countries are kept (rules need the country of residence and nationality).
+countries: [Afghanistan, Albania, Algeria, Andorra, Angola, Argentina, Armenia, Australia, Austria, Azerbaijan, Bahamas,
+  Bahrain, Bangladesh, Barbados, Belarus, Belgium, Belize, Benin, Bhutan, Bolivia, Bosnia and Herzegovina, Botswana, Brazil,
+  Brunei, Bulgaria, Burkina Faso, Burundi, Cambodia, Cameroon, Canada, Cape Verde, Chad, Chile, China, Colombia, Comoros, Congo,
+  Costa Rica, Croatia, Cuba, Cyprus, Czech Republic, Czechia, Denmark, Djibouti, Dominica, Dominican Republic, Ecuador, Egypt,
+  El Salvador, Eritrea, Estonia, Eswatini, Ethiopia, Fiji, Finland, France, Gabon, Gambia, Georgia, Germany, Ghana, Greece,
+  Grenada, Guatemala, Guinea, Guyana, Haiti, Honduras, Hong Kong, Hungary, Iceland, India, Indonesia, Iran, Iraq, Ireland,
+  Israel, Italy, Jamaica, Japan, Jordan, Kazakhstan, Kenya, Kiribati, Korea, South Korea, Kuwait, Kyrgyzstan, Laos, Latvia,
+  Lebanon, Lesotho, Liberia, Libya, Lithuania, Luxembourg, Macau, Madagascar, Malawi, Malaysia, Maldives, Mali, Malta,
+  Marshall Islands, Mauritius, Mexico, Micronesia, Moldova, Mongolia, Montenegro, Morocco, Mozambique, Myanmar, Namibia,
+  Nauru, Nepal, Netherlands, New Zealand, Nicaragua, Niger, Nigeria, North Macedonia, Norway, Oman, Pakistan, Palau,
+  Palestine, Panama, Papua New Guinea, Paraguay, Peru, Philippines, Poland, Portugal, Qatar, Romania, Russia, Rwanda, Samoa,
+  Saudi Arabia, Senegal, Serbia, Seychelles, Sierra Leone, Singapore, Slovakia, Slovenia, Solomon Islands, Somalia,
+  South Africa, South Sudan, Spain, Sri Lanka, Sudan, Suriname, Sweden, Switzerland, Syria, Taiwan, Tajikistan, Tanzania,
+  Thailand, Timor-Leste, East Timor, Togo, Tonga, Trinidad and Tobago, Tunisia, Turkey, Turkiye, Turkmenistan, Tuvalu,
+  Uganda, Ukraine, United Arab Emirates, UAE, United Kingdom, UK, United States, USA, Uruguay, Uzbekistan, Vanuatu, Venezuela,
+  Vietnam, Viet Nam, Yemen, Zambia, Zimbabwe]

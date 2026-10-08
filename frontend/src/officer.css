@@ -35,3 +35,15 @@
 .decision-card .statement { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); color: inherit; }
 .decision-card .button-primary:not(:disabled) { background: var(--blue); border-color: var(--blue); }
 .decision-card .button-primary:not(:disabled):hover { background: var(--blue-dark); }
+
+/* Logos: Grantie (product) on the dark sidebar; Study NT (program) on white tiles. */
+.workspace-brand.brand-grantie { margin: 0 6px 30px; display: block; }
+.workspace-brand.brand-grantie img { width: 100%; max-width: 190px; height: auto; padding: 0; border-radius: 0; background: none; object-fit: contain; }
+.partner-tile { display: grid; gap: 6px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: white; }
+.partner-tile small { color: var(--muted); font-size: 12px; line-height: 16px; }
+.partner-tile img { width: 100%; max-width: 150px; height: auto; }
+.login-logos { display: grid; justify-items: center; gap: 8px; margin-bottom: 8px; text-align: center; }
+.login-grantie { width: 260px; max-width: 100%; height: auto; }
+.login-for { color: var(--muted); font-size: 14px; }
+.login-studynt { width: 150px; height: auto; }
+.letter-logo { width: 120px; height: auto; flex: none; }

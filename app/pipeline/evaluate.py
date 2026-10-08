@@ -30,6 +30,24 @@ def _llm_failure(rule: Rule, exc: Exception | str) -> Finding:
     )
 
 
+def evidence_from_referees(rule: Rule, referees: list | None) -> Finding:
+    """M2: supporting evidence = the facts and quotes extracted from each referee letter (no AI judgement)."""
+    letters = referees or []
+    failed = [l for l in letters if l.error]
+    if failed:
+        return _llm_failure(rule, failed[0].error)
+    quotes: list[dict] = []
+    for l in letters:
+        for key in ("referee_name", "position", "organisation", "relationship", "length_of_association"):
+            f = l.fields.get(key)
+            if f and f.source_quote:
+                quotes.append({"quote": f.source_quote, "source": f.source, "label": key.replace("_", " "),
+                               "display": l.restore(f.source_quote)})
+        quotes.extend({**h, "label": "about the applicant", "display": l.restore(h["quote"])} for h in l.highlights)
+    return Finding(rule_id=rule.id, rule_code=rule.rule_code, ai_status="Evidence only", supporting_quotes=quotes,
+                   check_source=rule.check_method, is_valid=True)
+
+
 def evaluate_evidence_only(llm: LLMClient | None, rule: Rule, redacted_text: str, pack_version: str) -> Finding:
     if llm is None:
         return _llm_failure(rule, "no LLM configured")
@@ -88,13 +106,21 @@ def evaluate_rules(
     documents: DocumentChecks,
     register_rows: list[dict],
     grant_program_id: str | None = None,
+    application: dict | None = None,
+    reference_lists: dict | None = None,
+    referees: list | None = None,
+    raw_documents: list[dict] | None = None,
 ) -> list[Finding]:
     findings: list[Finding] = []
     for rule in rules:
-        if rule.evidence_only:
+        if rule.evidence_only and rule.params.get("evidence_source") == "referee_letters":
+            findings.append(evidence_from_referees(rule, referees))
+        elif rule.evidence_only:
             findings.append(evaluate_evidence_only(llm, rule, redacted_text, pack_version))
         elif rule.check_method == "code":
-            findings.append(run_code_check(CodeContext(rule, facts, documents, register_rows, grant_program_id)))
+            ctx = CodeContext(rule, facts, documents, register_rows, grant_program_id, application or {},
+                              reference_lists or {}, referees, raw_documents or [])
+            findings.append(run_code_check(ctx))
         else:
             findings.append(evaluate_llm_rule(llm, rule, redacted_text, pack_version))
     return findings

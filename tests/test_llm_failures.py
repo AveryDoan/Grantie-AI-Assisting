@@ -101,3 +101,20 @@ def test_judgement_failure_stays_evidence_only(scripted):
     llm, _ = scripted(lambda p, s: LLMError("down"))
     f = evaluate_evidence_only(llm, JUDGEMENT, TEXT, "v1")
     assert f.ai_status == "Evidence only" and f.error_flag and not f.is_valid
+
+
+def test_overloaded_503_is_retried_with_backoff():
+    from app.llm import LLMOverloaded
+
+    answers = iter([LLMOverloaded("503"), json.dumps(MET)])
+
+    def respond(p, s):
+        a = next(answers)
+        if isinstance(a, Exception):
+            raise a
+        return a
+
+    sleeps = []
+    llm = LLMClient(ScriptedProvider(respond), temperature=0.0, sleep=sleeps.append)
+    assert llm.call_llm(rule_prompt(RULE, TEXT, "v1"), RuleAssessmentOut).status == "Met"
+    assert len(sleeps) == 1

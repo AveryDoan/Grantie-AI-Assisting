@@ -24,9 +24,22 @@ from app.pipeline.parsing import date_candidates, parse_date
 
 _TYPE_KEYWORDS: dict[DocType, list[str]] = {
     "coe": ["confirmation of enrolment", "confirmation of enrollment", "coe code", "cricos", "course start date"],
+    "offer_letter": ["letter of offer", "offer of a place", "pleased to offer", "entry requirements", "offer letter"],
     "visa": ["visa grant", "visa subclass", "grant notice", "visa expiry", "must not arrive after", "stay until"],
     "travel_document": ["passport", "travel document", "nationality", "place of birth", "document number"],
+    "travel_booking": ["booking reference", "itinerary", "e-ticket", "passenger", "flight number", "booking confirmation"],
+    "referee_letter": ["to whom it may concern", "referee", "i have known", "letter of reference", "reference letter"],
+    "headshot": ["headshot", "photograph"],
 }
+# Checked first: a screenshot of a flight search is not a booking, and a
+# translation of a letter is a translation, whatever else it mentions.
+_PRIORITY_TYPES: list[tuple[DocType, list[str]]] = [
+    ("certified_translation", ["certified translation", "naati", "true and accurate translation"]),
+    ("flight_screenshot", ["screenshot", "search results", "select your flight"]),
+]
+_ENGLISH_WORDS = frozenset(
+    "the and of to in is for this that with you i we a an are was be have has on at as by from it my our your".split()
+)
 
 _DECLARED_ALIASES: dict[str, DocType] = {
     "coe": "coe",
@@ -37,6 +50,22 @@ _DECLARED_ALIASES: dict[str, DocType] = {
     "passport": "travel_document",
     "travel document": "travel_document",
     "travel_document": "travel_document",
+    "offer letter": "offer_letter",
+    "offer_letter": "offer_letter",
+    "letter of offer": "offer_letter",
+    "booking": "travel_booking",
+    "travel booking": "travel_booking",
+    "travel_booking": "travel_booking",
+    "itinerary": "travel_booking",
+    "flight booking": "travel_booking",
+    "referee letter": "referee_letter",
+    "referee_letter": "referee_letter",
+    "reference letter": "referee_letter",
+    "headshot": "headshot",
+    "photo": "headshot",
+    "translation": "certified_translation",
+    "certified translation": "certified_translation",
+    "certified_translation": "certified_translation",
 }
 
 _FIELD_ALIASES: dict[str, str] = {
@@ -72,16 +101,29 @@ _FIELD_ALIASES: dict[str, str] = {
     "date of expiry": "document_expiry_date",
     "expiry date": "document_expiry_date",
     "nationality": "nationality",
+    "study load": "study_load",
+    "attendance": "study_load",
+    "booking reference": "booking_reference",
+    "arrival": "arrival_date",
+    "arrival date": "arrival_date",
+    "arrives": "arrival_date",
 }
 
 DOC_LABEL_SHORT: dict[str, str] = {
     "coe": "a Confirmation of Enrolment (CoE)",
     "visa": "a visa grant notice",
     "travel_document": "a passport or travel document",
+    "offer_letter": "a letter of offer",
+    "travel_booking": "a travel booking or itinerary",
+    "flight_screenshot": "a screenshot of a flight (not a booking)",
+    "referee_letter": "a referee letter",
+    "headshot": "a headshot photo",
+    "certified_translation": "a certified translation",
     "other": "another kind of document",
 }
 
 DATE_FIELDS = {
+    "arrival_date",
     "date_of_birth",
     "course_start_date",
     "course_end_date",
@@ -105,9 +147,31 @@ def normalise_declared(declared: str) -> DocType:
 
 def classify(text: str) -> DocType:
     lowered = text.lower()
+    for doc_type, keywords in _PRIORITY_TYPES:
+        if any(kw in lowered for kw in keywords):
+            return doc_type
     scores = {t: sum(1 for kw in kws if kw in lowered) for t, kws in _TYPE_KEYWORDS.items()}
     best = max(scores, key=lambda t: scores[t])
     return best if scores[best] > 0 else "other"
+
+
+def is_english(text: str, *, min_words: int = 20, threshold: float = 0.06) -> bool | None:
+    """Rough check that a text is in English. Code-only; an officer verifies translations.
+
+    - many words with accented or non-Latin letters -> not English;
+    - otherwise English if common English words are frequent enough, or if the
+      text is mostly "Label: value" lines (forms, bookings, CoEs);
+    - None when there is too little text to tell.
+    """
+    words = re.findall(r"[^\W\d_]+", text.lower())
+    if len(words) < min_words:
+        return None
+    if sum(any(ord(ch) > 127 for ch in w) for w in words) / len(words) > 0.2:
+        return False
+    if sum(w in _ENGLISH_WORDS for w in words) / len(words) >= threshold:
+        return True
+    labelled = sum(1 for line in text.splitlines() if re.match(r"^\s*[A-Za-z][A-Za-z ()/-]{1,40}:\s*\S", line))
+    return labelled >= 3
 
 
 def extract_fields(text: str) -> dict[str, str]:
@@ -118,7 +182,11 @@ def extract_fields(text: str) -> dict[str, str]:
         label, _, value = line.partition(":")
         key = _FIELD_ALIASES.get(re.sub(r"\s+", " ", label.strip().lower()))
         if key and value.strip() and key not in fields:
-            fields[key] = value.strip()
+            value = value.strip()
+            if key == "arrival_date":  # e.g. "Darwin (DRW) 20 September 2026 14:05"
+                m = re.search(r"(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4})", value)
+                value = m.group(1) if m else value
+            fields[key] = value
     if "full_name" not in fields and ("given_names" in fields or "family_name" in fields):
         fields["full_name"] = " ".join(x for x in (fields.get("given_names"), fields.get("family_name")) if x)
     for k in DATE_FIELDS & fields.keys():

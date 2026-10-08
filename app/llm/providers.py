@@ -11,6 +11,7 @@ from app.llm.base import (
     LLMError,
     LLMInvalidOutput,
     LLMNotConfigured,
+    LLMOverloaded,
     LLMRateLimited,
     LLMTimeout,
     Prompt,
@@ -48,6 +49,8 @@ class GeminiProvider:
         except errors.APIError as exc:
             if exc.code == 429:
                 raise LLMRateLimited("Gemini rate limit (429)") from None
+            if exc.code in (500, 502, 503):
+                raise LLMOverloaded(f"Gemini temporarily unavailable ({exc.code})") from None
             if exc.code in (408, 504):
                 raise LLMTimeout(f"Gemini timeout ({exc.code})") from None
             raise LLMError(f"Gemini API error {exc.code}") from None
@@ -95,6 +98,8 @@ class GroqProvider:
             raise LLMError(f"Groq transport error: {type(exc).__name__}") from None
         if r.status_code == 429:
             raise LLMRateLimited("Groq rate limit (429)")
+        if r.status_code in (500, 502, 503):
+            raise LLMOverloaded(f"Groq temporarily unavailable ({r.status_code})")
         if r.status_code >= 400:
             raise LLMError(f"Groq API error {r.status_code}")
         try:

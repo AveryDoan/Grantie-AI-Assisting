@@ -67,6 +67,7 @@ def ensure_users(store: Any, password: str | None) -> dict[str, str]:
     """Create demo auth users in Supabase (admin API) and set their roles."""
     client = store.client
     password = password or secrets.token_urlsafe(12)
+    insert_missing(store, "organisations", data.ORG)  # profiles reference it
     ids: dict[str, str] = {}
     existing = {u.email: u.id for u in client.auth.admin.list_users()}
     for role, email in DEMO_USERS.items():
@@ -106,13 +107,30 @@ def seed(store: Any, *, demo_values: bool = True, user_ids: dict[str, str] | Non
                     insert_missing(store, "rules", rule)
             store.update("rule_packs", {"status": "approved", "approved_by": admin_id, "approved_at": now},
                          eq={"id": pack["id"]})
+        # One active pack per program: older approved versions are retired (kept for history).
+        for other in store.select("rule_packs", eq={"grant_program_id": pack["grant_program_id"], "status": "approved"}):
+            if other["id"] != pack["id"]:
+                store.update("rule_packs", {"status": "retired"}, eq={"id": other["id"]})
+
+    for lst in data.REFERENCE_LISTS:
+        existing = store.select("reference_lists", eq={"name": lst["name"]}, limit=1)
+        if not existing:
+            store.insert("reference_lists", lst)
+        elif lst["items"] and existing[0].get("items") != lst["items"]:
+            store.update("reference_lists", {"items": lst["items"], "source": lst["source"]}, eq={"name": lst["name"]})
 
     app_ids: dict[str, str] = {}
     for case in data.CASES:
         applicant_id = sid(f"applicant:{case['code']}")
+        demo_user = user_ids.get("applicant") if case["code"] == "N01" else None
+        if demo_user:
+            # The demo applicant login owns one record: move it from any older demo case.
+            for other in store.select("applicants", eq={"user_id": demo_user}):
+                if other["id"] != applicant_id:
+                    store.update("applicants", {"user_id": None}, eq={"id": other["id"]})
         insert_missing(store, "applicants", {
             "id": applicant_id,
-            "user_id": user_ids.get("applicant") if case["code"] == "S01" else None,
+            "user_id": demo_user,
             "display_name": case["display_name"],
             "organisation_name": case["organisation_name"],
             "email": case["email"],
@@ -126,7 +144,7 @@ def seed(store: Any, *, demo_values: bool = True, user_ids: dict[str, str] | Non
             "applicant_id": applicant_id,
             "application_text": case["application_text"],
             "status": "submitted",
-            "submitted_at": now,
+            "submitted_at": case.get("submitted_at") or now,
             "language_style_tag": case["style"],
         })
         for i, (declared, text) in enumerate(case["documents"]):
@@ -141,11 +159,14 @@ def seed(store: Any, *, demo_values: bool = True, user_ids: dict[str, str] | Non
                 "is_sample": True,
             })
             _upload(store, f"{app_id}/{file_name}", text)
-        for j, status in enumerate(case["register"]):
+        for j, rec in enumerate(case["register"]):
+            status = rec["status"]
             insert_missing(store, "mock_grants_register", {
                 "id": sid(f"register:{case['code']}:{j}"),
                 "applicant_id": applicant_id,
-                "grant_program_id": case["program"],
+                "grant_program_id": rec.get("program"),
+                "record_type": rec["record_type"],
+                "record_name": rec["record_name"],
                 "status": status,
                 "start_date": date(2025, 1 + j, 1).isoformat(),
                 "end_date": date(2027, 1, 1).isoformat() if status == "active" else date(2025, 12, 31).isoformat(),
@@ -202,6 +223,9 @@ def main() -> None:
     print("Placeholders used (replace with real values from the guidelines):")
     for ph, where in data.PLACEHOLDERS.items():
         print(f"  {ph:32} {where}")
+    print("Assumptions to confirm (Study NT v2):")
+    for code, text in data.ASSUMPTIONS.items():
+        print(f"  {code:6} {text}")
 
 
 if __name__ == "__main__":

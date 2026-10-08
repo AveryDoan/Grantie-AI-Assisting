@@ -12,7 +12,10 @@ Confidence = Literal["high", "medium", "low"]
 RuleType = Literal["factual", "document_based", "cross_application", "judgement"]
 CheckMethod = Literal["llm", "code", "human_only"]
 ReviewAction = Literal["confirm", "override", "ask_applicant"]
-DocType = Literal["coe", "visa", "travel_document", "other"]
+DocType = Literal[
+    "coe", "visa", "travel_document", "offer_letter", "travel_booking", "flight_screenshot",
+    "referee_letter", "headshot", "certified_translation", "other",
+]
 Role = Literal["officer", "applicant", "admin"]
 
 NOT_STATED = "not stated"

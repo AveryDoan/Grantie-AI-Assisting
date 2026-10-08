@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.config import Settings
@@ -25,6 +25,7 @@ from app.pipeline.facts import FactSet, extract_facts
 from app.pipeline.injection import InjectionFlag, screen_application
 from app.pipeline.prompts import PROMPT_VERSION
 from app.pipeline.redaction import RedactionResult, redact
+from app.pipeline.referees import extract_referee_letters
 from app.pipeline.rules_loader import RulePackError, RulePackNotApproved, load_rule_pack
 from app.pipeline.verification import verify_findings
 from app.services.access import Actor, application_for_staff
@@ -35,6 +36,23 @@ from app.store.base import Store, now_iso, one
 log = get_logger(__name__)
 
 ASSESSABLE = ("submitted", "in_review", "awaiting_applicant")
+
+
+REFEREE_CHECKS = {"referee_fields", "referee_dates"}
+
+
+def _needs_referees(pack: RulePack) -> bool:
+    return any(r.params.get("check") in REFEREE_CHECKS or r.params.get("evidence_source") == "referee_letters"
+               for r in pack.rules)
+
+
+def load_reference_lists(store: Store, pack: RulePack) -> dict[str, list[str] | None]:
+    """Official lookup lists named by the pack's rules. Missing = not loaded."""
+    names = sorted({r.params["list"] for r in pack.rules if r.params.get("list")})
+    if not names:
+        return {}
+    rows = {row["name"]: row.get("items") or [] for row in store.select("reference_lists", in_={"name": names})}
+    return {n: rows.get(n) for n in names}
 
 
 @dataclass
@@ -48,13 +66,19 @@ class AssessmentOutcome:
     input_hash: str
     model_name: str
     prompt_version: str
+    referees: list = field(default_factory=list)
 
 
 def compute_input_hash(
-    redacted_text: str, documents: list[dict[str, Any]], pack_version: str, model_name: str, consistency: bool
+    redacted_text: str, documents: list[dict[str, Any]], pack_version: str, model_name: str, consistency: bool,
+    reference_lists: dict[str, Any] | None = None, register_rows: list[dict[str, Any]] | None = None,
 ) -> str:
+    """Changes whenever anything that can change a finding changes."""
     docs = sorted((d.get("id", ""), d.get("declared_type", ""), d.get("extracted_text") or "") for d in documents)
-    payload = json.dumps([redacted_text, docs, pack_version, PROMPT_VERSION, model_name, consistency], ensure_ascii=False)
+    register = sorted((r.get("record_type", ""), r.get("record_name") or "", r.get("status", ""), str(r.get("grant_program_id")))
+                      for r in register_rows or [])
+    payload = json.dumps([redacted_text, docs, pack_version, PROMPT_VERSION, model_name, consistency,
+                          reference_lists or {}, register], ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -72,6 +96,7 @@ def assess_application(
     settings: Settings,
     applicant: dict[str, Any] | None = None,
     consistency: bool | None = None,
+    reference_lists: dict[str, list[str] | None] | None = None,
 ) -> AssessmentOutcome:
     # Defence in depth: the API and the database both refuse too.
     if application.get("manual_assessment_requested"):
@@ -92,6 +117,11 @@ def assess_application(
     facts = extract_facts(
         llm, pack.rules, typed, redaction.text, pack.version, threshold=settings.quote_fuzzy_threshold
     )
+    referees: list = []
+    if _needs_referees(pack):
+        letters = [d for d in documents if any(c.document_id == d["id"] and c.detected_type == "referee_letter" for c in doc_checks.checks)]
+        referees = extract_referee_letters(llm, letters, pack.version, applicant_names=_applicant_names(applicant),
+                                           threshold=settings.quote_fuzzy_threshold)
     findings = evaluate_rules(
         llm,
         pack.rules,
@@ -101,6 +131,10 @@ def assess_application(
         documents=doc_checks,
         register_rows=register_rows,
         grant_program_id=application.get("grant_program_id"),
+        application=application,
+        reference_lists=reference_lists or {},
+        referees=referees,
+        raw_documents=documents,
     )
     if use_consistency:
         findings = consistency_check(llm, pack.rules, findings, redaction.text, pack.version)
@@ -110,6 +144,7 @@ def assess_application(
         redaction.text,
         threshold=settings.quote_fuzzy_threshold,
         min_fuzzy_length=settings.quote_min_fuzzy_length,
+        extra_sources={f"document:{r.document_id}": r.redacted_text for r in referees},
     )
     if flags:
         # Instruction-like text was found: never let it raise confidence.
@@ -124,9 +159,11 @@ def assess_application(
         document_checks=doc_checks,
         facts=facts,
         findings=findings,
-        input_hash=compute_input_hash(redaction.text, documents, pack.version, model_name, use_consistency),
+        input_hash=compute_input_hash(redaction.text, documents, pack.version, model_name, use_consistency,
+                                      reference_lists, register_rows),
         model_name=model_name,
         prompt_version=PROMPT_VERSION,
+        referees=referees,
     )
 
 
@@ -169,7 +206,9 @@ def run_assessment(
 
     # Idempotency: same inputs -> same run (reviews are kept).
     redacted_preview = redact(app.get("application_text") or {}, extra_names=_applicant_names(applicant)).text
-    input_hash = compute_input_hash(redacted_preview, documents, pack.version, model_name, use_consistency)
+    reference_lists = load_reference_lists(store, pack)
+    input_hash = compute_input_hash(redacted_preview, documents, pack.version, model_name, use_consistency,
+                                    reference_lists, register_rows)
     if not force:
         previous = store.select(
             "assessment_runs",
@@ -208,6 +247,7 @@ def run_assessment(
             settings=settings,
             applicant=applicant,
             consistency=use_consistency,
+            reference_lists=reference_lists,
         )
         _persist(store, app, run, outcome, documents)
     except Exception as exc:
@@ -269,7 +309,7 @@ def _persist(
             "quote_verified": f.quote_verified,
             "source": f.source,
         }
-        for f in outcome.facts.facts.values()
+        for f in [*outcome.facts.facts.values(), *(f for r in outcome.referees for f in r.fields.values())]
     ]
     if fact_rows:
         store.insert("fact_extractions", fact_rows)

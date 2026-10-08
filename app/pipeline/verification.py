@@ -59,8 +59,13 @@ def verify_findings(
     *,
     threshold: float = 92.0,
     min_fuzzy_length: int = 12,
+    extra_sources: dict[str, str] | None = None,
 ) -> list[Finding]:
-    """Verify quotes and completeness. Returns exactly one finding per rule."""
+    """Verify quotes and completeness. Returns exactly one finding per rule.
+
+    Supporting quotes tagged with a `source` (e.g. "document:<id>" for a
+    referee letter) are checked against that source's text instead.
+    """
     by_rule: dict[str, Finding] = {}
     duplicates: set[str] = set()
     for f in findings:
@@ -89,7 +94,8 @@ def verify_findings(
                 f.error_detail = (f.error_detail + "; " if f.error_detail else "") + "Quote not found in the application text"
         if f.supporting_quotes:
             for sq in f.supporting_quotes:
-                qc = verify_quote(sq.get("quote"), source, threshold=threshold, min_fuzzy_length=min_fuzzy_length)
+                text = (extra_sources or {}).get(sq.get("source") or "", source)
+                qc = verify_quote(sq.get("quote"), text, threshold=threshold, min_fuzzy_length=min_fuzzy_length)
                 sq["verified"] = qc.verified
                 sq["method"] = qc.method
             if not all(sq["verified"] for sq in f.supporting_quotes):

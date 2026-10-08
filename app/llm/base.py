@@ -39,6 +39,10 @@ class LLMRateLimited(LLMError):
     pass
 
 
+class LLMOverloaded(LLMRateLimited):
+    """Provider temporarily unavailable (HTTP 500/502/503): back off and retry like a 429."""
+
+
 class LLMTimeout(LLMError):
     pass
 

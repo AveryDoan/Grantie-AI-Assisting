@@ -92,15 +92,22 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
 export function useLoad<T>(loader: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let live = true;
     setError(null);
-    loader().then((d) => live && setData(d)).catch((e) => live && setError(e));
+    setLoading(true);
+    loader()
+      .then((d) => live && setData(d))
+      .catch((e) => live && setError(e))
+      .finally(() => live && setLoading(false));
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
-  return { data, error, reload: () => setTick((t) => t + 1) };
+  // `loading` stays true while a reload is in flight, so callers can lock
+  // actions until the screen shows the result of the previous one.
+  return { data, error, loading, reload: () => { setLoading(true); setTick((t) => t + 1); } };
 }
 
 // ---------------------------------------------------------------- helpers

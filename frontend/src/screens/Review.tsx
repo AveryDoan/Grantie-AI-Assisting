@@ -159,14 +159,18 @@ function AskDialog({ detail, finding, onDone, close }: { detail: Detail; finding
 
 // ---------------------------------------------------------------- rule card
 
-function Quote({ text, verified }: { text: string; verified: boolean }) {
+function Quote({ text, verified, fromDocument, label }: { text: string; verified: boolean; fromDocument?: boolean; label?: string }) {
+  const where = fromDocument ? "referee letter" : "application";
   return (
     <blockquote className={verified ? "" : "quote-unverified"}>
+      {label && <small className="check-source">{humanise(label)}</small>}
       <span className="quote-mark">“</span>{text}
-      <footer><Icon name={verified ? "check" : "close"} size={15} />{verified ? "Verified in application" : "Not found in the application – do not rely on this quote"}</footer>
+      <footer><Icon name={verified ? "check" : "close"} size={15} />{verified ? `Verified in ${where}` : `Not found in the ${where} – do not rely on this quote`}</footer>
     </blockquote>
   );
 }
+
+const SECTION_LABEL: Record<string, string> = { eligibility: "Eligibility", documents: "Document", merit: "Merit" };
 
 function RuleCard({
   f, index, total, locked, onDialog, onConfirm, busy,
@@ -198,7 +202,8 @@ function RuleCard({
     <article id={`rule-${f.rule_code}`} className={`rule-card ${expanded ? "expanded" : ""}`}>
       <button className="rule-head" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
         <span className="rule-number">{decided ? <Icon name="check" size={16} /> : index}</span>
-        <span className="rule-title"><strong>{f.rule_text}</strong><small>Rule {f.rule_code} · {index} of {total}{asked ? " · Waiting for applicant" : ""}</small></span>
+        <span className="rule-title"><strong>{f.rule_text}</strong>
+          <small>{f.section ? `${SECTION_LABEL[f.section] ?? f.section} · ` : ""}Rule {f.rule_code} · {index} of {total}{asked ? " · Waiting for applicant" : ""}</small></span>
         <StatusChip status={effectiveStatus(f)} />
         <span className={expanded ? "rotate" : ""}><Icon name="chevron" /></span>
       </button>
@@ -211,10 +216,15 @@ function RuleCard({
             </div>
           )}
           {judgement && <div className="judgement-note"><Icon name="user" /><strong>Officer judgement required – no AI suggestion</strong></div>}
+          {f.weight != null && (
+            <div className="notice"><Icon name="info" />Weight on the application form: {f.weight}%. Shown for reference only – this system never adds up or scores merit.</div>
+          )}
 
           {judgement ? (
             f.supporting_quotes_restored.length ? (
-              f.supporting_quotes_restored.map((q, i) => <Quote key={i} text={q.quote} verified={!!q.verified} />)
+              f.supporting_quotes_restored.map((q, i) => (
+                <Quote key={i} text={q.quote} verified={!!q.verified} fromDocument={q.source?.startsWith("document:")} label={q.label} />
+              ))
             ) : <p className="explanation">No passages were found for this criterion. Read the full application.</p>
           ) : quote ? (
             <Quote text={quote} verified={f.quote_verified} />
@@ -243,8 +253,8 @@ function RuleCard({
           {!locked && (
             <div className="rule-actions">
               <Button icon="check" disabled={busy || confirmDisabled} onClick={confirmAction} title={confirmTitle}>{confirmLabel}</Button>
-              {!judgement && <Button variant="secondary" icon="edit" onClick={() => onDialog({ kind: "override", finding: f })}>Override</Button>}
-              <Button variant="quiet" icon="send" onClick={() => onDialog({ kind: "ask", finding: f })}>Ask applicant</Button>
+              {!judgement && <Button variant="secondary" icon="edit" disabled={busy} onClick={() => onDialog({ kind: "override", finding: f })}>Override</Button>}
+              <Button variant="quiet" icon="send" disabled={busy} onClick={() => onDialog({ kind: "ask", finding: f })}>Ask applicant</Button>
             </div>
           )}
         </div>
@@ -322,7 +332,7 @@ function ApplicationText({ detail, tab, setTab, openDoc }: { detail: Detail; tab
 // ---------------------------------------------------------------- page
 
 export default function Review({ id, navigate }: { id: string; navigate: Navigate }) {
-  const { data: detail, error, reload } = useLoad(() => api.detail(id), [id]);
+  const { data: detail, error, loading, reload } = useLoad(() => api.detail(id), [id]);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -342,6 +352,9 @@ export default function Review({ id, navigate }: { id: string; navigate: Navigat
   const counts = (s: string) => findings.filter((f) => effectiveStatus(f) === s).length;
   const flags = detail.latest_run?.injection_flags ?? [];
 
+  // Lock every action until the reload after the previous one has finished,
+  // so a decision cannot be submitted twice against a stale screen.
+  const locking = busy || loading;
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setActionError(null);
@@ -410,13 +423,13 @@ export default function Review({ id, navigate }: { id: string; navigate: Navigat
           )}
           {total > 0 && <div className="notice blue"><Icon name="info" />Unclear items, missing evidence and unverified findings appear first. Check the applicant’s words before you decide.</div>}
           {open.map((f) => (
-            <RuleCard key={f.id} f={f} index={indexOf(f)} total={total} locked={locked} busy={busy} onDialog={setDialog} onConfirm={confirm} />
+            <RuleCard key={f.id} f={f} index={indexOf(f)} total={total} locked={locked} busy={locking} onDialog={setDialog} onConfirm={confirm} />
           ))}
           {decided.length > 0 && !showDecided && (
             <button className="show-more" onClick={() => setShowDecided(true)}>Show {decided.length} decided rule{decided.length === 1 ? "" : "s"} <Icon name="chevron" /></button>
           )}
           {showDecided && decided.map((f) => (
-            <RuleCard key={f.id} f={f} index={indexOf(f)} total={total} locked={locked} busy={busy} onDialog={setDialog} onConfirm={confirm} />
+            <RuleCard key={f.id} f={f} index={indexOf(f)} total={total} locked={locked} busy={locking} onDialog={setDialog} onConfirm={confirm} />
           ))}
         </section>
 

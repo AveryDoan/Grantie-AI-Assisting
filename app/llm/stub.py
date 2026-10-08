@@ -32,6 +32,16 @@ _HINTS: dict[str, dict[str, list[str]]] = {
         "positive": ["Darwin", "Alice Springs", "Katherine", "Palmerston", "Tennant Creek", "Northern Territory", "in the NT"],
     },
     "SNT-R7": {"evidence": ["community", "volunteer", "contribute", "help other"]},
+    # Study NT v2
+    "SNT-S8": {
+        "field": ["current_study"],
+        "negative": ["Charles Darwin University", "studying with an NT provider", "enrolled at CDU", "study at CDU"],
+        "positive": ["secondary school", "high school", "Year 12", "not studying", "working as"],
+    },
+    "SNT-S4": {"evidence": ["IELTS", "English entry", "entry requirement", "academic requirement"]},
+    "SNT-M1": {"evidence": ["average", "prize", "examination", "exam", "grades", "results"]},
+    "SNT-M3": {"evidence": ["lead", "leader", "led", "coordinator", "organised", "organise"]},
+    "SNT-M4": {"evidence": ["volunteer", "community", "clinic"]},
     "CBF-C6": {"evidence": ["community", "residents", "benefit", "local people", "elders"]},
 }
 _AMBIGUOUS = ["might", "maybe", "not sure", "planning to", "hope to", "or possibly"]
@@ -40,10 +50,12 @@ _ACT = re.compile(
 )
 
 
-def _sentences(source: str) -> list[str]:
+def _sentences(source: str, fields: list[str] | None = None) -> list[str]:
     out = []
     for line in source.splitlines():
-        _, _, value = line.partition(": ")
+        key, _, value = line.partition(": ")
+        if fields and key not in fields:
+            continue
         for s in re.split(r"(?<=[.!?])\s+", value):
             if s.strip():
                 out.append(s.strip())
@@ -69,8 +81,12 @@ class OfflineStubProvider:
         kind = meta.get("kind")
         if kind == "facts":
             return json.dumps({"facts": [self._fact(k, sentences) for k in meta.get("keys", [])]})
+        if kind == "referee":
+            return json.dumps(self._referee(source))
         code = self._qualified(meta.get("rule_code", ""), prompt)
         hints = _HINTS.get(code, {})
+        if hints.get("field"):
+            sentences = _sentences(source, hints["field"])
         if kind == "evidence":
             quotes = [s for s in sentences if any(re.search(rf"(?<!\w){re.escape(k)}(?!\w)", s, re.I) for k in hints.get("evidence", []))]
             return json.dumps({"supporting_quotes": quotes[:3]})
@@ -80,8 +96,31 @@ class OfflineStubProvider:
 
     @staticmethod
     def _qualified(rule_code: str, prompt: Prompt) -> str:
-        prefix = "SNT" if rule_code.startswith("R") else "CBF"
+        prefix = "CBF" if rule_code.startswith("C") else "SNT"
         return f"{prefix}-{rule_code}"
+
+    _REFEREE_LABELS = {
+        "referee name": "referee_name", "position": "position", "organisation": "organisation",
+        "relationship": "relationship", "known applicant for": "length_of_association",
+        "length of association": "length_of_association", "date": "letter_date", "signature": "signature",
+    }
+
+    @classmethod
+    def _referee(cls, source: str) -> dict[str, Any]:
+        found: dict[str, dict[str, Any]] = {}
+        for line in source.splitlines():
+            label, sep, value = line.partition(":")
+            key = cls._REFEREE_LABELS.get(label.strip().lower())
+            if sep and key and value.strip() and key not in found:
+                found[key] = {"key": key, "value": value.strip(), "quote": line.strip()}
+            if "letterhead" in line.lower() and "letterhead" not in found:
+                found["letterhead"] = {"key": "letterhead", "value": "yes", "quote": line.strip()}
+        keys = ["referee_name", "position", "organisation", "relationship", "length_of_association", "letter_date",
+                "signature", "letterhead"]
+        fields = [found.get(k, {"key": k, "value": "not stated", "quote": None}) for k in keys]
+        highlights = [s for s in re.split(r"(?<=[.!?])\s+", source.replace("\n", " "))
+                      if re.search(r"dedicated|hard-working|excellent|led |organised", s)][:3]
+        return {"fields": fields, "highlights": [h.strip() for h in highlights]}
 
     @staticmethod
     def _fact(key: str, sentences: list[str]) -> dict[str, Any]:

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { api, type Letter } from "../api";
 import type { Navigate } from "../App";
+import studyNtLogo from "../assets/study-nt-logo.svg";
 import { Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../ui";
 
 const LABELS = [
@@ -110,7 +111,7 @@ export default function LetterScreen({ id, navigate }: { id: string; navigate: N
         <div className="letter-layout">
           <section className="letter-paper">
             <div className="letter-mast">
-              <span className="logo-placeholder small">Study NT<br />logo here</span>
+              <img className="letter-logo" src={studyNtLogo} alt="Study NT" />
               <div><strong>{app.program_name}</strong><small>Sample correspondence · fictional</small></div>
             </div>
             {editing

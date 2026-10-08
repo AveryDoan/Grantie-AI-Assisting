@@ -113,6 +113,11 @@ def review_finding(
         if final_status == "Not met" and not reason:
             raise ValidationFailed('A final status of "Not met" always requires a typed reason')
 
+    # Idempotent: repeating the current decision (double click, retry) records nothing new.
+    current = latest_reviews(store, [finding_id]).get(finding_id)
+    if current and (current["action"], current["final_status"], current.get("reason")) == (action, final_status, reason):
+        return current
+
     review = store.insert(
         "officer_reviews",
         {

@@ -22,9 +22,9 @@ from typing import Any
 
 from app.config import Settings
 from app.llm import LLMClient
-from app.pipeline.orchestrator import assess_application
+from app.pipeline.orchestrator import assess_application, load_reference_lists
 from app.pipeline.prompts import PROMPT_VERSION
-from app.pipeline.rules_loader import load_rule_pack
+from app.pipeline.rules_loader import RulePackNotApproved, load_rule_pack
 from app.store.base import Store, one
 
 
@@ -220,7 +220,11 @@ def run_evaluation(
         if app.get("manual_assessment_requested"):
             report.skipped.append({"case_code": case["case_code"], "reason": "manual assessment requested"})
             continue
-        pack = packs.get(app["rule_pack_id"]) or load_rule_pack(store, app["rule_pack_id"])
+        try:
+            pack = packs.get(app["rule_pack_id"]) or load_rule_pack(store, app["rule_pack_id"])
+        except RulePackNotApproved:
+            report.skipped.append({"case_code": case["case_code"], "reason": "rule pack retired (superseded by a newer version)"})
+            continue
         packs[app["rule_pack_id"]] = pack
         outcome = assess_application(
             application=app,
@@ -230,6 +234,7 @@ def run_evaluation(
             llm=llm,
             settings=settings,
             applicant=one(store.select("applicants", eq={"id": app["applicant_id"]}, limit=1)),
+            reference_lists=load_reference_lists(store, pack),
         )
         by_rule = {f.rule_id: f for f in outcome.findings}
         rules = {r.id: r for r in pack.rules}
