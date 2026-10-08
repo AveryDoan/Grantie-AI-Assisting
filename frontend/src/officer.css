@@ -1,0 +1,37 @@
+/* Small additions for states the Figma design did not cover (sign-in, errors,
+   invalid findings, print). Uses the design's tokens from index.css. */
+
+.error-notice { background: var(--red-bg); color: var(--red); }
+.warn-notice { background: var(--amber-bg); color: var(--amber); }
+
+.login-page { padding-top: 64px; }
+.login-panel { display: grid; gap: 16px; padding: 32px; max-width: 520px; margin: 0 auto; }
+.login-panel h1 { margin: 0; }
+.login-form { display: grid; gap: 16px; }
+
+.workspace-brand .logo-placeholder { flex: none; }
+.workspace-sidebar-footer .workspace-link { min-height: 40px; }
+
+.quote-unverified { border-left-color: var(--red) !important; }
+.quote-unverified footer { color: var(--red); }
+.invalid-banner { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--red-bg); color: var(--red); font-weight: 600; }
+.decision-line { font-size: 14px; color: var(--muted); }
+.decision-line strong { color: var(--ink); }
+.check-source { font-size: 13px; color: var(--muted); }
+.doc-text { white-space: pre-wrap; font-size: 13px; background: var(--surface-subtle); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 12px; overflow-x: auto; }
+.empty-state { padding: 32px; text-align: center; color: var(--muted); }
+.statement { font-size: 14px; background: var(--surface-subtle); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; }
+.twins-table td, .twins-table th { white-space: nowrap; }
+
+@media print {
+  .workspace-sidebar, .workspace-topbar, .ai-banner, .quality-panel, .page-heading, .back-link { display: none !important; }
+  .letter-layout, .officer-shell { display: block !important; }
+  .letter-paper { border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+}
+
+/* The sign-off statement sits on the design's dark decision card. */
+.decision-card .statement { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); color: inherit; }
+.decision-card .button-primary:not(:disabled) { background: var(--blue); border-color: var(--blue); }
+.decision-card .button-primary:not(:disabled):hover { background: var(--blue-dark); }

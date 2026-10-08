@@ -1,0 +1,250 @@
+"""FastAPI application: decision support for grants officers.
+
+The AI only suggests. Officers confirm or override every finding and sign
+off every decision. No endpoint returns an eligibility score, a ranking, or
+an approve/reject recommendation, and there is no bulk-approve endpoint.
+
+Run:  uvicorn app.main:app --reload
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import APIRouter, Depends, FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
+
+from app.api.auth import current_actor, get_store_dep
+from app.api.ratelimit import rate_limit
+from app.api.schemas import (
+    AssessRequest,
+    ClarificationRequestIn,
+    DemoLogin,
+    LetterPatch,
+    PrecheckRequest,
+    ReviewRequest,
+    SignOffRequest,
+)
+from app.config import Settings, get_settings
+from app.llm import LLMClient, LLMError, build_llm_client
+from app.llm.cache import StoreCache
+from app.logging_utils import configure_logging, get_logger
+from app.pipeline.orchestrator import run_assessment
+from app.services import audit, letters, precheck, queue, review
+from app.services.access import Actor, require_role
+from app.services.errors import ServiceError
+from app.store.base import Store, StoreError, one
+
+log = get_logger(__name__)
+
+
+def create_app(
+    *,
+    store: Store | None = None,
+    llm_factory: Callable[[Store, Settings], LLMClient | None] | None = None,
+    settings: Settings | None = None,
+) -> FastAPI:
+    settings = settings or get_settings()
+    configure_logging()
+    _store: dict[str, Store] = {}
+
+    demo_users: dict[str, dict] = {}
+    if settings.app_mode == "demo" and store is None:
+        from app.demo import build_demo, demo_llm_factory
+        from app.llm.cache import MemoryCache
+
+        store, settings, demo_users = build_demo(settings)
+        llm_factory = llm_factory or demo_llm_factory(MemoryCache())
+        log.warning("DEMO MODE: in-memory synthetic data and demo logins. Never use with real data.")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # Data retention: purge cached LLM inputs/outputs older than LLM_RETENTION_DAYS.
+        if store is None and settings.supabase_url:
+            try:
+                n = get_store().rpc("purge_expired_llm_data", {"p_retention_days": settings.llm_retention_days})
+                log.info("retention purge removed %s cached LLM rows", n)
+            except Exception:
+                log.warning("retention purge skipped")
+        yield
+
+    app = FastAPI(
+        lifespan=lifespan,
+        title="AI Application for Study NT Grant - officer decision support",
+        version="0.1.0",
+        description="Decision support only. Officers decide. Synthetic data only.",
+    )
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"]
+        )
+
+    def get_store() -> Store:
+        if "s" not in _store:
+            if store is not None:
+                _store["s"] = store
+            else:
+                from app.store.supabase_store import SupabaseStore
+
+                _store["s"] = SupabaseStore(settings)
+        return _store["s"]
+
+    def default_llm_factory(s: Store, cfg: Settings) -> LLMClient | None:
+        return build_llm_client(cfg, cache=StoreCache(s, cfg.llm_retention_days))
+
+    make_llm = llm_factory or default_llm_factory
+
+    app.dependency_overrides[get_store_dep] = get_store
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    @app.exception_handler(ServiceError)
+    async def _service_error(_: Request, exc: ServiceError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"error": exc.code, "message": exc.message, "details": exc.details})
+
+    @app.exception_handler(StoreError)
+    async def _store_error(_: Request, exc: StoreError) -> JSONResponse:
+        # Trigger messages describe the rule that was broken; they contain no personal data.
+        return JSONResponse(status_code=409, content={"error": "rejected_by_database", "message": str(exc)})
+
+    general = Depends(rate_limit("general", "rate_limit_per_minute"))
+    r = APIRouter(dependencies=[general])
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "mode": settings.app_mode}
+
+    if demo_users:
+        from app.demo import demo_token
+
+        @app.post("/demo/login", dependencies=[general])
+        def demo_login(body: DemoLogin) -> dict[str, Any]:
+            user = demo_users.get(body.role)
+            if not user:
+                return JSONResponse(status_code=404, content={"error": "unknown_demo_role"})  # type: ignore[return-value]
+            return {"access_token": demo_token(settings, user["id"]), "role": body.role,
+                    "display_name": user["display_name"], "demo": True}
+
+    @r.get("/me")
+    def me(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        profile = one(s.select("profiles", eq={"id": actor.user_id}, limit=1)) or {}
+        return {"user_id": actor.user_id, "role": actor.role, "display_name": profile.get("display_name"),
+                "organisation_id": actor.organisation_id}
+
+    # ---------------------------------------------------------------- queue
+    @r.get("/applications")
+    def list_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        return queue.list_queue(s, actor)
+
+    @r.post("/applications/precheck")
+    def precheck_application(
+        body: PrecheckRequest, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)
+    ) -> dict[str, Any]:
+        return precheck.precheck(
+            s, actor, grant_program_id=body.grant_program_id, fields=body.fields,
+            documents=[d.model_dump() for d in body.documents],
+        )
+
+    @r.get("/applications/{application_id}")
+    def get_application(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return queue.application_detail(s, actor, application_id)
+
+    # ------------------------------------------------------------ pipeline
+    @r.post("/applications/{application_id}/assess",
+            dependencies=[Depends(rate_limit("assess", "rate_limit_assess_per_minute"))])
+    def assess(
+        application_id: str,
+        body: AssessRequest | None = None,
+        actor: Actor = Depends(current_actor),
+        s: Store = Depends(get_store),
+    ) -> dict[str, Any]:
+        require_role(actor, "officer", "admin")
+        body = body or AssessRequest()
+        try:
+            llm = make_llm(s, settings)
+        except LLMError as exc:
+            return JSONResponse(status_code=503, content={"error": "llm_not_configured", "message": str(exc)})  # type: ignore[return-value]
+        return run_assessment(s, actor, application_id, llm, settings, force=body.force, consistency=body.consistency_check)
+
+    # ------------------------------------------------------- officer review
+    @r.post("/findings/{finding_id}/review")
+    def review_finding(
+        finding_id: str, body: ReviewRequest, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)
+    ) -> dict[str, Any]:
+        return review.review_finding(s, actor, finding_id, action=body.action, final_status=body.final_status, reason=body.reason)
+
+    @r.post("/applications/{application_id}/clarification")
+    def clarification(
+        application_id: str, body: ClarificationRequestIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)
+    ) -> dict[str, Any]:
+        return review.create_clarification(
+            s, actor, application_id, finding_id=body.finding_id, message_text=body.message_text,
+            send=body.send, clarification_id=body.clarification_id,
+        )
+
+    @r.post("/applications/{application_id}/signoff")
+    def signoff(
+        application_id: str, body: SignOffRequest, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)
+    ) -> dict[str, Any]:
+        return review.sign_off(s, actor, application_id, statement_acknowledged=body.statement_acknowledged)
+
+    @r.get("/signoff-statement")
+    def signoff_statement() -> dict[str, str]:
+        return {"statement": review.SIGN_OFF_STATEMENT}
+
+    # -------------------------------------------------------------- letters
+    @r.post("/applications/{application_id}/letter")
+    def generate_letter(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return letters.generate_letter(s, actor, application_id)
+
+    @r.patch("/letters/{letter_id}")
+    def patch_letter(
+        letter_id: str, body: LetterPatch, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)
+    ) -> dict[str, Any]:
+        return letters.update_letter(s, actor, letter_id, body_text=body.body_text, approve=body.approve)
+
+    # ------------------------------------------------------------ applicant
+    @r.post("/applications/{application_id}/request-manual")
+    def request_manual(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return review.request_manual_assessment(s, actor, application_id)
+
+    # ---------------------------------------------------------------- audit
+    @r.get("/audit-log", response_model=None)
+    def audit_log(
+        application_id: str | None = None,
+        action: str | None = None,
+        actor_id: str | None = None,
+        since: str | None = Query(None, description="ISO timestamp"),
+        until: str | None = Query(None, description="ISO timestamp"),
+        limit: int = Query(500, ge=1, le=5000),
+        format: str = Query("json", pattern="^(json|csv)$"),
+        actor: Actor = Depends(current_actor),
+        s: Store = Depends(get_store),
+    ) -> Any:
+        rows = audit.enrich(s, audit.list_audit(s, actor, application_id=application_id, action=action,
+                                                actor_id=actor_id, since=since, until=until, limit=limit))
+        if format == "csv":
+            return PlainTextResponse(audit.to_csv(rows), media_type="text/csv",
+                                     headers={"Content-Disposition": "attachment; filename=audit_log.csv"})
+        return rows
+
+    # ----------------------------------------------------------- evaluation
+    @r.get("/evaluation/latest")
+    def evaluation_latest(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        require_role(actor, "officer", "admin")
+        latest = one(s.select("evaluation_runs", order="started_at", desc=True, limit=1))
+        if not latest:
+            return {"evaluation_run": None, "message": "No evaluation has been run yet (python -m eval.run)"}
+        return {"evaluation_run": latest}
+
+    app.include_router(r)
+    return app
+
+
+def _lazy_app() -> FastAPI:
+    return create_app()
+
+
+app = _lazy_app()

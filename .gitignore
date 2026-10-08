@@ -1,0 +1,27 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# Frontend
+node_modules/
+frontend/dist/
