@@ -25,7 +25,6 @@ SOPL = "nt_skilled_occupation_priority_list"
 TIER_HEADINGS = {"high priority occupations": "High priority", "priority occupations": "Priority"}
 
 _ROW = re.compile(r"^(?P<code>\d{6})\s+(?P<name>.+?)\s+(?P<level>[1-5])\s*$")
-_NOISE = re.compile(r"^(?:\d{4} northern territory|department of|\d{1,2} \w+ \d{4}\s*\|\s*page|page \d+)", re.I)
 
 
 def parse_text(text: str) -> tuple[list[dict[str, Any]], list[str]]:
@@ -35,7 +34,6 @@ def parse_text(text: str) -> tuple[list[dict[str, Any]], list[str]]:
     entries: list[dict[str, Any]] = []
     warnings: list[str] = []
     tier = ""
-    skipped = 0
     for raw in text.splitlines():
         line = re.sub(r"\s+", " ", raw).strip()
         if not line:
@@ -48,10 +46,7 @@ def parse_text(text: str) -> tuple[list[dict[str, Any]], list[str]]:
         if m:
             entries.append({"code": m["code"], "name": m["name"].strip(), "skill_level": int(m["level"]), "tier": tier})
         elif re.match(r"^\d{6}\b", line):
-            skipped += 1
             warnings.append(f"Could not read this row: {line[:80]}")
-        elif not _NOISE.match(line):
-            continue
     if entries:
         return _dedupe(entries, warnings), warnings[:20]
     return _plain(text, warnings)
@@ -59,8 +54,8 @@ def parse_text(text: str) -> tuple[list[dict[str, Any]], list[str]]:
 
 def _plain(text: str, warnings: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
     names: list[str] = []
-    rows = list(csv.reader(io.StringIO(text))) if "," in text.splitlines()[0:1].__str__() and text.count("\n") else None
-    source = [r[0] for r in rows if r] if rows else text.splitlines()
+    first_line = text.splitlines()[0] if text.strip() else ""
+    source = [r[0] for r in csv.reader(io.StringIO(text)) if r] if "," in first_line else text.splitlines()
     for line in source:
         name = re.sub(r"\s+", " ", line).strip(" -•*\t\"")
         if len(name) >= 2 and re.search(r"[A-Za-z]{2}", name):

@@ -145,3 +145,21 @@ def test_evaluation_latest(client, settings, officer, store, stub_llm):
     run_evaluation(store, stub_llm, settings, provider_label="offline stub")
     latest = client.get("/evaluation/latest", headers=h).json()["evaluation_run"]
     assert "twin_consistency_rate" in latest["summary"] and latest["report_markdown"].startswith("# Evaluation report")
+
+
+def test_reference_list_endpoints(client, settings, officer, applicant_actor):
+    h = token(settings, officer.user_id)
+    name = "nt_skilled_occupation_priority_list"
+    lists = {x["name"]: x for x in client.get("/reference-lists", headers=h).json()}
+    assert lists[name]["count"] == 247 and lists[name]["used_by"] == ["S3"]
+    assert any(e["name"] == "Cloud Engineer" for e in client.get(f"/reference-lists/{name}?q=cloud", headers=h).json()["entries"])
+    prev = client.post(f"/reference-lists/{name}/preview", headers=h, json={"text": "111111 Example Worker 2"})
+    assert prev.status_code == 200 and prev.json()["count"] == 1
+    assert client.get(f"/reference-lists/{name}", headers=h).json()["count"] == 247  # preview saved nothing
+    assert client.post(f"/reference-lists/{name}/preview", headers=h, json={"text": " "}).status_code == 422
+    assert client.get("/reference-lists/nope", headers=h).status_code == 404
+    bad = token(settings, applicant_actor.user_id)
+    assert client.get("/reference-lists", headers=bad).status_code == 403
+    assert client.put(f"/reference-lists/{name}", headers=bad, json={"text": "111111 X 2"}).status_code == 403
+    put = client.put(f"/reference-lists/{name}", headers=h, json={"text": "111111 Example Worker 2", "edition": "Test"})
+    assert put.status_code == 200 and put.json()["count"] == 1

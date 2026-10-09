@@ -10,6 +10,7 @@ import Audit from "./screens/Audit";
 import Evaluation from "./screens/Evaluation";
 import AiTrace from "./screens/AiTrace";
 import Pool from "./screens/Pool";
+import Lists from "./screens/Lists";
 import PublicHome from "./screens/PublicHome";
 import ApplicantFlow from "./ApplicantFlow";
 import "./officer.css";
@@ -25,6 +26,7 @@ export type Route =
   | { name: "apply" }
   | { name: "queue"; q?: string }
   | { name: "pool" }
+  | { name: "lists" }
   | { name: "review"; id: string }
   | { name: "trace"; id: string }
   | { name: "signoff"; id: string }
@@ -44,6 +46,7 @@ function parse(hash: string): Route {
   if (parts[0] === "queue") return { name: "queue", q: new URLSearchParams(query).get("q") ?? undefined };
   if (parts[0] === "apply") return { name: "apply" };
   if (parts[0] === "pool") return { name: "pool" };
+  if (parts[0] === "lists") return { name: "lists" };
   if (parts[0] === "audit") return { name: "audit" };
   if (parts[0] === "evaluation") return { name: "evaluation" };
   return { name: "home" };
@@ -54,6 +57,7 @@ export function href(route: Route): string {
     case "home": return "#/";
     case "apply": return "#/apply";
     case "pool": return "#/pool";
+    case "lists": return "#/lists";
     case "queue": return route.q ? `#/queue?q=${encodeURIComponent(route.q)}` : "#/queue";
     case "review": return `#/applications/${route.id}`;
     case "trace": return `#/applications/${route.id}/trace`;
@@ -80,7 +84,7 @@ function useRoute(): [Route, Navigate] {
 }
 
 const TITLES: Record<Route["name"], string> = {
-  home: "", apply: "", queue: "Applications", pool: "Linked applications", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
+  home: "", apply: "", queue: "Applications", pool: "Linked applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
   letter: "Outcome letter", audit: "Audit trail", evaluation: "Evaluation",
 };
 
@@ -98,6 +102,7 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
   const nav: { route: Route; label: string; icon: string; active: boolean; badge?: number | null }[] = [
     { route: { name: "queue" }, label: "Applications", icon: "list", active: ["queue", "review", "signoff", "letter", "trace"].includes(route.name), badge: attention },
     { route: { name: "pool" }, label: "Linked applications", icon: "grid", active: route.name === "pool" },
+    { route: { name: "lists" }, label: "Reference lists", icon: "file", active: route.name === "lists" },
     { route: { name: "audit" }, label: "Audit trail", icon: "clock", active: route.name === "audit" },
     { route: { name: "evaluation" }, label: "Evaluation", icon: "shield", active: route.name === "evaluation" },
   ];
@@ -209,6 +214,7 @@ export default function App() {
       {route.name === "review" && <Review key={route.id} id={route.id} navigate={navigate} />}
       {route.name === "trace" && <AiTrace key={route.id} id={route.id} navigate={navigate} />}
       {route.name === "pool" && <Pool navigate={navigate} />}
+      {route.name === "lists" && <Lists />}
       {route.name === "signoff" && <Signoff key={route.id} id={route.id} navigate={navigate} />}
       {route.name === "letter" && <LetterScreen key={route.id} id={route.id} navigate={navigate} />}
       {route.name === "audit" && <Audit />}

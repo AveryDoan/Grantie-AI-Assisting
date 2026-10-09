@@ -137,3 +137,12 @@
 .trace-table q { display: block; margin-bottom: 4px; }
 .trace-table q::before, .trace-table q::after { content: ""; }
 .trace-dropped td { opacity: .65; }
+
+/* Reference lists */
+.rl-browse, .rl-editor { display: grid; gap: 12px; margin-top: 12px; }
+.rl-table { max-height: 360px; overflow: auto; border: 1px solid var(--border, #d8dde6); border-radius: 8px; }
+.rl-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rl-table th, .rl-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border, #e5e8ee); }
+.rl-table th { position: sticky; top: 0; background: var(--surface, #fff); }
+.rl-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.rl-preview { border-top: 1px solid var(--border, #e5e8ee); padding-top: 12px; display: grid; gap: 8px; }

@@ -158,7 +158,7 @@ Set `LLM_FALLBACK_PROVIDER=groq` with `GROQ_API_KEY` and `GROQ_MODEL`. When Gemi
 ## Tests
 
 ```bash
-pytest                                                        # 359 tests incl. redaction and consistency (needs the [redaction] extra + en_core_web_lg)
+pytest                                                        # 370 tests incl. redaction and consistency (needs the [redaction] extra + en_core_web_lg)
 TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres pytest   # + real-Postgres trigger/RLS tests
 ```
 
@@ -380,12 +380,16 @@ Interpretations still to confirm are listed in `seed/data.py` under `ASSUMPTIONS
 
 **Reference lists** (`reference_lists` table):
 - `nt_education_providers` (S1): loaded from the list supplied by the project owner.
-- `nt_skilled_occupation_priority_list` (S3): not loaded yet. Until it is, S3 returns "Unclear – list not loaded". nt.gov.au blocks automated downloads, so download the PDF in a browser, then run:
-  ```bash
-  python -m seed.load_lists --sopl ~/Downloads/nt-skilled-occupation-priority-list.pdf          # preview
-  python -m seed.load_lists --sopl ~/Downloads/nt-skilled-occupation-priority-list.pdf --save   # load
-  ```
-  Courses are linked to occupations by shared word stems ("Nursing" and "Nurse"). Anything without a clear link is "Unclear" for the officer, never "Not met".
+- `nt_skilled_occupation_priority_list` (S3): the 31 August 2026 edition (247 occupations: 137 high priority, 110 priority) is in `seed/lists/` and loaded by the seed. Rows are `OSCA code, occupation, skill level`; the tier comes from the heading.
+  Courses are linked to occupations by shared word stems ("Nursing" and "Nurse"). Anything without a clear link is "Unclear" for the officer, never "Not met". With about 250 occupations a stem can match loosely, so the officer confirms every S3 result.
+
+**Updating a list (officers):** the **Reference lists** screen (`#/lists`) lets an officer paste or upload a new edition, shows a preview (count, new, removed, unreadable rows) that saves nothing, then replaces the list. Saving is audited with counts only, and re-assessing an application afterwards creates a fresh run. API: `GET /reference-lists`, `GET /reference-lists/{name}?q=`, `POST /reference-lists/{name}/preview`, `PUT /reference-lists/{name}`. Lists are shared by all programs, so any officer can update them; restrict `PUT` to admins if that is too wide.
+
+Loading into Supabase (needs migration 0012 first, then):
+```bash
+python -m seed.load_lists --sopl seed/lists/nt_skilled_occupation_priority_list_2026.txt                              # preview
+python -m seed.load_lists --sopl seed/lists/nt_skilled_occupation_priority_list_2026.txt --save --edition "31 August 2026"
+```
 
 **Synthetic test cases:** N01, N08 and N09 are a clean twin set written in three styles. N02–N07 each cover one or more failure scenarios (screenshot instead of a booking, one referee letter, out-of-range dates, a mismatched arrival date, an ambiguous study load, an untranslated document, register conflicts, and an injection attempt). The CBF-style program keeps cases C01–C06.
 

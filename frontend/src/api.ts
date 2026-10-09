@@ -352,6 +352,17 @@ export function setUnauthorisedHandler(fn: () => void) {
   onUnauthorised = fn;
 }
 
+export type ReferenceListSummary = {
+  name: string; description: string | null; source: string | null; edition: string | null; count: number; loaded: boolean;
+  tiers: Record<string, number>; updated_at: string | null; used_by: string[];
+};
+export type ReferenceListEntry = { code: string; name: string; skill_level: number | null; tier: string };
+export type ReferenceListDetail = ReferenceListSummary & { entries: ReferenceListEntry[]; entries_truncated: boolean };
+export type ReferenceListPreview = {
+  count: number; tiers: Record<string, number>; warnings: string[]; sample: ReferenceListEntry[]; current_count: number;
+  added: string[]; removed: string[]; added_count: number; removed_count: number;
+};
+
 async function request<T>(path: string, init: { method?: string; body?: unknown; raw?: boolean } = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: init.method ?? "GET",
@@ -399,6 +410,12 @@ export const api = {
     request<string>(`/audit-log?${new URLSearchParams({ ...params, format: "csv" })}`, { raw: true }),
   reviewFlag: (flagId: string, body: { action: "confirm" | "dismiss"; note?: string }) =>
     request<ConsistencyFlag>(`/consistency-flags/${flagId}/review`, { method: "POST", body }),
+  referenceLists: () => request<ReferenceListSummary[]>("/reference-lists"),
+  referenceList: (name: string, q = "") => request<ReferenceListDetail>(`/reference-lists/${name}?${new URLSearchParams(q ? { q } : {})}`),
+  previewReferenceList: (name: string, text: string) =>
+    request<ReferenceListPreview>(`/reference-lists/${name}/preview`, { method: "POST", body: { text } }),
+  saveReferenceList: (name: string, body: { text: string; edition?: string; source?: string }) =>
+    request<ReferenceListSummary & { warnings: string[] }>(`/reference-lists/${name}`, { method: "PUT", body }),
   linkedGroups: () => request<LinkedGroup[]>("/pool/linked-applications"),
   redact: (id: string, force = false) =>
     request<{ run_id: string; reused: boolean; report: Record<string, unknown> }>(`/applications/${id}/redact`, { method: "POST", body: { force } }),

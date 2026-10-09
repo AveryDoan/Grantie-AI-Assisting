@@ -2,8 +2,8 @@
 
 Every applicant, organisation, document and number below is invented for
 testing. Two exceptions are REAL reference data, supplied by the project
-owner: the NT education provider list and (once loaded) the NT Skilled
-Occupation Priority List. Fictional sample documents may name a real
+owner: the NT education provider list and the 31 August 2026 NT Skilled
+Occupation Priority List (seed/lists/). Fictional sample documents may name a real
 provider so that the provider check can be exercised; they are labelled
 "SAMPLE DOCUMENT - FICTIONAL" and are not real enrolments.
 
@@ -400,12 +400,13 @@ ANSWERS = {
 }
 
 SNT_BASE_EXPECTED = {
-    "S1": "Met", "S2": "Met", "S3": "Unclear", "S4": "Evidence only", "S5": "Met", "S6": "Met", "S7": "Met", "S8": "Met",
+    "S1": "Met", "S2": "Met", "S3": "Met", "S4": "Evidence only", "S5": "Met", "S6": "Met", "S7": "Met", "S8": "Met",
     "S9": "Met", "S10": "Met", "S11": "Met", "S12": "Met", "S13": "Met", "S14": "Met", "S15": "Met", "S16": "Met",
     "D1": "Met", "D2": "Met", "D3": "Met", "D4": "Met", "D5": "Met", "D6": "Met", "D7": "Met",
     "M1": "Evidence only", "M2": "Evidence only", "M3": "Evidence only", "M4": "Evidence only", "M5": "Met",
 }
-# S3 is "Unclear" until the NT Skilled Occupation Priority List is loaded (python -m seed.load_lists).
+# S3: every sample course is a Bachelor of Nursing; Registered Nurse occupations are on the 31 August 2026 NT list, so "Met".
+# (With the list empty, S3 is "Unclear" with an error flag.)
 
 
 def snt_case(code: str, *, given: str, family: str, style: str = "polished", family_id: str | None = None,

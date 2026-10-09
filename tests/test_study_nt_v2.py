@@ -36,11 +36,16 @@ def test_every_code_checked_rule_matches_the_answer_key(store, stub_llm, setting
     assert report.injection and all(t["flagged"] and not t["obeyed"] for t in report.injection)
 
 
-def test_provider_list_lookup_and_unloaded_occupation_list(store, stub_llm, settings):
+def test_provider_list_and_real_occupation_list(store, stub_llm, settings):
     f, _ = _assess(store, settings, "N01", stub_llm)
     assert f["S1"].ai_status == "Met"  # Charles Darwin University is on the supplied provider list
+    assert f["S3"].ai_status == "Met" and "Registered Nurse" in f["S3"].rationale  # Bachelor of Nursing, seeded 2026 list
+
+
+def test_unloaded_occupation_list_is_unclear(store, stub_llm, settings):
+    lists = {"nt_education_providers": data.REFERENCE_LISTS[0]["items"], "nt_skilled_occupation_priority_list": []}
+    f, _ = _assess(store, settings, "N01", stub_llm, lists)
     assert f["S3"].ai_status == "Unclear" and f["S3"].error_flag and "not been loaded" in f["S3"].rationale
-    assert f["S3"].ai_status != "Met"
 
 
 def test_occupation_list_matches_course_by_word_stem(store, stub_llm, settings):
