@@ -16,9 +16,9 @@ function rulesNeedingAttention(item: QueueItem): string {
   return String(item.attention.unreviewed_findings);
 }
 
-export default function Queue({ navigate }: { navigate: Navigate }) {
+export default function Queue({ navigate, initialSearch = "" }: { navigate: Navigate; initialSearch?: string }) {
   const { data, error } = useLoad(api.queue, []);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState<"attention" | "newest">("attention");
 

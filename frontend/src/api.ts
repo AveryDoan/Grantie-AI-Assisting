@@ -76,6 +76,9 @@ export interface DocumentRow {
   id: string;
   file_name: string;
   declared_type: string;
+  redacted_text?: string | null;
+  extraction_status?: "ok" | "no_text" | "unsupported" | null;
+  needs_manual_review?: boolean;
   detected_type: string | null;
   type_matches: boolean | null;
   needs_verification: boolean;
@@ -138,13 +141,34 @@ export interface ApplicationRecord {
   submitted_at: string | null;
   manual_assessment_requested: boolean;
   application_text: { fields?: Record<string, string>; answers?: Record<string, string> };
+  redacted_text?: string | null;
+  ai_status?: "not_redacted" | "ready" | "blocked_redaction_leak" | "blocked_low_confidence";
+  location_class?: string | null;
+}
+
+export interface Fact {
+  id: string;
+  fact_key: string;
+  fact_value: string;
+  source_quote: string | null;
+  quote_verified: boolean;
+  source: string | null;
+}
+
+export interface RawQuote {
+  quote: string;
+  verified?: boolean;
+  method?: string;
+  source?: string;
+  label?: string;
 }
 
 export interface Detail {
   application: ApplicationRecord;
   documents: DocumentRow[];
   latest_run: Run | null;
-  findings: Finding[];
+  facts: Fact[];
+  findings: (Finding & { supporting_quotes?: RawQuote[] })[];
   letters: Letter[];
   sign_off: { signed_at: string; officer_id: string } | null;
   attention: Attention;
@@ -194,6 +218,60 @@ export interface EvaluationRun {
     failures: number;
     invalid_findings?: number;
   };
+}
+
+export interface RedactionReport {
+  application_id: string;
+  ai_status: string;
+  location_class: string | null;
+  run: {
+    id: string;
+    status: string;
+    started_at: string;
+    finished_at: string | null;
+    counts: Record<string, number>;
+    leak_scan: Record<string, number>;
+    detector_version: string;
+    config_hash: string;
+  } | null;
+  tokens: { token: string; entity_type: string; occurrences: number; sources: string[] }[];
+  documents: { document_id: string; declared_type: string; extraction_status: string | null; needs_manual_review: boolean; included_in_ai_input: boolean }[];
+}
+
+export interface OriginalView {
+  application_id: string;
+  application_text: string;
+  matches_stored_original: boolean;
+  documents: { document_id: string; text: string }[];
+}
+
+export interface Program { id: string; name: string; description: string | null }
+
+export interface UploadResult {
+  id: string;
+  file_name: string;
+  declared_type: string;
+  kind: string;
+  extraction_status: "ok" | "no_text" | "unsupported";
+  needs_manual_review: boolean;
+  pages: number;
+  looks_like: string | null;
+}
+
+export interface DraftCheck {
+  missing_fields: { field: string; label: string; rules: string[] }[];
+  missing_documents: { document_type: string; label: string; needed: number; provided: number }[];
+  wrong_document_type: { file_name: string; declared_as: string; looks_like: string; message: string }[];
+  items_to_check: number;
+  note: string;
+}
+
+export interface MyApplication { id: string; status: string; submitted_at: string | null; reference: string }
+
+export interface ApplicantDetail {
+  application: { id: string; status: string; submitted_at: string | null; manual_assessment_requested: boolean;
+    application_text: { fields?: Record<string, string>; answers?: Record<string, string> } };
+  documents: { id: string; file_name: string; declared_type: string; uploaded_at: string }[];
 }
 
 export class ApiError extends Error {
@@ -263,5 +341,24 @@ export const api = {
     request<AuditRow[]>(`/audit-log?${new URLSearchParams(params)}`),
   auditCsv: (params: Record<string, string> = {}) =>
     request<string>(`/audit-log?${new URLSearchParams({ ...params, format: "csv" })}`, { raw: true }),
+  redact: (id: string, force = false) =>
+    request<{ run_id: string; reused: boolean; report: Record<string, unknown> }>(`/applications/${id}/redact`, { method: "POST", body: { force } }),
+  redactionReport: (id: string) => request<RedactionReport>(`/applications/${id}/redaction-report`),
+  originalView: (id: string) => request<OriginalView>(`/applications/${id}/original-view`),
+  // applicant
+  programs: () => request<Program[]>("/programs"),
+  myApplications: () => request<MyApplication[]>("/me/applications"),
+  applicantDetail: (id: string) => request<ApplicantDetail>(`/applications/${id}`),
+  createDraft: (body: { grant_program_id?: string; fields: Record<string, string>; answers: Record<string, string> }) =>
+    request<{ id: string; status: string }>("/me/applications", { method: "POST", body }),
+  saveDraft: (id: string, body: { fields: Record<string, string>; answers: Record<string, string> }) =>
+    request<{ id: string; status: string }>(`/me/applications/${id}`, { method: "PUT", body }),
+  uploadDocument: (id: string, body: { file_name: string; declared_type: string; content_base64: string }) =>
+    request<UploadResult>(`/me/applications/${id}/documents`, { method: "POST", body }),
+  removeDocument: (id: string, docId: string) =>
+    request<{ removed: string }>(`/me/applications/${id}/documents/${docId}`, { method: "DELETE" }),
+  checkDraft: (id: string) => request<DraftCheck>(`/me/applications/${id}/check`),
+  submitDraft: (id: string, manual_assessment: boolean) =>
+    request<{ id: string; status: string; reference: string; submitted_at: string }>(`/me/applications/${id}/submit`, { method: "POST", body: { manual_assessment } }),
   evaluationLatest: () => request<{ evaluation_run: EvaluationRun | null; message?: string }>("/evaluation/latest"),
 };

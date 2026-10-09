@@ -379,7 +379,10 @@ export default function Review({ id, navigate }: { id: string; navigate: Navigat
               <div className="progress"><i style={{ width: `${(decided.length / total) * 100}%` }} /></div>
             </div>
           )}
-          <Button onClick={() => navigate({ name: "signoff", id })}>{locked ? "View sign-off" : "Review sign-off"} <Icon name="arrow" /></Button>
+          <div className="review-heading-actions">
+            <Button variant="secondary" icon="shield" onClick={() => navigate({ name: "trace", id })}>Redaction & AI trace</Button>
+            <Button onClick={() => navigate({ name: "signoff", id })}>{locked ? "View sign-off" : "Review sign-off"} <Icon name="arrow" /></Button>
+          </div>
         </div>
         {total > 0 && (
           <div className="status-summary" aria-label="Finding summary">
@@ -417,8 +420,9 @@ export default function Review({ id, navigate }: { id: string; navigate: Navigat
           )}
           {!detail.latest_run && !app.manual_assessment_requested && (
             <div className="panel empty-state">
-              <p>This application has not been checked yet.</p>
+              <p>This application has not been checked yet. The check redacts personal details first, then asks the AI.</p>
               <Button icon="search" disabled={busy || locked} onClick={() => void act(() => api.assess(id))}>{busy ? "Checking…" : "Run AI check"}</Button>
+              <Button variant="quiet" icon="shield" onClick={() => navigate({ name: "trace", id })}>See the redacted text first</Button>
             </div>
           )}
           {total > 0 && <div className="notice blue"><Icon name="info" />Unclear items, missing evidence and unverified findings appear first. Check the applicant’s words before you decide.</div>}

@@ -47,3 +47,54 @@
 .login-for { color: var(--muted); font-size: 14px; }
 .login-studynt { width: 150px; height: auto; }
 .letter-logo { width: 120px; height: auto; flex: none; }
+
+/* ---- Redaction & AI trace ------------------------------------------------ */
+.token-mark { background: var(--verify-bg); color: var(--verify); border-radius: 4px; padding: 0 3px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.trace-page .breadcrumb button { background: none; border: 0; color: var(--blue); padding: 0; display: inline-flex; gap: 4px; align-items: center; }
+.trace-actions, .review-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.trace-metrics { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.trace-tone.ok { color: var(--green); } .trace-tone.warn { color: var(--amber); } .trace-tone.bad { color: var(--red); }
+.trace-small { font-size: 20px !important; line-height: 28px !important; }
+.trace-section { display: grid; gap: 16px; margin-top: 24px; }
+.trace-text-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.trace-text-tabs button { border: 1px solid var(--line); background: var(--white); border-radius: 999px; padding: 6px 12px; font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
+.trace-text-tabs button.active { background: var(--blue); border-color: var(--blue); color: white; }
+.trace-pill { font-size: 12px; border-radius: 999px; padding: 0 8px; }
+.trace-pill.warn { background: var(--amber-bg); color: var(--amber); }
+.trace-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.trace-compare.single { grid-template-columns: 1fr; }
+.trace-compare h3 { display: flex; gap: 6px; align-items: center; font-size: 15px; margin: 0 0 8px; }
+.trace-text { max-height: 480px; overflow: auto; margin: 0; }
+.trace-tokens summary { cursor: pointer; font-weight: 600; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th, .data-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.data-table th { color: var(--muted); font-weight: 600; font-size: 13px; }
+.trace-table td small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.trace-verified { display: inline-flex; gap: 4px; align-items: center; font-size: 13px; font-weight: 600; }
+.trace-verified.ok { color: var(--green); } .trace-verified.bad { color: var(--red); }
+.check-source.bad { color: var(--red); }
+.trace-quotes { display: grid; gap: 12px; }
+.trace-quote { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; background: var(--white); display: grid; gap: 10px; }
+.trace-quote.unverified { border-left: 4px solid var(--red); }
+.trace-quote header { display: flex; gap: 10px; align-items: center; }
+.trace-rule { flex: 1; font-weight: 600; font-size: 14px; }
+.trace-quote blockquote { margin: 4px 0 0; padding: 8px 12px; background: var(--surface-subtle); border-left: 3px solid var(--quote-underline); border-radius: 6px; font-size: 14px; }
+.trace-quote small { color: var(--muted); font-size: 12px; }
+.trace-quote footer { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.link-button { background: none; border: 0; color: var(--blue); font-weight: 600; padding: 0; display: inline-flex; gap: 4px; align-items: center; cursor: pointer; margin-left: auto; }
+@media (max-width: 860px) { .trace-compare { grid-template-columns: 1fr; } }
+
+/* ---- Logos on the public pages and the application form --------------- */
+.public-logo { height: 44px; width: auto; }
+.public-logo.light { background: white; border-radius: 8px; padding: 6px 10px; height: 52px; }
+.footer-grantie { height: 22px; width: auto; vertical-align: middle; margin-right: 8px; }
+.af-brand-logo { height: 40px; width: auto; }
+.af-footer-logo-img { height: 44px; width: auto; background: white; border-radius: 8px; padding: 6px 10px; }
+.af-signin { display: grid; gap: 16px; width: 100%; max-width: 420px; margin: 0 auto; text-align: left; }
+.back-link { color: var(--blue); font-size: 14px; }
+
+/* The topbar's first <div> is the actions group (the search is a <form>): keep it in a row. */
+.officer-shell .workspace-topbar > .topbar-actions { flex-direction: row; }
+.officer-shell .workspace-topbar > .topbar-actions span { text-transform: none; letter-spacing: normal; }
+@media (max-width: 760px) { .ai-control-pill { display: none; } .global-search { width: auto; flex: 1; } }
+.officer-shell .workspace-topbar > .topbar-actions .ai-control-pill strong { font-family: inherit; font-size: 14px; line-height: 20px; }

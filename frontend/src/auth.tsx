@@ -19,8 +19,8 @@ interface AuthState {
   me: Me | null;
   ready: boolean;
   error: string | null;
-  loginDemo: (role: string) => Promise<void>;
-  loginPassword: (email: string, password: string) => Promise<void>;
+  loginDemo: (role: "officer" | "admin" | "applicant") => Promise<void>;
+  loginPassword: (email: string, password: string, allowed?: string[]) => Promise<void>;
   logout: () => void;
 }
 
@@ -61,12 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase?.auth.signOut();
   }, []);
 
-  const activate = useCallback(async (token: string) => {
+  // One session at a time. Each page checks the role it needs (officer pages: officer/admin;
+  // the application form: applicant).
+  const activate = useCallback(async (token: string, allowed: string[] = ["officer", "admin", "applicant"]) => {
     setToken(token);
     const profile = await api.me();
-    if (profile.role !== "officer" && profile.role !== "admin") {
+    if (!allowed.includes(profile.role)) {
       setToken(null);
-      throw new Error("This workspace is for grants officers. Your account does not have the officer role.");
+      throw new Error(allowed.includes("applicant")
+        ? "This form is for applicants. Your account does not have the applicant role."
+        : "This workspace is for grants officers. Your account does not have the officer role.");
     }
     store(token);
     setMe(profile);
@@ -88,18 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, [activate, logout]);
 
-  const loginDemo = async (role: string) => {
+  const loginDemo = async (role: "officer" | "admin" | "applicant") => {
     setError(null);
     const res = await api.demoLogin(role);
-    await activate(res.access_token);
+    await activate(res.access_token, [role]);
   };
 
-  const loginPassword = async (email: string, password: string) => {
+  const loginPassword = async (email: string, password: string, allowed: string[] = ["officer", "admin"]) => {
     setError(null);
     if (!supabase) throw new Error("Supabase sign-in is not configured (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).");
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
     if (err || !data.session) throw new Error(err?.message ?? "Sign-in failed");
-    await activate(data.session.access_token);
+    await activate(data.session.access_token, allowed);
   };
 
   return (
