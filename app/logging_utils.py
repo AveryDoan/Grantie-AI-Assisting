@@ -43,6 +43,9 @@ def get_logger(name: str) -> logging.Logger:
 
 def configure_logging(level: int = logging.INFO) -> None:
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    # Third-party HTTP clients log full URLs and sometimes bodies at DEBUG.
-    for noisy in ("httpx", "httpcore", "google_genai", "hpack"):
+    # Third-party HTTP clients log full URLs and sometimes bodies at DEBUG. PDF libraries log the raw
+    # CONTENT of the document they are reading (names, emails, phone numbers) at DEBUG: never allow that.
+    # The redaction engine (Presidio) logs the ORIGINAL text around each match at DEBUG, so it is pinned too.
+    for noisy in ("httpx", "httpcore", "google_genai", "hpack", "pdfminer", "pdfplumber", "pypdf", "PIL",
+                  "presidio-analyzer", "presidio_analyzer", "presidio-anonymizer", "presidio_anonymizer", "spacy", "filelock"):
         logging.getLogger(noisy).setLevel(logging.WARNING)

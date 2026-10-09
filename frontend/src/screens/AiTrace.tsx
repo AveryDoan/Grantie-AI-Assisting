@@ -5,7 +5,7 @@
 //  2. AI extraction: facts and finding quotes exactly as the AI produced them
 //     (with tokens), next to the restored words, with the code's verification.
 import { useMemo, useState, type ReactNode } from "react";
-import { api, type Detail, type OriginalView } from "../api";
+import { api, type Detail, type OriginalView, type TraceItem } from "../api";
 import type { Navigate } from "../App";
 import { Button, ErrorNotice, Icon, Loading, StatusChip, formatDate, humanise, useLoad } from "../ui";
 
@@ -43,6 +43,76 @@ function Section({ eyebrow, title, intro, aside, children }: { eyebrow: string; 
     <div className="panel-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2>{intro && <p>{intro}</p>}</div>{aside}</div>
     {children}
   </section>;
+}
+
+function Verdict({ item }: { item: TraceItem }) {
+  return item.verified
+    ? <span className="trace-verified ok"><Icon name="check" size={14} />Found in the text by code</span>
+    : <span className="trace-verified bad"><Icon name="close" size={14} />Not found: dropped</span>;
+}
+
+/** Step 4: what the two AI-assisted consistency checks were given, what they returned, and what code made of it. */
+function ConsistencyTrace({ detail }: { detail: Detail }) {
+  const view = detail.consistency;
+  if (!view?.enabled) return null;
+  const t = view.trace ?? {};
+  const ran = Boolean(t.timeline || t.narrative || t.cross_document);
+  const names = (src?: string | null) => (src === "application_text" ? "Application form" : src ? humanise(detail.documents.find((d) => `document:${d.id}` === src)?.declared_type ?? "document") : "–");
+  const ai: { key: "timeline" | "narrative"; title: string; blurb: string }[] = [
+    { key: "timeline", title: "Timeline", blurb: "The AI lists dated events with an exact quote each. Code then checks the order, overlaps and ages." },
+    { key: "narrative", title: "Statements that conflict", blurb: "The AI points at two passages that appear to disagree and quotes both. It never judges why." },
+  ];
+  return (
+    <Section eyebrow="Step 4 · Consistency checks" title="Does the story add up? What the AI was given and what code made of it"
+      intro="Both AI checks read the redacted form and documents above, combined into one text, through the same guard. Every quote they return is searched for by code. An item whose quote is not found is dropped.">
+      {!ran && <p className="empty-state">The AI check has not run yet.</p>}
+      {ran && ai.map(({ key, title, blurb }) => {
+        const c = t[key];
+        const items = c?.returned ?? [];
+        return (
+          <div className="trace-ai" key={key}>
+            <h3>{title}</h3>
+            <p className="muted">{blurb}</p>
+            {c?.skipped && <p className="empty-state">{c.skipped}</p>}
+            {c?.error && <p className="empty-state">The AI did not answer ({c.error}). No flags were made from it.</p>}
+            {c?.input && (
+              <p className="trace-sources"><strong>Input:</strong> {c.input.sources.map((s) => `${s.label} (${s.characters.toLocaleString()} characters)`).join(" · ")}
+                {c.input.notes.length > 0 && <> · <em>{c.input.notes.join("; ")}</em></>}</p>
+            )}
+            {c && !c.skipped && !c.error && (
+              <p className="trace-counts"><strong>{items.length}</strong> returned · <strong>{c.verified ?? 0}</strong> verified by code · <strong>{c.dropped_unverified ?? 0}</strong> dropped · <strong>{c.flags ?? 0}</strong> flag{(c.flags ?? 0) === 1 ? "" : "s"} raised</p>
+            )}
+            {items.length > 0 && (
+              <table className="data-table trace-table">
+                <thead><tr><th>{key === "timeline" ? "Event" : "Topic"}</th><th>Quote(s) as the AI returned them</th><th>Code check</th></tr></thead>
+                <tbody>
+                  {items.map((it, i) => (
+                    <tr key={i} className={it.verified ? "" : "trace-dropped"}>
+                      <td>{key === "timeline" ? <><strong>{it.label}</strong><small>{it.kind} · {it.start ?? "?"} to {it.end ?? "?"}{it.full_time ? " · full-time" : ""}</small></> : <strong>{it.topic}</strong>}</td>
+                      <td>{key === "timeline"
+                        ? <q><Tokens text={it.quote ?? ""} /></q>
+                        : <><q><Tokens text={it.first_quote ?? ""} /></q><small>{names(it.first_source)}</small><q><Tokens text={it.second_quote ?? ""} /></q><small>{names(it.second_source)}</small></>}</td>
+                      <td><Verdict item={it} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
+      {ran && (
+        <div className="trace-ai">
+          <h3>Checks done by plain code</h3>
+          <ul className="cx-list">
+            <li>Across documents: {t.cross_document?.error ? `did not run (${t.cross_document.error})` : `${t.cross_document?.flags ?? 0} flag(s)`}</li>
+            <li>Document signals (weak only): {t.document_integrity?.error ? `did not run (${t.document_integrity.error})` : `${t.document_integrity?.flags ?? 0} flag(s)`}</li>
+            <li>Across applications: {t.cross_application?.skipped ?? `${t.cross_application?.identifiers ?? 0} identifiers and ${t.cross_application?.fingerprints ?? 0} document fingerprints stored as keyed hashes only; ${t.cross_application?.linked_applications ?? 0} linked application(s)`}</li>
+          </ul>
+        </div>
+      )}
+    </Section>
+  );
 }
 
 export default function AiTrace({ id, navigate }: { id: string; navigate: Navigate }) {
@@ -156,5 +226,7 @@ export default function AiTrace({ id, navigate }: { id: string; navigate: Naviga
             <button className="link-button" onClick={() => navigate({ name: "review", id })}>Review rule <Icon name="arrow" size={14} /></button></footer>
         </article>)}</div>}
     </Section>
+
+    <ConsistencyTrace detail={detail} />
   </main>;
 }

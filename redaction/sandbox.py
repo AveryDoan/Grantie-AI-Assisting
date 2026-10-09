@@ -88,7 +88,7 @@ def no_network() -> Iterator[None]:
 
 
 def quiet_libraries() -> None:
-    for name in ("presidio-analyzer", "presidio_analyzer", "tldextract", "filelock", "urllib3", "pdfminer"):
+    for name in ("presidio-analyzer", "presidio_analyzer", "presidio-anonymizer", "tldextract", "filelock", "urllib3", "pdfminer", "pdfplumber", "pypdf"):
         logging.getLogger(name).setLevel(logging.ERROR)
 
 

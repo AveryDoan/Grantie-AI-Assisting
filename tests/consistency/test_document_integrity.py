@@ -24,14 +24,15 @@ def pdf_with(info):
 
 
 def test_signals_are_derived_and_no_raw_metadata_string_is_kept():
-    data_ = pdf_with({"Producer": "iLovePDF", "Creator": "Adobe Photoshop 25.0", "Author": AUTHOR, "CreationDate": pdf_date("2026-10-02"),
+    data_ = pdf_with({"Producer": "iLovePDF build 3.2.1-x9", "Creator": "Adobe Photoshop 25.0", "Author": AUTHOR, "CreationDate": pdf_date("2026-10-02"),
                       "ModDate": pdf_date("2026-10-05")})
     sig = read_integrity_signals(data_, text="Date: 20 May 2026\nZed Quillfeather wrote this", applicant_name=AUTHOR)
     assert sig["created"] == "2026-10-02" and sig["modified"] == "2026-10-05"
     assert sig["software_class"] == "editor" and sig["editor"] == "Adobe Photoshop"
     assert sig["author_present"] and sig["author_matches_applicant"] and sig["author_in_text"]
     dump = json.dumps(sig)
-    assert AUTHOR not in dump and "Quillfeather" not in dump and "iLovePDF" not in dump and "25.0" not in dump
+    assert AUTHOR not in dump and "Quillfeather" not in dump                     # a person's name is never kept
+    assert "3.2.1-x9" not in dump and "25.0" not in dump and "build" not in dump  # nor the raw producer or creator text (only a closed-list label)
 
 
 def test_a_pdf_without_metadata_and_a_non_pdf_give_no_signals():
@@ -105,14 +106,14 @@ def _draft_and_upload(env, body: bytes, name="letter.pdf"):
 
 
 def test_intake_reads_metadata_before_stripping_and_keeps_only_derived_signals(client_env):
-    pdf = pdf_with({"Producer": "iLovePDF", "Author": AUTHOR, "CreationDate": pdf_date("2026-10-02"), "ModDate": pdf_date("2026-10-02")})
+    pdf = pdf_with({"Producer": "iLovePDF build 3.2.1-x9", "Author": AUTHOR, "CreationDate": pdf_date("2026-10-02"), "ModDate": pdf_date("2026-10-02")})
     app_id, row = _draft_and_upload(client_env, pdf)
     sig = row["integrity_signals"]
     assert sig["created"] == "2026-10-02" and sig["software_class"] == "editor" and sig["author_matches_applicant"] is True
     stored = client_env["store"].files[("application-documents", row["storage_path"])]
-    assert AUTHOR.encode() not in stored and b"iLovePDF" not in stored and b"/Author" not in stored   # metadata stripped from the stored file
+    assert AUTHOR.encode() not in stored and b"3.2.1-x9" not in stored and b"/Author" not in stored   # metadata stripped from the stored file
     everything = json.dumps({k: v for k, v in row.items() if k != "extracted_text"}) + json.dumps(client_env["store"].select("audit_log"))
-    assert AUTHOR not in everything and "iLovePDF" not in everything                                  # nor kept in any row or audit entry
+    assert AUTHOR not in everything and "3.2.1-x9" not in everything                                  # nor kept in any row or audit entry
 
 
 def test_with_the_layer_off_intake_stores_no_signals(store, settings, applicant_actor, officer):

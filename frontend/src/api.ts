@@ -17,6 +17,60 @@ export interface Attention {
   awaiting_applicant: boolean;
 }
 
+// ---- Consistency layer: signals for the officer to check. Never a verdict, score or recommendation.
+export interface FlagEvidence {
+  kind: "quote" | "field" | "signal" | "link";
+  source: string;                 // "application_text", "document:<id>", "form", or "application:<id>" for a link
+  label: string;
+  quote?: string;                 // as the AI saw it (placeholders included)
+  restored?: string | null;       // the applicant's own words, restored for the officer
+  verified?: boolean;
+  field?: string;
+  value?: string;
+}
+
+export interface ConsistencyFlag {
+  id: string;
+  check_id: string;
+  check_type: "cross_document" | "timeline" | "document_integrity" | "cross_application" | "narrative";
+  type_label: string;
+  strength: "strong" | "weak";
+  description: string;
+  evidence: FlagEvidence[];
+  verification: "verified" | "unclear";
+  status: "open" | "confirmed" | "dismissed";
+  note: string | null;
+  reviewed_at: string | null;
+}
+
+export interface TraceItem {
+  label?: string; kind?: string; start?: string | null; end?: string | null; full_time?: boolean | null;
+  topic?: string; first_quote?: string; second_quote?: string; quote?: string; verified: boolean;
+  source?: string | null; first_source?: string | null; second_source?: string | null; method?: string;
+}
+
+export interface ConsistencyTrace {
+  cross_document?: { flags?: number; error?: string };
+  document_integrity?: { flags?: number; error?: string };
+  timeline?: { input?: { sources: { source: string; label: string; characters: number }[]; notes: string[] }; returned?: TraceItem[]; verified?: number; dropped_unverified?: number; flags?: number; error?: string; skipped?: string };
+  narrative?: { input?: { sources: { source: string; label: string; characters: number }[]; notes: string[] }; returned?: TraceItem[]; verified?: number; dropped_unverified?: number; flags?: number; error?: string; skipped?: string };
+  cross_application?: { identifiers?: number; fingerprints?: number; linked_applications?: number; skipped?: string };
+}
+
+export interface ConsistencyView {
+  enabled: boolean;
+  unavailable?: boolean;
+  flags: ConsistencyFlag[];
+  trace: ConsistencyTrace;
+}
+
+export interface LinkedGroup {
+  id: string;
+  applications: { id: string; reference: string; applicant_name: string | null }[];
+  attributes: { check_id: string; label: string; strength: "strong" | "weak" }[];
+  open_flags: number;
+}
+
 export interface QueueItem {
   id: string;
   reference: string;
@@ -26,6 +80,7 @@ export interface QueueItem {
   submitted_at: string | null;
   attention: Attention;
   open_items: number;
+  flags_to_check: number;   // a count only: shown when at least one open flag is strong; never used to sort
 }
 
 export interface Review {
@@ -167,6 +222,7 @@ export interface Detail {
   application: ApplicationRecord;
   documents: DocumentRow[];
   latest_run: Run | null;
+  consistency: ConsistencyView;
   facts: Fact[];
   findings: (Finding & { supporting_quotes?: RawQuote[] })[];
   letters: Letter[];
@@ -341,6 +397,9 @@ export const api = {
     request<AuditRow[]>(`/audit-log?${new URLSearchParams(params)}`),
   auditCsv: (params: Record<string, string> = {}) =>
     request<string>(`/audit-log?${new URLSearchParams({ ...params, format: "csv" })}`, { raw: true }),
+  reviewFlag: (flagId: string, body: { action: "confirm" | "dismiss"; note?: string }) =>
+    request<ConsistencyFlag>(`/consistency-flags/${flagId}/review`, { method: "POST", body }),
+  linkedGroups: () => request<LinkedGroup[]>("/pool/linked-applications"),
   redact: (id: string, force = false) =>
     request<{ run_id: string; reused: boolean; report: Record<string, unknown> }>(`/applications/${id}/redact`, { method: "POST", body: { force } }),
   redactionReport: (id: string) => request<RedactionReport>(`/applications/${id}/redaction-report`),

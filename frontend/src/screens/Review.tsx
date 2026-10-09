@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { api, type Decision, type Detail, type DocumentRow, type Finding } from "../api";
 import type { Navigate } from "../App";
+import { ConsistencyPanel } from "./Consistency";
 import {
   APP_STATUS_LABEL, Button, CHECK_SOURCE_LABEL, ErrorNotice, Icon, Loading, StatusChip, effectiveStatus, formatDate,
   humanise, isDecided, useLoad,
@@ -400,6 +401,7 @@ export default function Review({ id, navigate }: { id: string; navigate: Navigat
         </div>
       )}
       <ErrorNotice error={actionError} />
+      <ConsistencyPanel view={detail.consistency} onChanged={reload} onTrace={() => navigate({ name: "trace", id })} />
 
       <div className="review-grid">
         <aside className="application-sidebar">

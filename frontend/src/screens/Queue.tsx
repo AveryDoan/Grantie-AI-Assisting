@@ -84,7 +84,8 @@ export default function Queue({ navigate, initialSearch = "" }: { navigate: Navi
                 {rows.map((row) => (
                   <tr key={row.id} onClick={() => navigate({ name: "review", id: row.id })} className="clickable">
                     <td><button className="table-link" onClick={(e) => { e.stopPropagation(); navigate({ name: "review", id: row.id }); }}>{row.reference}</button></td>
-                    <td><strong>{row.applicant_name ?? "—"}</strong><br /><small className="check-source">{row.program_name}</small></td>
+                    <td><strong>{row.applicant_name ?? "—"}</strong><br /><small className="check-source">{row.program_name}</small>
+                      {row.flags_to_check > 0 && <><br /><small className="cx-count">{row.flags_to_check} {row.flags_to_check === 1 ? "flag" : "flags"} to check</small></>}</td>
                     <td>{formatDate(row.submitted_at)}</td>
                     <td><span className={rulesNeedingAttention(row) === "0" ? "attention zero" : "attention"}>{rulesNeedingAttention(row)}</span></td>
                     <td><AppStatus status={statusLabel(row)} /></td>
