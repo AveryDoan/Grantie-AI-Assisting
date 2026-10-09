@@ -23,17 +23,21 @@ from app.api.schemas import (
     AssessRequest,
     ClarificationRequestIn,
     DemoLogin,
+    DocumentUpload,
+    DraftIn,
     LetterPatch,
     PrecheckRequest,
+    RedactRequest,
     ReviewRequest,
     SignOffRequest,
+    SubmitIn,
 )
 from app.config import Settings, get_settings
 from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, letters, precheck, queue, review
+from app.services import audit, intake, letters, precheck, queue, redaction_service, review
 from app.services.access import Actor, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
@@ -149,7 +153,7 @@ def create_app(
 
     @r.get("/applications/{application_id}")
     def get_application(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
-        return queue.application_detail(s, actor, application_id)
+        return queue.application_detail(s, actor, application_id, settings)
 
     # ------------------------------------------------------------ pipeline
     @r.post("/applications/{application_id}/assess",
@@ -197,13 +201,77 @@ def create_app(
     # -------------------------------------------------------------- letters
     @r.post("/applications/{application_id}/letter")
     def generate_letter(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
-        return letters.generate_letter(s, actor, application_id)
+        return letters.generate_letter(s, actor, application_id, settings)
 
     @r.patch("/letters/{letter_id}")
     def patch_letter(
         letter_id: str, body: LetterPatch, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)
     ) -> dict[str, Any]:
         return letters.update_letter(s, actor, letter_id, body_text=body.body_text, approve=body.approve)
+
+    # ------------------------------------------------------------ redaction
+    @r.post("/applications/{application_id}/redact",
+            dependencies=[Depends(rate_limit("assess", "rate_limit_assess_per_minute"))])
+    def redact(
+        application_id: str, body: RedactRequest | None = None,
+        actor: Actor = Depends(current_actor), s: Store = Depends(get_store),
+    ) -> dict[str, Any]:
+        """Run the redaction pipeline (idempotent). Returns status and counts only - no values."""
+        require_role(actor, "officer", "admin")
+        out = redaction_service.run_and_store(s, actor, application_id, settings, force=bool(body and body.force))
+        outcome = out["outcome"]
+        return {"run_id": out["run"]["id"], "reused": out["reused"], "report": outcome.report,
+                "documents_needing_manual_review": outcome.manual_review}
+
+    @r.get("/applications/{application_id}/redaction-report")
+    def redaction_report(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        require_role(actor, "officer", "admin")
+        return redaction_service.report(s, actor, application_id)
+
+    @r.get("/applications/{application_id}/original-view")
+    def original_view(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Officers only: the stored redacted text restored with the encrypted token map. Audited."""
+        return redaction_service.original_view(s, actor, application_id, settings)
+
+    # ------------------------------------------------------------ applicant intake
+    @r.get("/programs")
+    def list_programs(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        return intake.programs(s)
+
+    @r.get("/me/applications")
+    def my_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        return intake.my_applications(s, actor)
+
+    @r.post("/me/applications")
+    def create_draft(body: DraftIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        program_id = body.grant_program_id or next((p["id"] for p in intake.programs(s)), None)
+        if not program_id:
+            return JSONResponse(status_code=404, content={"error": "not_found", "message": "No open grant program"})  # type: ignore[return-value]
+        return intake.create_draft(s, actor, grant_program_id=program_id, fields=body.fields, answers=body.answers)
+
+    @r.put("/me/applications/{application_id}")
+    def save_draft(application_id: str, body: DraftIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return intake.update_draft(s, actor, application_id, fields=body.fields, answers=body.answers)
+
+    @r.post("/me/applications/{application_id}/documents")
+    def upload_document(application_id: str, body: DocumentUpload, actor: Actor = Depends(current_actor),
+                        s: Store = Depends(get_store)) -> dict[str, Any]:
+        return intake.add_document(s, actor, application_id, file_name=body.file_name,
+                                   declared_type=body.declared_type, content_base64=body.content_base64)
+
+    @r.delete("/me/applications/{application_id}/documents/{document_id}")
+    def delete_document(application_id: str, document_id: str, actor: Actor = Depends(current_actor),
+                        s: Store = Depends(get_store)) -> dict[str, Any]:
+        return intake.remove_document(s, actor, application_id, document_id)
+
+    @r.get("/me/applications/{application_id}/check")
+    def check_draft(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return intake.check(s, actor, application_id)
+
+    @r.post("/me/applications/{application_id}/submit")
+    def submit_draft(application_id: str, body: SubmitIn | None = None, actor: Actor = Depends(current_actor),
+                     s: Store = Depends(get_store)) -> dict[str, Any]:
+        return intake.submit(s, actor, application_id, manual_assessment=bool(body and body.manual_assessment))
 
     # ------------------------------------------------------------ applicant
     @r.post("/applications/{application_id}/request-manual")

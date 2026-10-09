@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.pipeline.documents import DOC_LABEL_SHORT, classify, normalise_declared
+from app.pipeline.documents import DOC_LABEL_SHORT, detect_type, normalise_declared
 from app.pipeline.rules_loader import load_active_pack_for_program
 from app.services.access import Actor, require_role
 from app.services.errors import NotFound
@@ -64,7 +64,7 @@ def precheck(
     detected_counts: dict[str, int] = {}
     for i, doc in enumerate(documents):
         declared = normalise_declared(doc.get("declared_type") or "")
-        detected = classify(doc.get("text") or doc.get("extracted_text") or "")
+        detected = detect_type(doc.get("text") or doc.get("extracted_text") or "", declared)
         detected_counts[detected] = detected_counts.get(detected, 0) + 1
         if declared != detected:
             wrong_type.append(

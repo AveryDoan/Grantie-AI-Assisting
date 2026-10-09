@@ -9,7 +9,6 @@ from app.pipeline.code_checks import CodeContext, run_code_check
 from app.pipeline.documents import DocumentChecks, check_documents, classify, compare_names
 from app.pipeline.facts import FactSet
 from app.pipeline.parsing import parse_amount, parse_date
-from app.pipeline.redaction import redact
 from app.pipeline.rules_loader import RulePackNotApproved, load_rule_pack
 from seed import data
 
@@ -42,21 +41,7 @@ def test_run_is_stamped_with_pack_version(store, officer, stub_llm, settings):
     assert run["rule_pack_version"] == "v2" and run["status"] == "complete"
 
 
-# ---------------------------------------------------------------- redaction
-def test_redaction_strips_identifiers_keeps_org_facts():
-    text = {
-        "fields": {"applicant_name": "Linh Tran", "email": "linh@example.invalid", "region": "Katherine",
-                   "requested_amount": "$4,500", "arrival_date": "2026-02-15", "abn": "ABN 12 345 678 901"},
-        "answers": {"q": "Linh lives at 12 Smith Street, call 0412 345 678 or email linh@example.invalid. "
-                         "Passport N1234567. Contact Ms Jane Citizen. We are a not-for-profit in Katherine."},
-    }
-    r = redact(text)
-    for secret in ("Linh", "Tran", "linh@example.invalid", "12 Smith Street", "0412 345 678", "N1234567", "Jane Citizen"):
-        assert secret not in r.text, secret
-    for kept in ("Katherine", "$4,500", "2026-02-15", "not-for-profit", "12 345 678 901"):
-        assert kept in r.text, kept
-    assert "Linh Tran" in r.mapping.values()
-    assert r.restore(r.text).count("Linh") >= 1
+# Redaction is tested in tests/redaction/ (Presidio-based pipeline).
 
 
 # ---------------------------------------------------------------- parsing / documents

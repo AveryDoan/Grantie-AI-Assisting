@@ -23,7 +23,10 @@ from seed.run import seed
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(_env_file=None, llm_provider="stub", supabase_jwt_secret="test-secret-for-hs256-only-0123456789")
+    from redaction.crypto import generate_key
+
+    return Settings(_env_file=None, llm_provider="stub", supabase_jwt_secret="test-secret-for-hs256-only-0123456789",
+                    redaction_key=generate_key())
 
 
 @pytest.fixture

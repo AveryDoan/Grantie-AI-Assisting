@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     name_match_threshold: float = 85.0
     consistency_check: bool = False
 
+    # --- Redaction -----------------------------------------------------------
+    # AES-256-GCM key for token-map originals (base64, 32 bytes). Never logged.
+    redaction_key: SecretStr = SecretStr("")
+    redaction_key_previous: SecretStr = SecretStr("")
+
     # --- API ----------------------------------------------------------------
     rate_limit_per_minute: int = 60
     rate_limit_assess_per_minute: int = 6

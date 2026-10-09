@@ -22,8 +22,9 @@ from typing import Any
 
 import textstat
 
-from app.pipeline.redaction import render_source_text
 from app.pipeline.verification import verify_quote
+from app.config import Settings, get_settings
+from app.services.redaction_service import QuoteRestorer
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.audit import write_audit
 from app.services.errors import Conflict, NotFound, ValidationFailed
@@ -34,13 +35,6 @@ REASON_HEADER = re.compile(r"^Reason (\d+): rule (\S+)\b", re.M)
 QUOTE_LINE = re.compile(r'^What you wrote: "(.*)"\s*$', re.M)
 TARGET_GRADE = 9.0  # about Year 8; textstat's Flesch-Kincaid grade
 
-
-def _restore(text: str | None, mapping: dict[str, str]) -> str | None:
-    if text is None:
-        return None
-    for token, original in mapping.items():
-        text = text.replace(token, original)
-    return text
 
 
 def _what_would_change(rule: dict[str, Any]) -> str:
@@ -168,7 +162,8 @@ def run_letter_checks(
     return result
 
 
-def _context(store: Store, app: dict[str, Any]) -> dict[str, Any]:
+def _context(store: Store, app: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    from redaction.structured import original_application_text
     run = latest_run(store, app["id"])
     if run is None:
         raise Conflict("There is no complete assessment run for this application")
@@ -178,7 +173,6 @@ def _context(store: Store, app: dict[str, Any]) -> dict[str, Any]:
     pack = one(store.select("rule_packs", eq={"id": run["rule_pack_id"]}, limit=1)) or {}
     program = one(store.select("grant_programs", eq={"id": app["grant_program_id"]}, limit=1)) or {}
     rules = {r["id"]: r for r in store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]})}
-    redaction = one(store.select("redaction_maps", eq={"application_id": app["id"]}, limit=1))
     confirmed = {rules[f["rule_id"]]["rule_code"] for f in findings if f["id"] in reviews and reviews[f["id"]]["action"] != "ask_applicant"}
     return {
         "run": run,
@@ -188,16 +182,17 @@ def _context(store: Store, app: dict[str, Any]) -> dict[str, Any]:
         "pack": pack,
         "program": program,
         "rules": rules,
-        "mapping": (redaction or {}).get("mapping") or {},
+        # Quotes in findings contain tokens; this maps them back to the applicant's own words.
+        "restorer": QuoteRestorer(store, app, settings or get_settings()),
         "confirmed_codes": confirmed,
-        "source_text": render_source_text(app.get("application_text") or {}),
+        "source_text": original_application_text(app.get("application_text") or {}),
     }
 
 
-def generate_letter(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
+def generate_letter(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any]:
     require_role(actor, "officer")
     app = application_for_staff(store, actor, application_id)
-    ctx = _context(store, app)
+    ctx = _context(store, app, settings)
     if ctx["pending"]:
         raise Conflict(
             "Every finding needs an officer decision before a letter can be drafted",
@@ -210,7 +205,7 @@ def generate_letter(store: Store, actor: Actor, application_id: str) -> dict[str
         if review["final_status"] not in ("Not met", "Needs evidence"):
             continue
         rule = ctx["rules"][f["rule_id"]]
-        quote = _restore(f.get("evidence_quote"), ctx["mapping"]) if f.get("quote_verified") else None
+        quote = ctx["restorer"].original(f.get("evidence_quote"), "application_text") if f.get("quote_verified") else None
         if quote and not verify_quote(quote, ctx["source_text"], threshold=100.0).verified:
             quote = None  # never put words in the applicant's mouth
         reasons.append({"rule": rule, "finding": f, "quote": quote, "why": _why(f, review)})

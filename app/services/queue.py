@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.config import Settings, get_settings
+from app.services.redaction_service import QuoteRestorer
 from app.services.access import Actor, application_for_applicant, application_for_staff
 from app.services.errors import Forbidden
 from app.services.review import latest_reviews, latest_run
@@ -20,12 +22,17 @@ def reference(application_id: str) -> str:
     return "APP-" + application_id.replace("-", "")[:6].upper()
 
 
+def _typed_name(app: dict[str, Any]) -> str | None:
+    """The name typed on this application (an applicant account can hold several applications)."""
+    return ((app.get("application_text") or {}).get("fields") or {}).get("applicant_name")
+
+
 def _names(store: Store, app: dict[str, Any]) -> dict[str, Any]:
     applicant = one(store.select("applicants", eq={"id": app["applicant_id"]}, limit=1)) or {}
     program = one(store.select("grant_programs", eq={"id": app["grant_program_id"]}, limit=1)) or {}
     return {
         "reference": reference(app["id"]),
-        "applicant_name": applicant.get("organisation_name") or applicant.get("display_name"),
+        "applicant_name": applicant.get("organisation_name") or _typed_name(app) or applicant.get("display_name"),
         "program_name": program.get("name"),
     }
 
@@ -118,7 +125,7 @@ def list_queue(store: Store, actor: Actor) -> list[dict[str, Any]]:
             {
                 "id": app["id"],
                 "reference": reference(app["id"]),
-                "applicant_name": applicant.get("organisation_name") or applicant.get("display_name"),
+                "applicant_name": applicant.get("organisation_name") or _typed_name(app) or applicant.get("display_name"),
                 "program_name": programs.get(app["grant_program_id"], {}).get("name"),
                 "grant_program_id": app["grant_program_id"],
                 "status": app["status"],
@@ -132,20 +139,13 @@ def list_queue(store: Store, actor: Actor) -> list[dict[str, Any]]:
     return out
 
 
-def _restore(text: str | None, mapping: dict[str, str]) -> str | None:
-    if text is None:
-        return None
-    for token, original in mapping.items():
-        text = text.replace(token, original)
-    return text
 
-
-def application_detail(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
+def application_detail(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any]:
     if actor.role == "applicant":
         return applicant_view(store, actor, application_id)
     app = application_for_staff(store, actor, application_id)
     run = latest_run(store, application_id)
-    mapping = (one(store.select("redaction_maps", eq={"application_id": application_id}, limit=1)) or {}).get("mapping") or {}
+    restorer = QuoteRestorer(store, app, settings or get_settings())  # officer view: real words, from the encrypted map
     rules = {}
     findings_out = []
     facts = []
@@ -164,10 +164,11 @@ def application_detail(store: Store, actor: Actor, application_id: str) -> dict[
                     "rule_type": rule["rule_type"],
                     "source_clause": rule.get("source_clause"),
                     # Officer sees the applicant's real words; the AI only saw tokens.
-                    "evidence_quote_restored": _restore(f.get("evidence_quote"), mapping),
+                    "evidence_quote_restored": restorer.original(f.get("evidence_quote"), "application_text"),
                     # Officer view: real words restored (the AI only saw tokens).
                     "supporting_quotes_restored": [
-                        q | {"quote": q.get("display") or _restore(q.get("quote"), mapping)} for q in (f.get("supporting_quotes") or [])
+                        q | {"quote": restorer.original(q.get("quote"), q.get("source") or "application_text")}
+                        for q in (f.get("supporting_quotes") or [])
                     ],
                     "section": (rule.get("params") or {}).get("section"),
                     "weight": (rule.get("params") or {}).get("weight"),

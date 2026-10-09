@@ -53,6 +53,11 @@ class DobContext(BaseModel):
     cues: list[str]
 
 
+class NameCues(BaseModel):
+    honorifics: list[str] = Field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
+
+
 class DenyEntry(BaseModel):
     value: str
     type: TokenType
@@ -69,7 +74,9 @@ class RedactionConfig(BaseModel):
     patterns: dict[str, PatternGroup]
     phone_regions: list[str]
     dob_context: DobContext
+    name_cues: NameCues = Field(default_factory=NameCues)
     structured_fields: dict[TokenType, list[str]]
+    person_groups: dict[str, list[str]] = Field(default_factory=dict)
     location_fields: dict[str, list[str]]
     allowlist: list[str]
     denylist: list[DenyEntry] = Field(default_factory=list)
@@ -89,6 +96,12 @@ class RedactionConfig(BaseModel):
         for token_type, names in self.structured_fields.items():
             if field_name in names:
                 return token_type
+        return None
+
+    def person_group(self, field_name: str) -> str | None:
+        for group, names in self.person_groups.items():
+            if field_name in names:
+                return group
         return None
 
     def allowlist_patterns(self) -> list[re.Pattern[str]]:

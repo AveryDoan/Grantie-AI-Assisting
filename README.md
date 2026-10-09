@@ -92,17 +92,19 @@ The database repeats the critical rules as triggers and constraints (migrations 
 Requirements: Python 3.11+, a Supabase project, and a Google AI Studio API key (optional for offline work).
 
 ```bash
-# 1. Python environment
+# 1. Python environment (redaction runs locally: Presidio + spaCy + pdfplumber)
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,redaction]"
+python -m spacy download en_core_web_lg      # ~600 MB English model, pinned to 3.8.0
 
 # 2. Configuration
 cp .env.example .env          # then fill in SUPABASE_* and GEMINI_API_KEY / GEMINI_MODEL
+python -m redaction.crypto    # prints a new key: put it in .env as REDACTION_KEY (never commit it)
 
 # 3. Database: apply migrations (Supabase CLI)
 supabase init                 # once; keeps the existing supabase/migrations
 supabase link --project-ref <your-project-ref>
-supabase db push              # applies 0001 to 0007
+supabase db push              # applies 0001 to 0010
 #    (or paste each file in supabase/migrations/ into the SQL editor, in order,
 #     or: for f in supabase/migrations/*.sql; do psql "$DATABASE_URL" -1 -f "$f"; done
 #     using the Session pooler connection string - the direct db.* host is IPv6-only)
@@ -116,9 +118,21 @@ uvicorn app.main:app --reload            # docs at http://localhost:8000/docs
 
 Clients authenticate with a Supabase session JWT (`Authorization: Bearer <access_token>`). The token is verified against `SUPABASE_JWKS_URL`. The user's role comes from `profiles.role`, which only an admin can change.
 
-### Officer web app (frontend/)
+### Web app (frontend/)
 
-The officer workspace is a React + Vite app built from the Figma Make design "Study NT Grant – AI Application". It covers the queue, rule-by-rule review, sign-off, outcome letter, audit trail and evaluation dashboard. The applicant screens are not built yet.
+A React + Vite app built from the Figma Make design "Study NT Grant – AI Application".
+
+The public pages are:
+- `#/`: a landing page.
+- `#/apply`: the 7-step application form. Applicants sign in, and their draft is saved on the server. Documents are really uploaded: PDF, text or a JPG/PNG photo, up to 5 MB, with PDF metadata stripped. The server reads text locally (no OCR), and the check before submit uses the server's pre-check.
+
+The officer workspace covers:
+- the queue;
+- rule-by-rule review;
+- **Redaction & AI trace** (`#/applications/:id/trace`): the redacted text the AI reads, beside the original (shown on request and audited); the placeholders used; the facts the AI extracted; and every AI quote, as returned with placeholders, beside the applicant's restored words and the code's verification result;
+- sign-off, the outcome letter, the audit trail and the evaluation dashboard.
+
+Only the applicant can submit an application, and staff can never submit on an applicant's behalf, so an upload test runs as an applicant: apply at `#/apply`, then sign in as an officer to review.
 
 ```bash
 # Quickest demo: no Supabase needed (in-memory SYNTHETIC data, demo login)
@@ -144,7 +158,7 @@ Set `LLM_FALLBACK_PROVIDER=groq` with `GROQ_API_KEY` and `GROQ_MODEL`. When Gemi
 ## Tests
 
 ```bash
-pytest                                                        # 89 tests, in-memory
+pytest                                                        # 234 tests incl. redaction (needs the [redaction] extra + en_core_web_lg)
 TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres pytest   # + real-Postgres trigger/RLS tests
 ```
 
@@ -180,6 +194,77 @@ The run reports:
 - every failure.
 
 [eval/reports/sample_report.md](eval/reports/sample_report.md) is a **sample produced with the offline stub**. It shows the report format and that the deterministic code checks match the answer key. Its LLM-rule figures are not meaningful, because the stub was written alongside the cases. Run with a real key for real figures. `GET /evaluation/latest` returns the latest run.
+
+## Redaction
+
+> [!WARNING]
+> **Synthetic data only.** Do not load real applicant data until a privacy impact assessment (PIA) is done,
+> a retention policy is agreed, and the LLM provider's data terms have been reviewed
+> (on Google's free Gemini API tier, inputs may be used to improve Google's products).
+
+Every LLM call goes through redaction first. Redaction runs **locally**: Presidio and spaCy, plus custom regexes and the known values from the form. It never calls a cloud PII service and never uses an LLM.
+
+```mermaid
+flowchart LR
+    A[Stored original<br/>applications.application_text<br/>documents in Storage] --> B[Redaction<br/>fields + answers + PDFs<br/>no OCR]
+    B --> C[Leak scan<br/>emails, phones, long numbers,<br/>known values, redacted originals]
+    C -- fails --> X[Blocked<br/>ai_status = blocked_redaction_leak<br/>no LLM call]
+    C -- passes --> D[Redacted copy<br/>PERSON_1, EMAIL_1, ...]
+    D --> E[GuardedLLM<br/>only hashes of leak-scanned text,<br/>prompt re-scanned]
+    E --> F[LLM]
+    F --> G[Findings with tokens]
+    B --> K[(redaction_token_maps<br/>AES-256-GCM, staff-only RLS)]
+    G --> H[Officer view<br/>restore() + span mapping:<br/>quotes in the applicant's own words]
+    K --> H
+```
+
+- **Tokens are consistent:** the same person is `[PERSON_1]` everywhere, including "Linh Tran", "TRAN, Linh" and "Linh". Place names in addresses become a location class (`outside_australia`, `nt_australia`, `australia_outside_nt`, `unknown`), worked out before redaction.
+- **Kept on purpose:** providers, course names, visa subclasses, scholarships, NT places, countries and ordinary dates. The rules need them. Only a date of birth is redacted.
+- **Fails closed:** if anything personal is still visible, the LLM is not called and the officer sees why (counts and check names, never values).
+- **Originals:** stored encrypted (`v1:<key id>:<AES-GCM>`, key in `REDACTION_KEY`). They are never logged, and the audit log records only who looked and when.
+- **PDFs:** text is read with pdfplumber (MIT). Pages without text, images, scans and non-PDF files are flagged for manual review and never sent to the AI. Metadata is stripped.
+
+| Endpoint | Who | What |
+|---|---|---|
+| `POST /applications/{id}/redact` | officer, admin | run or reuse redaction (idempotent; `{"force": true}` re-runs) |
+| `GET /applications/{id}/redaction-report` | officer, admin | status, counts, documents needing review (no values) |
+| `GET /applications/{id}/original-view` | officer, admin | the original text, restored exactly; audited |
+
+Applicant intake (role `applicant`, own drafts only):
+
+| Endpoint | What |
+|---|---|
+| `GET /programs` | open programs |
+| `GET` / `POST /me/applications`, `PUT /me/applications/{id}` | list, create or save drafts (snake_case fields and answers) |
+| `POST /me/applications/{id}/documents` | upload one file as base64 JSON (≤ 5 MB; PDF, text or photo) |
+| `DELETE /me/applications/{id}/documents/{doc}` | remove a file from a draft |
+| `GET /me/applications/{id}/check` | missing items only, never eligibility |
+| `POST /me/applications/{id}/submit` | submit, optionally asking for a person-only assessment |
+
+Settings are in [config/redaction.yaml](config/redaction.yaml): entity types, patterns and scores, the allowlist, the denylist and countries. Its hash is stored with every run.
+
+### Redaction evaluation
+
+```bash
+python -m redaction.eval        # about 10 s; writes eval/reports/redaction_eval.md
+```
+
+It reports:
+- recall per entity type, where a name counts as leaked if any part survives;
+- over-redaction (terms the rules need that were removed, plus any unexpected tokens);
+- name recall by culture (detector only, and with known values);
+- whether findings change before and after redaction on the twin set N01/N08/N09 (offline stub).
+
+Every miss is listed. See [eval/reports/redaction_eval.md](eval/reports/redaction_eval.md). The set is small, and the detector was tuned on it, so treat the numbers as optimistic.
+
+### Redaction limits
+
+- **Redaction cannot guarantee zero leaks.** An unknown name that the detector misses and that matches nothing known will not be caught by the leak scan either. In the evaluation, "Le Hoang Nam" is still missed when the system is not told the name.
+- **Free text can identify someone indirectly**, for example through a rare job, a small town or a family story, without any name or number.
+- **Names from some cultures are missed more often**: single names, family-name-first orders and names that are also English words.
+- **Non-English text is over-redacted**, because the English model tags ordinary words as names.
+- **Not covered:** scanned documents, photos, signatures, letterheads drawn as images, handwriting and headshots (no OCR). They go to manual review instead.
+- **Speed:** a few seconds per application locally; about 13 seconds on the live project, including document downloads.
 
 ---
 
@@ -251,19 +336,19 @@ Assumption to confirm: R1's required document list (CoE, visa, passport or trave
 
 - **Synthetic data only** until a PIA is done. `documents.is_sample` is constrained to `true`.
 - **No secrets in the repo.** `.env` is git-ignored; `.env.example` lists every setting. The secret key is server-side only.
-- **The LLM sees redacted text only**, in `applications.redacted_text`. The token-to-original mapping lives in `redaction_maps`, which only staff can read. Documents never go to the LLM.
+- **The LLM sees redacted, leak-scanned text only** (see [Redaction](#redaction)): `applications.redacted_text` and `documents.redacted_text`. The token-to-original mapping lives in `redaction_token_maps`, encrypted, and readable only by staff and the backend service role. Applicants and the LLM never receive it.
 - **Logs:** application logs contain ids and counts only. A log filter masks emails, phone numbers, JWTs and API keys as a backstop. Error messages never include application text.
 - **Retention:** `LLM_RETENTION_DAYS` controls how long cached LLM outputs are kept. `purge_expired_llm_data()` runs at API startup and can be scheduled (for example with pg_cron).
 - **RLS:**
   - Officers see their organisation's programs only.
   - Applicants see their own applications, can edit only drafts, and see a letter only once it is approved.
-  - Applicants can never read findings, the audit log or redaction maps.
+  - Applicants can never read findings, the audit log or redaction token maps.
   - The API uses the secret key and repeats the same checks in `app/services/access.py`.
 - **Rate limiting** is in-process (a single instance). Use a shared store behind a load balancer.
 
 ## Limits of the system
 
-- **Redaction is pattern-based.** Personal names in free text without a cue (a form field, a title such as "Ms", or "my name is") can be missed. Review redacted text before any real use.
+- **Redaction cannot guarantee zero leaks.** See [Redaction limits](#redaction-limits). Review redacted text before any real use.
 - **The injection screen is pattern-based.** It flags common phrasings but can be evaded. That is why the prompts treat all text as data and an officer reviews every finding.
 - **Document checks read structured text samples only.** Classification is by keyword and fields are read from "Label: value" lines.
 - **Name tolerance:** names are compared regardless of order and diacritics. Transliteration differences are handled by a fuzzy threshold (`NAME_MATCH_THRESHOLD`), not linguistic rules.
@@ -285,10 +370,12 @@ Assumption to confirm: R1's required document list (CoE, visa, passport or trave
 ## Repository layout
 
 ```
-supabase/migrations/   schema, RLS, triggers, audit log, storage (0001 to 0007)
+supabase/migrations/   schema, RLS, triggers, audit log, storage, redaction (0001 to 0010)
 supabase/tests/        local Supabase stand-in + SQL behaviour checks
 app/llm/               call_llm interface, Gemini/Groq providers, cache, offline stub
-app/pipeline/          rules loader, redaction, injection, documents, facts, rules, verification, orchestrator
+app/pipeline/          rules loader, injection, documents, facts, rules, verification, orchestrator
+redaction/             local redaction: detector, tokens, PDFs, leak scan, crypto, restore, spans, eval
+config/redaction.yaml  redaction settings (entities, patterns, allowlist)
 app/services/          access, audit, officer review/sign-off, letters, pre-check, queue
 app/api/ + app/main.py FastAPI app, auth, rate limiting
 seed/                  synthetic data, placeholders, seed CLI

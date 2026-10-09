@@ -116,6 +116,37 @@ class SupabaseStore:
 
         return self._run(build, retry=False)
 
+    def delete(self, table: str, *, eq: dict[str, Any]) -> list[dict[str, Any]]:
+        if not eq:
+            raise StoreError("refusing an unfiltered delete")
+
+        def build() -> Any:
+            q = self.client.table(table).delete()
+            for k, v in eq.items():
+                q = q.eq(k, v)
+            return q
+
+        return self._run(build, retry=False)
+
+    def download(self, bucket: str, path: str) -> bytes | None:
+        """File bytes from Supabase Storage, or None if unavailable."""
+        try:
+            return self.client.storage.from_(bucket).download(path)
+        except Exception:
+            return None
+
+    def upload(self, bucket: str, path: str, data: bytes, content_type: str) -> None:
+        try:
+            self.client.storage.from_(bucket).upload(path, data, {"content-type": content_type, "upsert": "false"})
+        except Exception as exc:
+            raise StoreError("file upload failed") from exc  # never echo the file or its name
+
+    def remove(self, bucket: str, path: str) -> None:
+        try:
+            self.client.storage.from_(bucket).remove([path])
+        except Exception as exc:
+            raise StoreError("file delete failed") from exc
+
     def rpc(self, fn: str, params: dict[str, Any]) -> Any:
         try:
             return self.client.rpc(fn, params).execute().data

@@ -145,6 +145,14 @@ def normalise_declared(declared: str) -> DocType:
     return _DECLARED_ALIASES.get(declared.strip().lower(), "other")
 
 
+def detect_type(text: str, declared: DocType) -> DocType:
+    """A photo has no text to classify: take a declared headshot at its word (the officer
+    checks the photo by eye). Every other document must show its type in its text."""
+    if not text.strip() and declared == "headshot":
+        return "headshot"
+    return classify(text)
+
+
 def classify(text: str) -> DocType:
     lowered = text.lower()
     for doc_type, keywords in _PRIORITY_TYPES:
@@ -264,8 +272,8 @@ def check_documents(
     checks: list[DocumentCheck] = []
     for doc in documents:
         text = doc.get("extracted_text") or ""
-        detected = classify(text)
         declared = normalise_declared(doc.get("declared_type") or "")
+        detected = detect_type(text, declared)
         fields_ = extract_fields(text)
         chk = DocumentCheck(
             document_id=doc["id"],

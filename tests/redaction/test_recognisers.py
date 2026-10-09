@@ -9,7 +9,7 @@ pytest.importorskip("en_core_web_lg")
 
 from redaction.config import load_config  # noqa: E402
 from redaction.detector import Detector  # noqa: E402
-from redaction.recognizers import KnownValue, known_value_patterns  # noqa: E402
+from redaction.recognizers import KnownValue  # noqa: E402
 from tests.redaction.names import NAMES, TEMPLATES  # noqa: E402
 
 
@@ -143,12 +143,16 @@ def test_known_values_caught_in_any_form(detector):
 def test_reversed_name_order_and_parts(detector):
     known = [KnownValue("Linh Tran", "PERSON", "applicant_name")]
     f = found(detector, "Visa Holder: TRAN, Linh. Linh is hard-working.", known)
-    assert f.get("TRAN") == "PERSON" and f.get("Linh") == "PERSON"
+    assert f.get("TRAN, Linh") == "PERSON"  # family-name-first form caught as one name
+    assert f.get("Linh") == "PERSON"
 
 
-def test_name_particles_are_not_redacted_alone():
-    pats = [p for p, _ in known_value_patterns(KnownValue("Ahmed bin Rashid", "PERSON", "applicant_name"))]
-    assert not any(p.endswith("bin(?!\\w)") for p in pats)
+def test_name_particles_are_not_redacted_alone(detector):
+    known = [KnownValue("Ahmed bin Rashid", "PERSON", "applicant_name")]
+    text = "The bin was full. Ahmed bin Rashid emptied it."
+    f = found(detector, text, known)
+    assert f.get("Ahmed bin Rashid") == "PERSON"
+    assert "bin" not in f  # the particle alone is an ordinary word
 
 
 def test_known_value_overrides_allowlist(detector):

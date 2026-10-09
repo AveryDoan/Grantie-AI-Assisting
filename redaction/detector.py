@@ -28,9 +28,11 @@ from presidio_analyzer.predefined_recognizers import SpacyRecognizer
 
 from redaction.config import RedactionConfig, default_config
 from redaction.recognizers import (
+    HONORIFICS,
     DobRecognizer,
     KnownValue,
     KnownValueRecognizer,
+    NameCueRecognizer,
     builtin_recognizers,
     pattern_recognizers,
 )
@@ -50,6 +52,7 @@ class Detection:
     low_confidence: bool
     recognizer: str
     source: str | None = None  # for known values: the structured field (never the value)
+    group: str | None = None   # for known values: which person, e.g. "applicant"
 
 
 _ENGINES: dict[str, AnalyzerEngine] = {}
@@ -80,7 +83,8 @@ def build_engine(cfg: RedactionConfig) -> AnalyzerEngine:
     registry = RecognizerRegistry(supported_languages=["en"])
     registry.add_recognizer(SpacyRecognizer(supported_entities=["PERSON", "LOCATION"]))
     for rec in [*builtin_recognizers(cfg), *pattern_recognizers(cfg),
-                DobRecognizer(cfg.dob_context.cues, cfg.dob_context.window)]:
+                DobRecognizer(cfg.dob_context.cues, cfg.dob_context.window),
+                NameCueRecognizer(cfg.name_cues.honorifics, cfg.name_cues.labels)]:
         registry.add_recognizer(rec)
     return AnalyzerEngine(registry=registry, nlp_engine=provider.create_engine(), supported_languages=["en"])
 
@@ -92,6 +96,9 @@ class Detector:
         self.allow = self.cfg.allowlist_patterns()
         self.countries = self.cfg.country_set()
         self.entities = [e for e in self.cfg.entities if e not in ("REFEREE",)]
+        vocab = self.engine.nlp_engine.nlp["en"].vocab
+        # A sentence-initial word joins an adjacent name only if it is not an English word.
+        self.unknown_word = lambda w: not vocab[w.lower()].has_vector and not vocab[w.lower()].is_stop
 
     def _allowlisted_spans(self, text: str) -> list[tuple[int, int]]:
         return [(m.start(), m.end()) for p in self.allow for m in p.finditer(text)]
@@ -114,8 +121,12 @@ class Detector:
             is_known = r.entity_type == KnownValueRecognizer.ENTITY
             span = text[r.start : r.end]
             if not is_known:
-                if any(r.start < e and s < r.end for s, e in allowed):
-                    continue  # allowlisted phrase (provider, course, place, scholarship...)
+                # Allowlisted phrase (provider, course, place, scholarship...): it overrides any
+                # overlapping NER guess, but a structured pattern only when it lies wholly inside
+                # the phrase ("NT" is kept, the postcode in "NT 0800" is still an address).
+                ner = r.entity_type in ("PERSON", "LOCATION", "NRP")
+                if any((r.start < e and s < r.end) if ner else (s <= r.start and r.end <= e) for s, e in allowed):
+                    continue
                 if r.entity_type == "LOCATION" and span.strip(" .,").casefold() in self.countries:
                     continue  # country of residence / nationality are kept
             token_type = meta.get("token_type") if is_known else self.cfg.token_type(r.entity_type)
@@ -124,11 +135,20 @@ class Detector:
             if token_type == "PERSON" and kind == "referee_letter" and not is_known:
                 token_type = "REFEREE"
             start, end = r.start, r.end
+            if r.entity_type in ("PERSON", "LOCATION"):
+                # NER spans never cross a line: "Linh\nVisa Subclass" is a name plus a form label.
+                cut = text.find("\n", start, end)
+                if cut != -1:
+                    end = cut
+                if end <= start or not text[start:end].strip():
+                    continue
+                if r.entity_type == "PERSON" and text[start:end].strip(" .,").casefold() in HONORIFICS:
+                    continue  # a title on its own ("title: Ms") is not a name
             if r.entity_type == "PERSON":
-                start, end = _extend_name(text, start, end, allowed)
+                start, end = _extend_name(text, start, end, allowed, self.unknown_word)
             low = (not is_known) and r.score < self.cfg.min_score(r.entity_type)
             candidates.append(Detection(start, end, r.entity_type, token_type, round(r.score, 3), low,
-                                        meta.get("recognizer_name", "?"), meta.get("source")))
+                                        meta.get("recognizer_name", "?"), meta.get("source"), meta.get("group")))
         return _resolve_overlaps(candidates)
 
 
@@ -139,12 +159,14 @@ _NOT_NAME = frozenset(
 )
 
 
-def _extend_name(text: str, start: int, end: int, blocked: list[tuple[int, int]]) -> tuple[int, int]:
+def _extend_name(text: str, start: int, end: int, blocked: list[tuple[int, int]],
+                 unknown_word=lambda w: False) -> tuple[int, int]:
     """Grow a partial name detection over adjacent capitalised name words.
 
     Fairness: NER often catches only part of a family-name-first or Pacific
     name ("Nguyen Van" of "Nguyen Van An"). Stops at punctuation, sentence
-    starts, common capitalised words and allowlisted phrases.
+    starts, common capitalised words and allowlisted phrases. A sentence-initial
+    word is only taken when it is not an English word ("Sione Tupou and ...").
     """
     def ok(a: int, b: int, word: str) -> bool:
         return word not in _NOT_NAME and not any(a < e and s < b for s, e in blocked)
@@ -162,9 +184,11 @@ def _extend_name(text: str, start: int, end: int, blocked: list[tuple[int, int]]
         if not m or not ok(m.start(1), m.end(1), m.group(1)):
             break
         before = text[: m.start(1)].rstrip()
-        if not before or before[-1] in ".!?:\n":
-            break  # sentence-initial capital: not evidence of a name
+        if (not before or before[-1] in ".!?:\n") and not unknown_word(m.group(1)):
+            break  # sentence-initial capital of an English word: not evidence of a name
         start = m.start(1)
+        if not before or before[-1] in ".!?:\n":
+            break
     return start, end
 
 
@@ -177,8 +201,34 @@ _PRIORITY = {
 }
 
 
+_PERSONISH = ("PERSON", "REFEREE")
+
+
+def _merge_people(cands: list[Detection]) -> list[Detection]:
+    """Overlapping person detections become one span (their union).
+
+    A known value keeps its identity (type, group, source) in the union, so an
+    NER guess can never cut a known name in half ("TRAN, Linh" + "Linh").
+    """
+    people = sorted((d for d in cands if d.token_type in _PERSONISH), key=lambda d: d.start)
+    others = [d for d in cands if d.token_type not in _PERSONISH]
+    merged: list[Detection] = []
+    for d in people:
+        if merged and d.start < merged[-1].end:
+            m = merged[-1]
+            keep = m if m.entity == "KNOWN_VALUE" or d.entity != "KNOWN_VALUE" else d
+            merged[-1] = Detection(min(m.start, d.start), max(m.end, d.end), keep.entity, keep.token_type,
+                                   max(m.score, d.score), m.low_confidence and d.low_confidence, keep.recognizer,
+                                   keep.source, keep.group)
+        else:
+            merged.append(d)
+    return merged + others
+
+
 def _resolve_overlaps(cands: list[Detection]) -> list[Detection]:
-    """Longest span first, then the more specific recogniser, then score; keep non-overlapping."""
+    """Merge overlapping people, then longest span first, then the more specific
+    recogniser, then score; keep non-overlapping."""
+    cands = _merge_people(cands)
     ordered = sorted(cands, key=lambda d: (-(d.end - d.start), _PRIORITY.get(d.entity, 9), -d.score, d.start))
     kept: list[Detection] = []
     for d in ordered:

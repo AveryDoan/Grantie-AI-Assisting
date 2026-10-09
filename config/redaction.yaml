@@ -97,6 +97,13 @@ patterns:
     context: [phone, mobile, tel, telephone, call, whatsapp, contact]
     score: 0.5
 
+# Structural name cues (no NER needed). The name after a title, or the value
+# of a labelled line, is a person. The title itself is kept ("Mr [REFEREE_2]").
+name_cues:
+  honorifics: [Mr, Mrs, Ms, Miss, Mx, Dr, Prof, Professor, Sir, Madam, Dame, Rev, Fr, Sr]
+  labels: [referee name, referee, name, full name, student name, applicant name, signed, signature, signed by,
+           from, contact, contact name, contact person, prepared by, supervisor, principal, teacher, witness]
+
 # Regions for Presidio's phonenumbers-based recogniser (international applicants).
 phone_regions: [AU, NZ, US, GB, CA, IN, VN, CN, HK, TW, PH, ID, MY, SG, TH, NP, BD, LK, PK, KR, JP, NG, KE, GH, ZA, BR, CO, MX, IR, AE, SA, EG, FR, DE, IT, ES]
 
@@ -115,6 +122,14 @@ structured_fields:
   ADDRESS: [residential_address, postal_address, street_address, address]
   DOB: [date_of_birth, dob]
   ID: [passport_number, visa_grant_number, student_id, coe_number, coe_code, abn, tfn]
+
+# Name fields that belong to the same person share one token in every form
+# ("Linh Tran", "TRAN, Linh", "Linh"). Order fixes token numbering.
+person_groups:
+  applicant: [applicant_name, full_name, given_name, given_names, family_name, surname, preferred_name,
+              declaration_name, declaration_signature]
+  contact: [contact_name, contact_person]
+  guardian: [parent_name, guardian_name]
 
 # Fields used to compute the coarse location_class BEFORE redaction.
 location_fields:
@@ -151,6 +166,7 @@ allowlist:
   - Study NT
   # NT and Australian places (rules need them; they are not personal)
   - Northern Territory
+  - 're:(?-i:\bNT\b)'
   - Darwin
   - Palmerston
   - Alice Springs

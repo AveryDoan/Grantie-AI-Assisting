@@ -53,3 +53,25 @@ class DemoLogin(BaseModel):
     """Demo mode only (APP_MODE=demo)."""
 
     role: Literal["officer", "admin", "applicant"] = "officer"
+
+
+class RedactRequest(BaseModel):
+    force: bool = Field(False, description="Re-run even if nothing changed")
+
+
+class DraftIn(BaseModel):
+    """Applicant draft. Field names are snake_case; values are plain text."""
+
+    grant_program_id: str | None = None
+    fields: dict[str, Any] = Field(default_factory=dict)
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+
+class DocumentUpload(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    declared_type: str = Field(min_length=1, max_length=40)
+    content_base64: str = Field(min_length=1, max_length=7_100_000)  # 5 MB file, base64-encoded
+
+
+class SubmitIn(BaseModel):
+    manual_assessment: bool = False

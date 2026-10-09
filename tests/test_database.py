@@ -98,3 +98,65 @@ def test_audit_log_update_and_delete_blocked_even_for_owner(db):
             conn.execute("update audit_log set reason = 'x'")
         with pytest.raises(psycopg.Error):
             conn.execute("delete from audit_log")
+
+
+REDACTION_RLS_SQL = """
+begin;
+insert into auth.users (id) values ('00000000-0000-0000-0000-00000000aa01'), ('00000000-0000-0000-0000-00000000aa02'),
+                                   ('00000000-0000-0000-0000-00000000aa03');
+insert into organisations (id, name) values ('10000000-0000-0000-0000-0000000000aa', 'Redaction Org'),
+                                            ('10000000-0000-0000-0000-0000000000bb', 'Other Org');
+update profiles set role = 'officer', organisation_id = '10000000-0000-0000-0000-0000000000aa' where id = '00000000-0000-0000-0000-00000000aa01';
+update profiles set role = 'officer', organisation_id = '10000000-0000-0000-0000-0000000000bb' where id = '00000000-0000-0000-0000-00000000aa03';
+insert into grant_programs (id, organisation_id, name) values ('20000000-0000-0000-0000-0000000000aa', '10000000-0000-0000-0000-0000000000aa', 'P');
+insert into rule_packs (id, grant_program_id, version) values ('30000000-0000-0000-0000-0000000000aa', '20000000-0000-0000-0000-0000000000aa', 'v1');
+insert into rules (rule_pack_id, rule_code, rule_text, rule_type, check_method) values ('30000000-0000-0000-0000-0000000000aa', 'R1', 'x', 'factual', 'llm');
+update rule_packs set status = 'approved', approved_by = '00000000-0000-0000-0000-00000000aa01', approved_at = now() where id = '30000000-0000-0000-0000-0000000000aa';
+insert into applicants (id, user_id, display_name) values ('50000000-0000-0000-0000-0000000000aa', '00000000-0000-0000-0000-00000000aa02', 'Fictional');
+insert into applications (id, grant_program_id, rule_pack_id, applicant_id, status, submitted_at)
+  values ('60000000-0000-0000-0000-0000000000aa', '20000000-0000-0000-0000-0000000000aa', '30000000-0000-0000-0000-0000000000aa',
+          '50000000-0000-0000-0000-0000000000aa', 'submitted', now());
+insert into redaction_runs (id, application_id, status, detector_version, config_hash)
+  values ('70000000-0000-0000-0000-0000000000aa', '60000000-0000-0000-0000-0000000000aa', 'ok', 'test', 'hash');
+insert into redaction_token_maps (application_id, run_id, token, entity_type, original_value_encrypted, source, text_key, ordinal)
+  values ('60000000-0000-0000-0000-0000000000aa', '70000000-0000-0000-0000-0000000000aa', '[PERSON_1]', 'PERSON', 'v1:abcd:Zm9v',
+          'fields:applicant_name', 'application_text', 0);
+"""
+
+
+def _as(conn, user_id: str | None) -> None:
+    if user_id is None:
+        conn.execute("set local role anon")
+        return
+    conn.execute("select set_config('request.jwt.claims', %s, true)", (f'{{"sub":"{user_id}","role":"authenticated"}}',))
+    conn.execute("set local role authenticated")
+
+
+def test_redaction_token_map_rls(db):
+    with psycopg.connect(db) as conn:  # one transaction, rolled back at the end
+        for stmt in split_sql(REDACTION_RLS_SQL):
+            if stmt != "begin":
+                conn.execute(stmt)
+        conn.execute("savepoint s")
+        _as(conn, "00000000-0000-0000-0000-00000000aa01")  # officer, same organisation
+        assert conn.execute("select count(*) from redaction_token_maps").fetchone()[0] == 1
+        assert conn.execute("select count(*) from redaction_runs").fetchone()[0] == 1
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("insert into redaction_token_maps (application_id, token, entity_type, original_value_encrypted, "
+                         "source, text_key, ordinal) values ('60000000-0000-0000-0000-0000000000aa', '[X_1]', 'PERSON', "
+                         "'v1:a:b', 's', 't', 0)")
+        conn.execute("rollback to savepoint s")
+        for who in ("00000000-0000-0000-0000-00000000aa02", "00000000-0000-0000-0000-00000000aa03"):  # applicant; other org
+            _as(conn, who)
+            assert conn.execute("select count(*) from redaction_token_maps").fetchone()[0] == 0, who
+            assert conn.execute("select count(*) from redaction_runs").fetchone()[0] == 0, who
+            conn.execute("rollback to savepoint s")
+        _as(conn, None)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("select * from redaction_token_maps")
+        conn.execute("rollback to savepoint s")
+        with pytest.raises(psycopg.errors.CheckViolation):  # plaintext is rejected by the database itself
+            conn.execute("insert into redaction_token_maps (application_id, token, entity_type, original_value_encrypted, "
+                         "source, text_key, ordinal) values ('60000000-0000-0000-0000-0000000000aa', '[PERSON_2]', 'PERSON', "
+                         "'Linh Tran', 's', 't', 1)")
+        conn.rollback()

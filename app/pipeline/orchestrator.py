@@ -4,6 +4,12 @@
 it directly. `run_assessment` adds access checks, idempotency, persistence
 and audit for the API.
 
+Every LLM call goes through redaction first: the text is redacted and
+leak-scanned by the `redaction` package, and the LLM client is wrapped in
+GuardedLLM, which refuses anything that did not pass. If redaction blocks
+(leak found, or low-confidence detections in "block" mode) the assessment
+stops before any LLM call - it fails closed.
+
 The pipeline only produces suggestions. Nothing here approves, rejects,
 scores or ranks an application.
 """
@@ -24,13 +30,13 @@ from app.pipeline.evaluate import consistency_check, evaluate_rules
 from app.pipeline.facts import FactSet, extract_facts
 from app.pipeline.injection import InjectionFlag, screen_application
 from app.pipeline.prompts import PROMPT_VERSION
-from app.pipeline.redaction import RedactionResult, redact
 from app.pipeline.referees import extract_referee_letters
 from app.pipeline.rules_loader import RulePackError, RulePackNotApproved, load_rule_pack
 from app.pipeline.verification import verify_findings
 from app.services.access import Actor, application_for_staff
 from app.services.audit import write_audit
 from app.services.errors import Conflict, ManualAssessmentRequested
+from app.services.redaction_service import RedactionBlockedError, extracted_documents, document_kinds, run_and_store
 from app.store.base import Store, now_iso, one
 
 log = get_logger(__name__)
@@ -58,7 +64,7 @@ def load_reference_lists(store: Store, pack: RulePack) -> dict[str, list[str] | 
 @dataclass
 class AssessmentOutcome:
     rule_pack: RulePack
-    redaction: RedactionResult
+    redaction: Any  # redaction.pipeline.RedactionOutcome
     injection_flags: list[InjectionFlag]
     document_checks: DocumentChecks
     facts: FactSet
@@ -82,8 +88,13 @@ def compute_input_hash(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _applicant_names(applicant: dict[str, Any] | None) -> list[str]:
-    return [applicant["display_name"]] if applicant and applicant.get("display_name") else []
+def redact_for_assessment(application: dict[str, Any], documents: list[dict[str, Any]]):
+    """Pure redaction (no persistence), used when no stored outcome is passed in."""
+    from redaction.pipeline import run_redaction
+
+    extracted = extracted_documents(None, documents)
+    return run_redaction(application.get("id", "unsaved"), application.get("application_text") or {},
+                         [d for _, d, _ in extracted], document_kinds=document_kinds(extracted))
 
 
 def assess_application(
@@ -97,7 +108,10 @@ def assess_application(
     applicant: dict[str, Any] | None = None,
     consistency: bool | None = None,
     reference_lists: dict[str, list[str] | None] | None = None,
+    redaction: Any = None,
 ) -> AssessmentOutcome:
+    from redaction.pipeline import GuardedLLM
+
     # Defence in depth: the API and the database both refuse too.
     if application.get("manual_assessment_requested"):
         raise ManualAssessmentRequested(
@@ -111,21 +125,32 @@ def assess_application(
     use_consistency = settings.consistency_check if consistency is None else consistency
     model_name = llm.model_name if llm else "none"
 
-    redaction = redact(app_text, extra_names=_applicant_names(applicant))
+    # Redaction first. Nothing below may send unredacted text to the LLM.
+    redaction = redaction or redact_for_assessment(application, documents)
+    if not redaction.llm_allowed:
+        raise RedactionBlockedError(
+            f"AI assessment stopped: redaction status is '{redaction.ai_status}'. An officer must review the application.",
+            details={"ai_status": redaction.ai_status, "leak_scan": redaction.report.get("leak_scan", {})},
+        )
+    llm = GuardedLLM(llm, redaction) if llm is not None else None
+    redacted_text = redaction.redacted_text
+
+    # Local, code-only checks read the original text; it never leaves this process.
     flags = screen_application(app_text, documents)
     doc_checks = check_documents(typed, documents, name_threshold=settings.name_match_threshold)
     facts = extract_facts(
-        llm, pack.rules, typed, redaction.text, pack.version, threshold=settings.quote_fuzzy_threshold
+        llm, pack.rules, typed, redacted_text, pack.version, threshold=settings.quote_fuzzy_threshold
     )
     referees: list = []
     if _needs_referees(pack):
         letters = [d for d in documents if any(c.document_id == d["id"] and c.detected_type == "referee_letter" for c in doc_checks.checks)]
-        referees = extract_referee_letters(llm, letters, pack.version, applicant_names=_applicant_names(applicant),
+        doc_texts = {d.document_id: d.redacted_text for d in redaction.documents if d.included_in_ai_input}
+        referees = extract_referee_letters(llm, letters, pack.version, redacted_texts=doc_texts,
                                            threshold=settings.quote_fuzzy_threshold)
     findings = evaluate_rules(
         llm,
         pack.rules,
-        redacted_text=redaction.text,
+        redacted_text=redacted_text,
         pack_version=pack.version,
         facts=facts,
         documents=doc_checks,
@@ -137,11 +162,11 @@ def assess_application(
         raw_documents=documents,
     )
     if use_consistency:
-        findings = consistency_check(llm, pack.rules, findings, redaction.text, pack.version)
+        findings = consistency_check(llm, pack.rules, findings, redacted_text, pack.version)
     findings = verify_findings(
         findings,
         pack.rules,
-        redaction.text,
+        redacted_text,
         threshold=settings.quote_fuzzy_threshold,
         min_fuzzy_length=settings.quote_min_fuzzy_length,
         extra_sources={f"document:{r.document_id}": r.redacted_text for r in referees},
@@ -159,7 +184,7 @@ def assess_application(
         document_checks=doc_checks,
         facts=facts,
         findings=findings,
-        input_hash=compute_input_hash(redaction.text, documents, pack.version, model_name, use_consistency,
+        input_hash=compute_input_hash(redacted_text, documents, pack.version, model_name, use_consistency,
                                       reference_lists, register_rows),
         model_name=model_name,
         prompt_version=PROMPT_VERSION,
@@ -198,16 +223,26 @@ def run_assessment(
     except RulePackError as exc:
         raise Conflict(str(exc)) from exc
 
-    documents = store.select("documents", eq={"application_id": application_id})
     applicant = one(store.select("applicants", eq={"id": app["applicant_id"]}, limit=1))
     register_rows = store.select("mock_grants_register", eq={"applicant_id": app["applicant_id"]})
     use_consistency = settings.consistency_check if consistency is None else consistency
     model_name = llm.model_name if llm else "none"
 
+    # Redact (and store the encrypted token map) before anything else. Fail closed.
+    redacted = run_and_store(store, actor, application_id, settings)
+    redaction = redacted["outcome"]
+    if not redaction.llm_allowed:
+        write_audit(store, actor, "assessment.refused", application_id=application_id,
+                    details={"reason": redaction.ai_status, "redaction_run_id": redacted["run"]["id"]})
+        raise RedactionBlockedError(
+            f"AI assessment stopped: redaction status is '{redaction.ai_status}'. An officer must review the application.",
+            details={"ai_status": redaction.ai_status, "leak_scan": redaction.report.get("leak_scan", {})},
+        )
+    documents = store.select("documents", eq={"application_id": application_id})
+
     # Idempotency: same inputs -> same run (reviews are kept).
-    redacted_preview = redact(app.get("application_text") or {}, extra_names=_applicant_names(applicant)).text
     reference_lists = load_reference_lists(store, pack)
-    input_hash = compute_input_hash(redacted_preview, documents, pack.version, model_name, use_consistency,
+    input_hash = compute_input_hash(redaction.redacted_text, documents, pack.version, model_name, use_consistency,
                                     reference_lists, register_rows)
     if not force:
         previous = store.select(
@@ -248,15 +283,20 @@ def run_assessment(
             applicant=applicant,
             consistency=use_consistency,
             reference_lists=reference_lists,
+            redaction=redaction,
         )
         _persist(store, app, run, outcome, documents)
     except Exception as exc:
+        from redaction.pipeline import RedactionBlocked
+
         log.exception("assessment run %s failed", run["id"])
         message = f"{type(exc).__name__}"  # no application text in errors
         store.update("assessment_runs", {"status": "failed", "finished_at": now_iso(), "error_message": message},
                      eq={"id": run["id"]})
         write_audit(store, actor, "assessment.failed", application_id=application_id,
                     rule_pack_version=pack.version, details={"run_id": run["id"], "error": message})
+        if isinstance(exc, RedactionBlocked):
+            raise RedactionBlockedError(str(exc)) from exc
         raise
 
     summary = {
@@ -276,15 +316,8 @@ def _persist(
     store: Store, app: dict[str, Any], run: dict[str, Any], outcome: AssessmentOutcome, documents: list[dict[str, Any]]
 ) -> None:
     app_id = app["id"]
-    store.update(
-        "applications",
-        {"redacted_text": outcome.redaction.text, "status": "in_review"},
-        eq={"id": app_id},
-    )
-    if store.select("redaction_maps", eq={"application_id": app_id}, limit=1):
-        store.update("redaction_maps", {"mapping": outcome.redaction.mapping}, eq={"application_id": app_id})
-    else:
-        store.insert("redaction_maps", {"application_id": app_id, "mapping": outcome.redaction.mapping})
+    # Redacted text and the encrypted token map were stored by the redaction service.
+    store.update("applications", {"status": "in_review"}, eq={"id": app_id})
 
     for chk in outcome.document_checks.checks:
         store.update(

@@ -41,9 +41,8 @@ def evidence_from_referees(rule: Rule, referees: list | None) -> Finding:
         for key in ("referee_name", "position", "organisation", "relationship", "length_of_association"):
             f = l.fields.get(key)
             if f and f.source_quote:
-                quotes.append({"quote": f.source_quote, "source": f.source, "label": key.replace("_", " "),
-                               "display": l.restore(f.source_quote)})
-        quotes.extend({**h, "label": "about the applicant", "display": l.restore(h["quote"])} for h in l.highlights)
+                quotes.append({"quote": f.source_quote, "source": f.source, "label": key.replace("_", " ")})
+        quotes.extend({**h, "label": "about the applicant"} for h in l.highlights)
     return Finding(rule_id=rule.id, rule_code=rule.rule_code, ai_status="Evidence only", supporting_quotes=quotes,
                    check_source=rule.check_method, is_valid=True)
 

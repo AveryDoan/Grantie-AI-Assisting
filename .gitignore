@@ -25,3 +25,7 @@ supabase/.temp/
 # Frontend
 node_modules/
 frontend/dist/
+
+# Local redaction sandbox: real documents and their outputs must never be committed
+sandbox/input/
+sandbox/output/

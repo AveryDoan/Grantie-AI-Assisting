@@ -40,7 +40,12 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
     for role, u in DEMO_USERS.items():
         store.insert("profiles", {"id": u["id"], "role": role, "organisation_id": u["org"], "display_name": u["display_name"]})
     store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
-    demo_settings = settings.model_copy(update={"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48))})
+    from redaction.crypto import generate_key
+
+    update = {"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48))}
+    if not settings.redaction_key.get_secret_value():  # demo data is in memory: an ephemeral key is fine
+        update["redaction_key"] = SecretStr(generate_key())
+    demo_settings = settings.model_copy(update=update)
 
     # Populate the evaluation dashboard (clearly labelled as the offline stub).
     from eval.harness import run_evaluation

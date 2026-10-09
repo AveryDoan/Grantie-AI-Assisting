@@ -28,7 +28,9 @@ dev = ["pytest>=8", "psycopg[binary]>=3.2", "pypdf>=4"]
 # (azure-*, langextract, transformers). Install the spaCy model separately:
 #   pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 redaction = ["presidio-analyzer==2.2.364", "presidio-anonymizer==2.2.364", "spacy==3.8.16",
-             "pdfplumber==0.11.10", "pyyaml>=6.0.3", "cryptography>=46"]
+             "pdfplumber==0.11.10", "pypdf>=6.19", "pyyaml>=6.0.3", "cryptography>=46"]
+# Local OCR for the redaction sandbox. Also needs the Tesseract binary (Apache-2.0): brew install tesseract
+ocr = ["pytesseract==0.3.13"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

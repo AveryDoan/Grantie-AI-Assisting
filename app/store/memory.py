@@ -53,6 +53,19 @@ class MemoryStore:
     def __init__(self) -> None:
         self.tables: dict[str, list[dict[str, Any]]] = {}
         self._seq = itertools.count(1)
+        self.files: dict[tuple[str, str], bytes] = {}  # (bucket, path) -> bytes (in-memory Storage)
+
+    # -- Storage -----------------------------------------------------------
+    def upload(self, bucket: str, path: str, data: bytes, content_type: str) -> None:
+        if (bucket, path) in self.files:
+            raise StoreError("file already exists")
+        self.files[(bucket, path)] = bytes(data)
+
+    def download(self, bucket: str, path: str) -> bytes | None:
+        return self.files.get((bucket, path))
+
+    def remove(self, bucket: str, path: str) -> None:
+        self.files.pop((bucket, path), None)
 
     # -- helpers -----------------------------------------------------------
     @staticmethod
