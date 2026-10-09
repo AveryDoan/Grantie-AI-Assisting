@@ -57,3 +57,51 @@ Flags a case lists as ones it should NOT raise, but did: none.
 
 AI items dropped because their quote could not be verified in the text: **0**. Items kept only as 'unclear' (no quotes shown): **0**.
 <!-- /run:stub -->
+
+<!-- run:gemini -->
+
+## Run: Gemini (gemini:gemini-3.5-flash), REDACTED text only
+
+Generated 2026-10-09 12:02 UTC. 11 cases assessed.
+
+The AI-assisted checks (timeline, narrative, and the referee-letter fields) ran on a real model, through `GuardedLLM`, which only allows leak-scanned redacted text. Model output varies from run to run.
+
+### Per check type
+
+| Check type | Expected flags | Raised (recall) | Missed | Flags raised | Unexpected | Precision |
+|---|---|---|---|---|---|---|
+| cross_document | 5 | 5/5 (100%) | 0 | 6 | 0 | 6/6 (100%) |
+| timeline | 3 | 1/3 (33%) | 2 | 1 | 0 | 1/1 (100%) |
+| document_integrity | 2 | 2/2 (100%) | 0 | 3 | 0 | 3/3 (100%) |
+| cross_application | 11 | 11/11 (100%) | 0 | 11 | 0 | 11/11 (100%) |
+| narrative | 2 | 0/2 (0%) | 2 | 3 | 3 | 0/3 (0%) |
+
+Precision here is the share of flags raised that the case expected. Flags a case lists as allowed (weak signals or a near-duplicate of an expected one) count as expected.
+
+### Per case (planted problems)
+
+| Case | Should raise | Raised it | Missed | Unexpected flags | Strong | Unclear |
+|---|---|---|---|---|---|---|
+| F01 | `cross_document.arrival_vs_start` | 1/1 | - | `narrative.conflicting_statements` (strong) | 2 | 0 |
+| F02 | `cross_document.coe_length`, `cross_document.typed_coe_end`, `cross_document.referee_date_window` | 3/3 | - | `narrative.conflicting_statements` (strong) | 4 | 0 |
+| F03 | `cross_document.known_for_vs_timeline`, `narrative.conflicting_statements` | 1/2 | `narrative.conflicting_statements` | - | 1 | 0 |
+| F04 | `timeline.role_before_age`, `timeline.overlapping_full_time`, `timeline.visa_before_coe` | 1/3 | `timeline.role_before_age`, `timeline.overlapping_full_time` | - | 1 | 0 |
+| F05 | `narrative.conflicting_statements` | 0/1 | `narrative.conflicting_statements` | - | 0 | 0 |
+| F06 | `document_integrity.created_after_dated`, `document_integrity.editing_software` | 2/2 | - | `narrative.conflicting_statements` (strong) | 1 | 0 |
+| F07 | `cross_application.shared_referee_phone`, `cross_application.shared_referee_email_domain`, `cross_application.reused_wording`, `cross_application.shared_contact_phone` | 4/4 | - | - | 3 | 0 |
+| F08 | `cross_application.shared_referee_phone`, `cross_application.shared_referee_email_domain`, `cross_application.reused_wording` | 3/3 | - | - | 2 | 0 |
+| F09 | `cross_application.shared_referee_phone`, `cross_application.shared_referee_email_domain`, `cross_application.reused_wording`, `cross_application.shared_contact_phone` | 4/4 | - | - | 3 | 0 |
+
+### Controls (precision)
+
+Innocent cases. They must raise **no strong flag**. Weak signals are listed because they are the false-positive risk (scans, re-saved PDFs, a short agreed late arrival).
+
+| Case | Strong flags | Weak flags raised | Unexpected | Result |
+|---|---|---|---|---|
+| F10 | 0 | `cross_document.arrival_vs_start`, `document_integrity.created_after_dated` | - | pass |
+| N08 | 0 | - | - | pass |
+
+Flags a case lists as ones it should NOT raise, but did: F01: `narrative.conflicting_statements`, F02: `narrative.conflicting_statements`, F06: `narrative.conflicting_statements`.
+
+AI items dropped because their quote could not be verified in the text: **0**. Items kept only as 'unclear' (no quotes shown): **0**.
+<!-- /run:gemini -->

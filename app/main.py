@@ -23,6 +23,8 @@ from app.api.schemas import (
     AssessRequest,
     ClarificationRequestIn,
     DemoLogin,
+    ReferenceListSave,
+    ReferenceListText,
     DocumentUpload,
     DraftIn,
     FlagReview,
@@ -38,7 +40,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, consistency, intake, letters, precheck, queue, redaction_service, review
+from app.services import audit, consistency, intake, letters, precheck, queue, redaction_service, reference_lists, review
 from app.services.access import Actor, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
@@ -245,6 +247,28 @@ def create_app(
     def linked_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
         """Groups of applications that share an attribute. Names the attribute, never its value."""
         return consistency.linked_groups(s, actor, settings)
+
+    # ---------------------------------------------------- reference lists
+    @r.get("/reference-lists")
+    def reference_lists_index(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        return reference_lists.list_all(s, actor)
+
+    @r.get("/reference-lists/{name}")
+    def reference_list_detail(name: str, q: str | None = None, actor: Actor = Depends(current_actor),
+                              s: Store = Depends(get_store)) -> dict[str, Any]:
+        return reference_lists.get_one(s, actor, name, q)
+
+    @r.post("/reference-lists/{name}/preview")
+    def reference_list_preview(name: str, body: ReferenceListText, actor: Actor = Depends(current_actor),
+                               s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Read the pasted list and show what would change. Saves nothing."""
+        return reference_lists.preview(s, actor, name, body.text)
+
+    @r.put("/reference-lists/{name}")
+    def reference_list_save(name: str, body: ReferenceListSave, actor: Actor = Depends(current_actor),
+                            s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Replace the list. Audited with counts only. Re-assess applications to use the new list."""
+        return reference_lists.save(s, actor, name, body.text, body.edition, body.source)
 
     # ------------------------------------------------------------ applicant intake
     @r.get("/programs")

@@ -18,9 +18,16 @@ from model output. It is marked for human review.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any
 
+from app.services.reference_lists import items_of, parse_text
+
 NS = uuid.UUID("6f1c2b0e-8d3a-4c5e-9b7a-0d1e2f3a4b5c")
+
+
+SOPL_FILE = Path(__file__).parent / "lists" / "nt_skilled_occupation_priority_list_2026.txt"
+SOPL_ENTRIES = parse_text(SOPL_FILE.read_text(encoding="utf-8"))[0]
 
 
 def sid(key: str) -> str:
@@ -118,8 +125,10 @@ REFERENCE_LISTS = [
         "id": sid("list:nt_skilled_occupation_priority_list"),
         "name": "nt_skilled_occupation_priority_list",
         "description": "NT Skilled Occupation Priority List (Study NT rule S3)",
-        "source": "https://nt.gov.au/_media/docs/employing-people-and-jobs/for-employers-in-the-nt/nt-skilled-occupation-priority-list.pdf (not yet loaded: python -m seed.load_lists --sopl <pdf>)",
-        "items": [],
+        "source": "2026 Northern Territory skilled occupation priority list, Department of Trade, Business and Asian Relations",
+        "edition": "31 August 2026",
+        "entries": SOPL_ENTRIES,
+        "items": items_of(SOPL_ENTRIES),
     },
 ]
 

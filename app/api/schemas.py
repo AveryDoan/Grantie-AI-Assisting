@@ -80,3 +80,12 @@ class FlagReview(BaseModel):
 
 class SubmitIn(BaseModel):
     manual_assessment: bool = False
+
+
+class ReferenceListText(BaseModel):
+    text: str = Field(..., max_length=400_000, description="One row per line: OSCA code, occupation, skill level")
+
+
+class ReferenceListSave(ReferenceListText):
+    edition: str | None = Field(None, max_length=80, description="For example: 31 August 2026")
+    source: str | None = Field(None, max_length=300)

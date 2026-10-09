@@ -117,7 +117,7 @@ def seed(store: Any, *, demo_values: bool = True, user_ids: dict[str, str] | Non
         if not existing:
             store.insert("reference_lists", lst)
         elif lst["items"] and existing[0].get("items") != lst["items"]:
-            store.update("reference_lists", {"items": lst["items"], "source": lst["source"]}, eq={"name": lst["name"]})
+            store.update("reference_lists", {k: lst[k] for k in ("items", "source", "entries", "edition") if k in lst}, eq={"name": lst["name"]})
 
     app_ids: dict[str, str] = {}
     for case in data.CASES:
