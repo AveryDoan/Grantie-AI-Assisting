@@ -1,0 +1,13 @@
+[page 1]
+Biography
+[PERSON_1] is a computer engineer from [PLACE_1], Nepal, who is passionate about using data to
+solve real community problems. She graduates in December 2026 from Himalayan Institute of
+Technology with a GPA of 3.84 and will begin a Master of Data Science in Darwin in 2027. [PERSON_1]
+founded Code Pahadi, a free coding club that now teaches more than 180 rural girls across six
+schools. She has also led the Women in Technology Society, worked as a data analyst for a
+[PLACE_1] consultancy and led flood recovery training for 300 villagers. Her crop disease
+detection app for farmers won first place at the 2025 National Student Innovation Showcase. In the
+Northern Territory she hopes to build her data analytics skills, volunteer in the community and later
+work on data projects that help remote communities. Outside study, she enjoys hiking, cooking
+momo for friends and mentoring younger students whenever she can find the time.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

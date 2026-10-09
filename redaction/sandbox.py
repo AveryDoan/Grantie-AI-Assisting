@@ -665,6 +665,15 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--inject-test", action="store_true", help="re-insert one original value and show the leak scan catching it")
     r.add_argument("--ocr", action="store_true", help="read images and scanned pages with local Tesseract OCR")
     r.add_argument("--allow-cloud-sync", action="store_true", help="allow a cloud-synced folder (synthetic files only)")
+    a = sub.add_parser("assess", help="build one application from a folder of documents; show what the AI reads and finds")
+    a.add_argument("folder", type=Path)
+    a.add_argument("--known", nargs="*", default=[], metavar="VALUE", help='the applicant: "Full Name" 2003/03/14')
+    a.add_argument("--answers", type=Path, help="folder with <field>.txt written answers missing from the documents")
+    a.add_argument("--llm", choices=["stub", "gemini"], default="stub",
+                   help="stub (default): local keyword matcher, not an LLM. gemini: sends the REDACTED text to Gemini")
+    a.add_argument("--not-personal", nargs="*", default=[], metavar="WORD",
+                   help="ordinary words the name detector mistook for people, e.g. Code Email (this run only)")
+    a.add_argument("--allow-cloud-sync", action="store_true")
     rs = sub.add_parser("restore", help="decrypt the token map and rebuild the original view")
     rs.add_argument("output_dir", type=Path)
     w = sub.add_parser("wipe", help="securely delete everything in sandbox input/ and output/")
@@ -673,6 +682,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "run":
             run(args.file, args.known, inject_test=args.inject_test, allow_cloud_sync=args.allow_cloud_sync, ocr=args.ocr)
+        elif args.cmd == "assess":
+            from redaction.sandbox_assess import assess_folder
+
+            assess_folder(args.folder, args.known, answers_dir=args.answers, llm=args.llm, not_personal=args.not_personal,
+                         allow_cloud_sync=args.allow_cloud_sync)
         elif args.cmd == "restore":
             restore_dir(args.output_dir)
         else:

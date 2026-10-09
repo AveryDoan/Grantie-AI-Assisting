@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Original view (officer only)</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+</style></head><body><main>
+<div class="banner officer">OFFICER-ONLY · contains personal information · local file: never commit, upload or share</div>
+<h1>Original view (officer only)</h1><p class="muted">doc-1d163cf06c · detected spans are highlighted by type (hover for the token)</p>
+<div class="legend"><mark class="EMAIL">Email</mark><mark class="PERSON">Name</mark><mark class="PHONE">Phone</mark><mark class="PLACE">Place</mark><mark class="URL">URL</mark></div>
+<div class="card"><pre class="doc">[page 1]
+<mark class="PERSON" title="[PERSON_1] · Name">SITA KARKI</mark>
+House 22, Ward 5, <mark class="PLACE" title="[PLACE_1] · Place">Baneshwor</mark>, <mark class="PERSON" title="[PERSON_2] · Name">Kathmandu</mark> 44600, Nepal | <mark class="PHONE" title="[PHONE_1] · Phone">+977 9841 555 201</mark> | <mark class="EMAIL" title="[EMAIL_1] · Email">sita.karki.sample@gmail.com</mark> |
+<mark class="URL" title="[URL_1] · URL">linkedin.com/in/sitakarki-sample</mark>
+Education
+Bachelor of Engineering, Computer Engineering, Himalayan Institute of Technology,
+<mark class="PERSON" title="[PERSON_2] · Name">Kathmandu</mark>. Jan 2023 to Dec 2026 (expected). GPA 3.84/4.0. <mark class="PERSON" title="[PERSON_3] · Name">Dean</mark>&#x27;s Merit Award 2023, <mark class="PERSON" title="[PERSON_4] · Name">2024</mark>,
+2025.
+Higher Secondary (Science), Gorkha Model College. 2019 to 2021. Result: 3.92 GPA.
+Experience
+Data Analyst (part time intern, then contractor), <mark class="PERSON" title="[PERSON_5] · Name">Kathmandu DataWorks</mark>. <mark class="PERSON" title="[PERSON_6] · Name">Jun 2024</mark> to present.
+Built hospital reporting dashboard, cutting reporting time from 3 days to 4 hours. Trained 2 new
+interns. Python, SQL, Power BI.
+Founder and Lead Mentor, <mark class="PERSON" title="[PERSON_7] · Name">Code Pahadi</mark> (free coding club for rural girls). 2022 to present.
+Grew from 9 students in 1 school to 180+ students in 6 schools with 14 volunteer mentors.
+President, Women in Technology Society, Himalayan Institute of Technology. <mark class="PERSON" title="[PERSON_4] · Name">2024</mark>.
+Membership up from 40 to 125. Secured 12 internships with local employers.
+Volunteer Team Lead, Gorkha Flood Recovery Digital Skills Project. 2025.
+Led 6 volunteers, trained 300 villagers, moved 41 small businesses online.
+Awards and publications
+First place, National Student Innovation Showcase 2025. Short paper: &#x27;Offline first crop disease
+detection for low bandwidth farms&#x27;, Himalayan Computing Conference 2025.
+Skills and languages
+Python, SQL, TensorFlow, Power BI, React Native, <mark class="PERSON" title="[PERSON_8] · Name">Git</mark>. English (IELTS 7.5), Nepali (native), Hindi
+(fluent).
+Referees
+Dr <mark class="PERSON" title="[PERSON_9] · Name">Anita Rai</mark> (HIT), <mark class="EMAIL" title="[EMAIL_2] · Email">anita.rai@hit.example.edu.np</mark>. Mr <mark class="PERSON" title="[PERSON_10] · Name">Prakash Thapa</mark> (<mark class="PERSON" title="[PERSON_5] · Name">Kathmandu DataWorks</mark>),
+<mark class="EMAIL" title="[EMAIL_3] · Email">prakash@kdw.example.com.np</mark>.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></div></main></body></html>

@@ -1,0 +1,32 @@
+[page 1]
+[PERSON_2] Pvt. Ltd.
+K
+Analytics and Software Consulting
+[PLACE_1] 14, [PERSON_2] 44600, Nepal | [PHONE_1] | [EMAIL_1]
+16 September 2026
+Study NT Scholarship Assessment Panel
+Department of Trade, Business and Asian Relations
+Northern Territory Government, Darwin [LOCATION: NT, Australia], Australia
+RE: Letter of support for [PERSON_3], 2026-27 Scholarship Program Round 1 (Study NT)
+To the Assessment Panel,
+I am the Founder and Managing Director of [PERSON_2]. [PERSON_1] worked for us as a
+part time data analyst intern from June 2024 to August 2025, and has continued as a casual
+contractor since. I supervised her directly for the whole period, a total of about 27 months.
+Work and academic ability. [PERSON_1] joined us while studying full time and still delivered. She built a
+dashboard for a hospital client that cut their monthly reporting from three days to four hours. She
+taught herself Python libraries we had not used before and documented her work so others could
+follow it. In my view her technical skill is already at graduate level.
+Personal qualities and leadership. [PERSON_1] is honest about what she does not know and quick to ask
+for help. When two interns joined after her, she trained them without being asked. She also gave
+her own weekends to the [PERSON_4] flood relief project and asked for leave only twice. Colleagues
+trust her and clients ask for her by name.
+I recommend [PERSON_1] fully for this scholarship. She would be a credit to the Northern Territory
+community, and we would welcome her back after her studies if she chooses to return. I am happy
+to be contacted.
+Yours sincerely,
+[PERSON_5]
+Mr [PERSON_5]
+Founder and Managing Director, [PERSON_2] Pvt. Ltd.
+Relationship: direct employer and supervisor. Length of association: 27 months (since June 2024).
+[PERSON_6]: [EMAIL_2] | Mobile: [PHONE_2]
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

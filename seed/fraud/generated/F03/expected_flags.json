@@ -1,0 +1,14 @@
+{
+  "code": "F03",
+  "control": false,
+  "should_raise": [
+    "cross_document.known_for_vs_timeline",
+    "narrative.conflicting_statements"
+  ],
+  "may_raise": [],
+  "should_not_raise": [
+    "timeline.*",
+    "cross_application.*",
+    "document_integrity.*"
+  ]
+}

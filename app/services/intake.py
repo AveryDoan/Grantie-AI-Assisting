@@ -106,11 +106,35 @@ def update_draft(store: Store, actor: Actor, application_id: str, *, fields: dic
     return {"id": application_id, "status": "draft"}
 
 
-def add_document(store: Store, actor: Actor, application_id: str, *, file_name: str, declared_type: str,
-                 content_base64: str) -> dict[str, Any]:
+def prepare_upload(data: bytes, file_name: str, *, applicant_name: str | None = None, doc_id: str | None = None,
+                   read_signals: bool = False) -> tuple[bytes, Any, dict[str, Any], str]:
+    """Everything done to an uploaded file before it is stored: (bytes to store, extraction, signals, kind).
+
+    For a PDF the metadata is read FIRST (only derived signals are kept: dates, a software class, booleans)
+    and then stripped from the stored copy. The raw author, creator and producer strings are never kept.
+    """
     from redaction.extract import extract_document, sniff_kind, strip_pdf_metadata
 
-    _draft(store, actor, application_id)
+    kind = sniff_kind(data, file_name)
+    doc_id = doc_id or str(uuid.uuid4())
+    original = data
+    if kind == "pdf":
+        data = strip_pdf_metadata(data)   # the stored copy never carries author, title, XMP or any other metadata
+    extracted = extract_document(doc_id, file_name, data)   # text comes from the clean copy, as it always did
+    signals: dict[str, Any] = {}
+    if kind == "pdf" and read_signals:
+        from app.pipeline.consistency.integrity_signals import read_integrity_signals
+
+        # Read from the ORIGINAL bytes (the stripped copy has no metadata left). Only derived signals are kept.
+        signals = read_integrity_signals(original, text=extracted.text, applicant_name=applicant_name)
+    return data, extracted, signals, kind
+
+
+def add_document(store: Store, actor: Actor, application_id: str, *, file_name: str, declared_type: str,
+                 content_base64: str, consistency: bool = False) -> dict[str, Any]:
+    from redaction.extract import sniff_kind
+
+    app = _draft(store, actor, application_id)
     declared = declared_type.strip().lower()
     if declared not in DECLARED_TYPES:
         raise InvalidUpload("Unknown document type")
@@ -123,26 +147,27 @@ def add_document(store: Store, actor: Actor, application_id: str, *, file_name: 
     if len(data) > MAX_BYTES:
         raise InvalidUpload("File too large. Choose a file smaller than 5 MB or ask a person for help.")
     safe_name = re.sub(r"[^\w.\- ]", "_", file_name.strip())[:120] or "document"
-    kind = sniff_kind(data, safe_name)
-    if kind not in CONTENT_TYPES:
+    if sniff_kind(data, safe_name) not in CONTENT_TYPES:
         raise InvalidUpload("Upload a PDF, a plain-text file, or a JPG/PNG photo. Word files are not supported yet.")
-    if kind == "pdf":
-        data = strip_pdf_metadata(data)  # author/title/XMP often hold names; keep only the pages
-
     doc_id = str(uuid.uuid4())
+    typed_name = ((app.get("application_text") or {}).get("fields") or {}).get("applicant_name")
+    # Metadata is read before it is stripped (author/title/XMP often hold names); only derived signals are kept.
+    data, extracted, signals, kind = prepare_upload(data, safe_name, applicant_name=typed_name, doc_id=doc_id, read_signals=consistency)
     path = f"{application_id}/{doc_id}"  # no file name in the path: names often contain personal details
     upload = getattr(store, "upload", None)
     if upload is None:
         raise ServiceError("File storage is not available")
     upload(BUCKET, path, data, CONTENT_TYPES[kind])
-    extracted = extract_document(doc_id, safe_name, data)
     from app.pipeline.documents import classify
 
-    row = store.insert("documents", {
+    values = {
         "id": doc_id, "application_id": application_id, "storage_path": path, "file_name": safe_name,
         "declared_type": declared, "extracted_text": extracted.text or None,
         "detected_type": None, "is_sample": True,
-    })[0]
+    }
+    if consistency:
+        values["integrity_signals"] = signals   # column added by migration 0011
+    row = store.insert("documents", values)[0]
     looks_like = classify(extracted.text) if extracted.text else None
     write_audit(store, actor, "document.uploaded", application_id=application_id,
                 details={"document_id": doc_id, "declared_type": declared, "kind": kind, "bytes": len(data),

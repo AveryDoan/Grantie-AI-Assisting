@@ -1,0 +1,12 @@
+[page 1]
+HIMALAYAN INSTITUTE OF TECHNOLOGY
+Office of the [PERSON_2], Faculty of Engineering
+[PERSON_2]'s Merit Award
+is proudly presented to
+[PERSON_1]
+Student ID HIT-CE-2022-0381, Bachelor of Engineering (Computer Engineering)
+in recognition of outstanding academic achievement, placing in the top 5% of the cohort
+for the 2025 academic year.
+[PERSON_3]
+Prof. [PERSON_4], [PERSON_5]: 20 January 2026 | Cert. No. DMA-2025-0381
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

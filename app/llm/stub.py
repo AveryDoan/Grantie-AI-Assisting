@@ -83,6 +83,10 @@ class OfflineStubProvider:
             return json.dumps({"facts": [self._fact(k, sentences) for k in meta.get("keys", [])]})
         if kind == "referee":
             return json.dumps(self._referee(source))
+        if kind == "timeline":
+            return json.dumps({"events": _stub_timeline(source)})
+        if kind == "narrative":
+            return json.dumps({"contradictions": _stub_narrative(source)})
         code = self._qualified(meta.get("rule_code", ""), prompt)
         hints = _HINTS.get(code, {})
         if hints.get("field"):
@@ -150,3 +154,83 @@ class OfflineStubProvider:
             }
         return {"status": "Needs evidence", "rationale": "The application does not address this rule.", "evidence_quote": None,
                 "confidence": "medium", "language_flag": False, "needs_applicant_clarification": True}
+
+
+# ---------------------------------------------------------------------------
+# Consistency-layer tasks. Pattern matching over the combined redacted text; NOT an LLM, and written alongside
+# the synthetic test cases, so it says nothing about how a real model performs.
+# ---------------------------------------------------------------------------
+
+_MONTH = r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+_WHEN_S = rf"(?:{_MONTH}\.?\s+\d{{4}}|\d{{4}})"
+_RANGE = re.compile(rf"(?<![\d/])(?P<s>{_WHEN_S})\s*(?:-|\u2013|\u2014|to|until)\s*(?P<e>{_WHEN_S}|present|current|now)(?![\d/])", re.I)
+_MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+_ROLE_WORDS = re.compile(r"president|manager|engineer|analyst|developer|intern|volunteer|coordinator|captain|lead|director|founder|"
+                         r"assistant|officer|teacher|tutor|consultant|designer|member|chair|secretary|treasurer|representative", re.I)
+_STUDY_WORDS = re.compile(r"bachelor|master|diploma|degree|studies|studied|student at|studying|secondary school|high school|college|university|certificate", re.I)
+_NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+
+
+def _norm_when(text: str) -> str:
+    m = re.match(rf"({_MONTH})\.?\s+(\d{{4}})", text.strip(), re.I)
+    return f"{m.group(2)}-{_MONTHS[m.group(1)[:3].lower()]:02d}" if m else text.strip()
+
+
+def _stub_timeline(source: str) -> list[dict[str, Any]]:
+    events = []
+    for line in source.splitlines():
+        if line.startswith("=== ") or not line.strip():
+            continue
+        m = _RANGE.search(line)
+        if not m:
+            continue
+        before = re.sub(r"[\s,;:(\-\u2013]+$", "", line[: m.start()]).strip(" -*\u2022\t") or line[m.end():].strip(" ,;:()-")
+        kind = "role" if _ROLE_WORDS.search(line) or not _STUDY_WORDS.search(line) else "study"
+        if _STUDY_WORDS.search(line) and not _ROLE_WORDS.search(line):
+            kind = "study"
+        low = line.lower()
+        events.append({"label": before[:80] or "Event", "kind": kind, "start": _norm_when(m.group("s")),
+                       "end": "present" if m.group("e").lower() in ("present", "current", "now") else _norm_when(m.group("e")),
+                       "full_time": True if re.search(r"full[- ]time", low) else False if re.search(r"part[- ]time", low) else None,
+                       "quote": line.strip()})
+    return events[:40]
+
+
+def _num(token: str) -> float | None:
+    t = token.lower()
+    return float(_NUMBER_WORDS[t]) if t in _NUMBER_WORDS else (float(t) if re.fullmatch(r"\d+(?:\.\d+)?", t) else None)
+
+
+def _stub_narrative(source: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    parts = re.split(r"(?m)^=== .* ===\n", source)
+    claims, records = [], []
+    for part in parts:
+        for m in re.finditer(r"[^.\n]*\b(?:studied|study|studying|completed)\b[^.\n]*?\bfor\s+(\w+)\s+years?\b[^.\n]*", part, re.I):
+            n = _num(m.group(1))
+            if n is not None:
+                topic = re.search(r"(?:studied|study|studying|completed)\s+([\w ]{3,40}?)\s+for\b", m.group(0), re.I)
+                claims.append((n, m.group(0).strip(), topic.group(1).strip() if topic else "years of study"))
+        for m in re.finditer(r"[^\n]*\b(?:years? (?:completed|of study|attended)|duration of (?:study|attendance)|completed\s+\w+\s+years?)\b[^\n]*", part, re.I):
+            nums = [n for t in re.findall(r"\b(\d+(?:\.\d+)?|one|two|three|four|five|six)\b", m.group(0), re.I) if (n := _num(t)) is not None and n < 15]
+            if nums:
+                records.append((nums[0], m.group(0).strip()))
+    for n, quote, topic in claims:
+        for k, rec in records:
+            if abs(n - k) >= 1 and quote != rec:
+                out.append({"topic": "years of study" if not topic else topic[:40], "first_quote": quote, "second_quote": rec})
+                break
+    # A referee's "known for N years" against the same letter's "since <Month YYYY>".
+    for part in parts:
+        known = re.search(r"[^.\n]*\bknown\b[^.\n]*?\bfor\s+(\w+)\s+years?\b[^.\n]*", part, re.I)
+        since = re.search(rf"[^.\n]*\b(?:since|joined|started)\b[^.\n]*?({_MONTH}\.?\s+\d{{4}})[^.\n]*", part, re.I)
+        dated = re.search(rf"(?im)^\s*date\s*:\s*(?:\d{{1,2}}\s+)?({_MONTH}\.?\s+\d{{4}})", part)
+        if known and since and dated and known.group(0) != since.group(0):
+            n = _num(known.group(1))
+            a, b = _norm_when(since.group(1)).split("-"), _norm_when(dated.group(1)).split("-")
+            if n is not None and len(a) == 2 and len(b) == 2:
+                months = (int(b[0]) - int(a[0])) * 12 + int(b[1]) - int(a[1])
+                if abs(n * 12 - months) > 12:
+                    out.append({"topic": "how long the referee has known the applicant", "first_quote": known.group(0).strip(),
+                                "second_quote": since.group(0).strip()})
+    return out[:6]

@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     redaction_key: SecretStr = SecretStr("")
     redaction_key_previous: SecretStr = SecretStr("")
 
+    # --- Consistency layer ("the story doesn't add up" signals) --------------
+    # Off by default in supabase mode: it needs migration 0011. Demo mode turns it on.
+    consistency_layer: bool = False
+    # HMAC key for the identifier hashes used to link applications (base64/url-safe, >= 32 bytes).
+    # Identifiers are never stored or logged, only keyed hashes. Never commit this value.
+    identifier_hash_key: SecretStr = SecretStr("")
+
     # --- API ----------------------------------------------------------------
     rate_limit_per_minute: int = 60
     rate_limit_assess_per_minute: int = 6

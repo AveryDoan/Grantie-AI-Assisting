@@ -21,6 +21,7 @@ instead of quietly producing "Unclear" findings.
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypeVar
 
@@ -95,6 +96,8 @@ def consistency_known_values(token_map: TokenMap, known: list[KnownValue]) -> li
             token_type = token_map.entries[o.token].token_type
             if token_type == "ADDRESS" or len(o.original.strip()) < 3:
                 continue  # addresses already come from fields; very short values would over-match
+            if token_type in ("PERSON", "REFEREE") and not any(ch.isalpha() for ch in o.original):
+                continue  # a name has letters: a year the NER tagged once ("2024") must not vanish everywhere
             key = (token_type, o.original.casefold())
             if key not in have:
                 have.add(key)
@@ -180,6 +183,30 @@ class GuardedLLM:
         self.scanner = LeakScanner(cfg or default_config())
         self.allowed = {text_hash(t) for t in outcome.ai_texts().values()} if outcome.llm_allowed else set()
         self.blocked_calls = 0
+
+    def combine(self, parts: list[tuple[str, str]]) -> tuple[str, list[tuple[str, int, int, str]]]:
+        """One prompt text made of several redacted texts, for checks that compare passages across documents.
+
+        Each part must already be an allowed (redacted, leak-scanned) text, exactly as the redaction produced it.
+        The headings are made here from plain labels. The combined text is then allowed as a whole, and the
+        prompt is still re-scanned before sending. Returns the text and (label, start, end, part_text) per part.
+        """
+        if not self.outcome.llm_allowed:
+            raise RedactionBlocked(f"LLM call refused for application {self.outcome.application_id}: {self.outcome.ai_status}")
+        out, segments, pos = [], [], 0
+        for label, text in parts:
+            if text_hash(text) not in self.allowed:
+                raise RedactionBlocked("combined text refused: a part did not pass redaction")
+            if not re.fullmatch(r"[A-Za-z0-9 _:()./-]{1,80}", label):
+                raise RedactionBlocked("combined text refused: unsafe heading")
+            head = f"=== {label} ===\n"
+            start = pos + len(head)
+            out.append(head + text + "\n\n")
+            segments.append((label, start, start + len(text), text))
+            pos += len(out[-1])
+        combined = "".join(out)
+        self.allowed.add(text_hash(combined))
+        return combined, segments
 
     @property
     def model_name(self) -> str:

@@ -1,0 +1,16 @@
+{
+  "code": "F02",
+  "control": false,
+  "should_raise": [
+    "cross_document.coe_length",
+    "cross_document.typed_coe_end",
+    "cross_document.referee_date_window"
+  ],
+  "may_raise": [],
+  "should_not_raise": [
+    "timeline.*",
+    "narrative.*",
+    "cross_application.*",
+    "document_integrity.*"
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "code": "F04",
+  "title": "A role before the applicant could have held it, overlapping full-time work, a visa before the CoE",
+  "display_name": "Farid Waverley",
+  "email": "farid.waverley@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Farid Waverley",
+      "date_of_birth": "2004-06-10",
+      "email": "farid.waverley@example.com",
+      "phone": "0491 570 158",
+      "nationality": "Pakistan",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "5 Jasmine Road, Lahore 54000, Pakistan",
+      "residential_country": "Pakistan",
+      "postal_address": "5 Jasmine Road, Lahore 54000, Pakistan",
+      "postal_country": "Pakistan",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Business",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Farid Waverley",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I am studying at a college in Lahore and will finish my diploma this year.",
+      "academic_achievements": "I have a distinction average and received the college's business studies award last year.",
+      "leadership": "I run a youth robotics club and manage a small team at a retail company.",
+      "community_engagement": "I raise money each Ramadan for a food bank that serves families near my college.",
+      "nt_contribution": "I want to study business in Darwin and learn how small enterprises in remote communities can grow, because I have managed a team and know how much a good plan can change a business.",
+      "biography": "Farid is a business student from Lahore who has combined study, work and community projects since his early teens. He studies full time at a college, works in retail and has founded a youth robotics club that teaches schoolchildren to build and programme simple machines. Each Ramadan he organises a fundraising drive for a food bank, collecting donations from local shops and packing parcels with a team of friends. Colleagues describe him as ambitious, energetic and good with customers. He enjoys cricket, photography and cooking biryani for large groups. In Darwin he wants to study business, learn how small enterprises grow in regional places and one day start a company that gives young people their first job. He believes a good plan, a good team and some patience can change a small business."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    },
+    {
+      "file": "other_1.pdf",
+      "declared_type": "other"
+    }
+  ],
+  "notes": "Born 2004, president of a club from 2013 (age 8 or 9); two full-time jobs and full-time study overlap; the visa is dated before the CoE."
+}

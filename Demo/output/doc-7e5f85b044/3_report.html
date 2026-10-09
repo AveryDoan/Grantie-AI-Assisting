@@ -1,0 +1,87 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Redaction report doc-7e5f85b044</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+</style></head><body><main>
+<div class="banner officer">OFFICER-ONLY · the left pane shows the original document · local file: never commit, upload or share</div>
+<div><h1>Redaction report</h1><p class="muted">doc-7e5f85b044 · pdf, 1 page(s), text layer · 2026-10-09T08:25:40+00:00 · fully local, no network, no LLM</p></div>
+
+<div class="banner ok">Leak scan: <span class="pass">PASS</span> · nothing personal found in the text the LLM would receive</div>
+<div class="grid2">
+  <div class="card"><h2>Original with detections <span class="muted">(officer only)</span></h2>
+    <iframe src="1_original_view.html" title="Original view (officer only)"></iframe></div>
+  <div class="card"><h2>Redacted text <span class="muted">(exactly what an LLM would receive)</span></h2>
+    <div class="pane"><pre class="doc">[page 1]
+HIMALAYAN INSTITUTE OF TECHNOLOGY
+Office of the <mark class="tok">[PERSON_2]</mark>, Faculty of Engineering
+<mark class="tok">[PERSON_2]</mark>&#x27;s Merit Award
+is proudly presented to
+<mark class="tok">[PERSON_1]</mark>
+Student ID HIT-CE-2022-0381, Bachelor of Engineering (Computer Engineering)
+in recognition of outstanding academic achievement, placing in the top 5% of the cohort
+for the 2025 academic year.
+<mark class="tok">[PERSON_3]</mark>
+Prof. <mark class="tok">[PERSON_4]</mark>, <mark class="tok">[PERSON_5]</mark>: 20 January 2026 | Cert. No. DMA-2025-0381
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></div></div>
+</div>
+<div class="grid2">
+  <div class="card"><h2>Tokens</h2><table><thead><tr><th>Entity type</th><th>Token</th><th class=num>Count</th></tr></thead><tbody><tr><td>Name</td><td><mark class=tok>[PERSON_2]</mark></td><td class=num>2</td></tr><tr><td>Name</td><td><mark class=tok>[PERSON_1]</mark></td><td class=num>1</td></tr><tr><td>Name</td><td><mark class=tok>[PERSON_3]</mark></td><td class=num>1</td></tr><tr><td>Name</td><td><mark class=tok>[PERSON_4]</mark></td><td class=num>1</td></tr><tr><td>Name</td><td><mark class=tok>[PERSON_5]</mark></td><td class=num>1</td></tr></tbody></table>
+    <p class="muted" style="margin-top:8px">No original values on this side. The mapping is in token_map.enc (AES-256-GCM).</p></div>
+  <div class="card"><h2>Needed information kept</h2><p class="muted" style="margin-bottom:8px">Deliberately not redacted: the rules need these. “Partly replaced” means the detector over-redacted part of it.</p>
+    <table><thead><tr><th>What</th><th>As the AI sees it</th><th></th></tr></thead><tbody><tr><td>Date (not a date of birth)</td><td>20 January 2026</td><td>kept</td></tr><tr><td>Provider, course, visa or scholarship</td><td>CDU</td><td>kept</td></tr><tr><td>Provider, course, visa or scholarship</td><td>Bachelor of Engineering (Computer Engineering)</td><td>kept</td></tr><tr><td>Location class</td><td>Not enough information, or conflicting</td><td>kept</td></tr></tbody></table></div>
+</div>
+<div class="grid2">
+  <div class="card"><h2>Two-pass consistency</h2><p class="muted" style="margin-bottom:8px">Pass 2 re-redacts knowing every value pass 1 found, so a value hidden in one place is hidden everywhere.</p>
+    <table><thead><tr><th>Type</th><th class=num>Pass 1</th><th class=num>Final</th></tr></thead><tbody><tr><td>Name</td><td class=num>4</td><td class=num>6</td></tr></tbody></table>
+    <p style="margin-top:8px">Pass 2 added 2 replacement(s).</p></div>
+  <div class="card"><h2>Location class</h2><p class="muted" style="margin-bottom:8px">Worked out before redaction from the address and country (pass <code>--known country=…</code>); the AI sees the class, never the address.</p>
+    <table><tbody><tr><td>outside_australia</td><td>Lives outside Australia</td></tr><tr><td>nt_australia</td><td>Lives in the Northern Territory</td></tr><tr><td>australia_outside_nt</td><td>Lives in Australia, outside the NT</td></tr><tr><td><strong>unknown</strong> ← this document</td><td>Not enough information, or conflicting</td></tr></tbody></table></div>
+</div>
+<div class="grid2">
+  <div class="card"><h2>Machine-readable zone</h2><p>No machine-readable zone found.</p></div>
+  <div class="card"><h2>Leak test</h2><p class="muted">Run with <code>--inject-test</code> to re-insert one original value and watch the leak scan catch it.</p></div>
+</div>
+<p class="muted">Detector presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-1 · config c68750c709ac · redaction is not a guarantee: read the redacted text before relying on it.</p></main></body></html>

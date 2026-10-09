@@ -25,6 +25,7 @@ from app.api.schemas import (
     DemoLogin,
     DocumentUpload,
     DraftIn,
+    FlagReview,
     LetterPatch,
     PrecheckRequest,
     RedactRequest,
@@ -37,7 +38,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, intake, letters, precheck, queue, redaction_service, review
+from app.services import audit, consistency, intake, letters, precheck, queue, redaction_service, review
 from app.services.access import Actor, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
@@ -140,7 +141,7 @@ def create_app(
     # ---------------------------------------------------------------- queue
     @r.get("/applications")
     def list_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
-        return queue.list_queue(s, actor)
+        return queue.list_queue(s, actor, settings)
 
     @r.post("/applications/precheck")
     def precheck_application(
@@ -233,6 +234,18 @@ def create_app(
         """Officers only: the stored redacted text restored with the encrypted token map. Audited."""
         return redaction_service.original_view(s, actor, application_id, settings)
 
+    # ---------------------------------------------------- consistency flags
+    @r.post("/consistency-flags/{flag_id}/review")
+    def review_consistency_flag(flag_id: str, body: FlagReview, actor: Actor = Depends(current_actor),
+                                s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Confirm or dismiss one flag. A dismissal needs a note. Audited. Never changes a rule result."""
+        return consistency.review_flag(s, actor, flag_id, body.action, body.note, settings)
+
+    @r.get("/pool/linked-applications")
+    def linked_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        """Groups of applications that share an attribute. Names the attribute, never its value."""
+        return consistency.linked_groups(s, actor, settings)
+
     # ------------------------------------------------------------ applicant intake
     @r.get("/programs")
     def list_programs(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
@@ -256,8 +269,8 @@ def create_app(
     @r.post("/me/applications/{application_id}/documents")
     def upload_document(application_id: str, body: DocumentUpload, actor: Actor = Depends(current_actor),
                         s: Store = Depends(get_store)) -> dict[str, Any]:
-        return intake.add_document(s, actor, application_id, file_name=body.file_name,
-                                   declared_type=body.declared_type, content_base64=body.content_base64)
+        return intake.add_document(s, actor, application_id, file_name=body.file_name, declared_type=body.declared_type,
+                                   content_base64=body.content_base64, consistency=settings.consistency_layer)
 
     @r.delete("/me/applications/{application_id}/documents/{document_id}")
     def delete_document(application_id: str, document_id: str, actor: Actor = Depends(current_actor),

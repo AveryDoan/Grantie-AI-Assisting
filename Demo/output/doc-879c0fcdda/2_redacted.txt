@@ -1,0 +1,38 @@
+[page 1]
+Application Responses
+Grant: 2026-27 Scholarship Program Round 1, Higher Education, Study in Australia's [PLACE_1]
+[PLACE_2]
+Applicant: [PERSON_1] | Date of birth: [DOB_1] | [PERSON_2]: [DOB_2]
+Mobile: [PHONE_1]
+What are you studying now, and where?
+I am in the final semester of a Bachelor of Engineering in Computer Engineering at Himalayan
+Institute of Technology in [PLACE_3], Nepal. I graduate in December 2026. I have accepted an
+offer to start a Master of Data Science at Charles Darwin University in Darwin in Semester 1, 2027.
+Academic achievements
+I rank 3rd in a cohort of 142 students, with a GPA of 3.84 out of 4.0. I received the [PERSON_3]'s Merit
+Award in 2023, 2024 and 2025. My final year project, a low bandwidth crop disease detection app
+for farmers in [PERSON_4] district, won first place at the National Student Innovation Showcase 2025
+and was published as a short paper at the Himalayan Computing Conference. I also scored 7.5
+overall in IELTS Academic (August 2026).
+Leadership
+In 2022 I founded Code Pahadi, a free weekend coding club for girls in rural schools. It started with
+9 students in one classroom and now runs in 6 schools with more than 180 participants and 14
+volunteer mentors, most of them my former students. Two graduates have since won places in
+engineering programs. I served as President of the Women in Technology Society at my institute in
+2024, where I tripled membership from 40 to 125 and negotiated 12 paid internships with local
+employers. In 2025 I led a team of 6 volunteers to deliver digital skills training to 300 villagers after
+the [PERSON_4] floods, helping 41 small businesses move their orders online.
+How will studying in the NT contribute to your future and the [PLACE_1] [PLACE_2]?
+The [PLACE_1] [PLACE_2] faces a problem I know well: spread out communities, patchy connectivity
+and limited access to data skills. In Nepal I have built tools for exactly these conditions, so I want to
+learn how to do it at a larger scale. The Master of Data Science at Charles Darwin University,
+which is accredited by the Australian Computer Society, includes units such as Data Analytics and
+Advanced Data Management that match my goals. Its Casuarina campus and its links with
+[PLACE_2] agencies, health services and industry are a major reason I chose Darwin.
+During my studies I plan to volunteer with local community organisations, mentor other
+international students and join [PLACE_2] hackathons. After graduating I want to work in the [PLACE_2],
+ideally in a government or health data role, helping agencies use data to plan services for remote
+communities. I would also like to start a Code Pahadi chapter in Darwin to encourage girls and
+young women into technology. I want to give back to the place that gave me this opportunity, and
+to build my career here for the long term.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

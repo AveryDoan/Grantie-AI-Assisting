@@ -43,6 +43,20 @@ python -m redaction.sandbox wipe
 
 Images (JPG/PNG) and PDFs without a text layer stop with "No text layer found. Local OCR is needed". The sandbox never guesses at text in images, and there is no cloud OCR.
 
+## Show what the AI reads and what it finds (`assess`)
+
+Builds one application from a folder of documents, redacts it, runs the 28 rules, and writes `app_report.html`: the application and where each answer came from, the redacted text the AI reads, the facts it extracted, and every rule with its quote (as the AI saw it, and restored to the applicant's own words).
+
+```bash
+python -m redaction.sandbox assess ~/grantie-sandbox/app1 --known "Full Name" 2003/03/14 --answers ~/grantie-sandbox/answers
+```
+
+- **File names decide the document type:** `*Application_Responses*` (written answers), `*Confirmation*`/`*CoE*`, `*Flight*`/`*Booking*`, `*Letter_of_Support*`, `*Biography*`, images (headshot). Anything else is "other".
+- **`--answers <folder>`** holds `<field>.txt` for written answers missing from the documents (for example `community_engagement.txt`). The report labels these "written for the sample".
+- **Default AI:** the offline keyword stub. It is **not an LLM** and is wrong on some rules (it only reads `Label: value` lines and keyword-matches). `--llm gemini` sends the **redacted** text to Gemini through the app's guard; it needs `GEMINI_API_KEY` in `.env`, and on Google's free tier inputs may be used to improve Google's products.
+- **Identifiers the detector does not recognise** (a CoE number, a student ID) are read from their labels and supplied as known values, as a form field would be. The report also shows the leak scan **without** them, which fails and would block the AI.
+- **`--not-personal Word …`** is an officer's call for this run only: ordinary words the name detector mistook for people (for example `Code` from "Code Pahadi", `Email` from a letterhead). Without it the leak scan can block an application over those words. The report names the words and the output folder ends in `-reviewed`.
+
 ## What you get (`output/doc-<hash>/`)
 
 Folder names come from a hash of the file's content, never from the file name (file names often contain names).

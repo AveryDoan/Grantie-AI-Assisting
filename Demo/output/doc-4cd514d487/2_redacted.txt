@@ -1,0 +1,37 @@
+[page 1]
+Charles Darwin University
+CRICOS Provider Code: 00300K | ABN [ID_1]
+Casuarina Campus, [PLACE_1], Casuarina [LOCATION: unknown] | cdu.edu.au
+CONFIRMATION OF ENROLMENT
+This document confirms that the student named below has accepted an offer and is enrolled in the course specified,
+subject to the conditions of the offer.
+Confirmation of Enrolment (CoE) number E0912345678
+Student ID S2026-04417
+Family name [PERSON_1]
+Given names [PERSON_1]
+Date of birth [DOB_1]
+Sex Female
+Country of citizenship Nepal
+Passport number [ID_2]
+Passport expiry 08/11/2031
+Residential address (home country) House 22, Ward 5, [PLACE_2], [PLACE_3] 44600, Nepal
+Course Master of Data Science (SDASC3)
+CRICOS course code 116326C
+Course level Masters Degree (Coursework)
+Campus Casuarina Campus, Darwin NT
+Mode of study Full time, on campus
+Course start date 22/02/2027
+Course end date 20/11/2028
+Orientation 15/02/2027
+Course duration 2 years (4 semesters)
+Tuition fee per year (AUD) $31,688.00
+Total tuition fee (AUD) $63,376.00
+Initial prepaid tuition $15,844.00 (paid 30/09/2026)
+Overseas Health Cover (OSHC) provider Allianz Care Australia
+OSHC policy number OSH-[ID_3]
+OSHC period 15/02/2027 to 31/03/2029
+English test IELTS Academic 7.5 (21/08/2026)
+Date CoE issued 02/10/2026
+Issued by: CDU Global Admissions (sample record). This CoE is issued under the ESOS Act 2000. The student must hold
+a valid student visa to study in Australia.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

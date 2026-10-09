@@ -76,3 +76,19 @@ def test_a_title_is_not_redacted_as_part_of_a_known_name(detector):
     text = "title: Ms\nReferee name: Ms Rosa Example\nI thank Rosa."
     found = {text[d.start:d.end] for d in detector.detect(text, [KnownValue("Ms Rosa Example", "REFEREE", "document")])}
     assert "Ms" not in found and "Rosa" in found and any("Rosa Example" in f for f in found)
+
+
+def test_a_year_mistaken_for_a_name_once_is_not_hidden_everywhere():
+    from redaction.pipeline import consistency_known_values
+    from redaction.config import default_config
+    from redaction.tokenizer import TokenMap
+
+    tm = TokenMap(default_config())
+    from redaction.tokenizer import Occurrence
+
+    tok = tm._new("PERSON", "2024")
+    tm.occurrences["document:x"] = [Occurrence(tok, "2024", "document:x", 0, 4, 13, 17)]
+    tok2 = tm._new("PERSON", "Wulandari")
+    tm.occurrences["document:x"].append(Occurrence(tok2, "Wulandari", "document:x", 5, 9, 20, 29))
+    values = {k.value for k in consistency_known_values(tm, [])}
+    assert "2024" not in values and "Wulandari" in values

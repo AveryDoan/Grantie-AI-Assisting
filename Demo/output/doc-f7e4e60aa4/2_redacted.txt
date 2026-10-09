@@ -1,0 +1,49 @@
+[page 1]
+1180FF453
+Overseas Student Confirmation-of-Enrolment ([PERSON_2])
+A. INFORMATIONF OROVERSEASSTUDENTS
+THISI SNOTAVISAANDDOESNOTACTASANEXTENSION OF YOUR VISA.
+You may check your visa status through Visa Entitlement Verification Online (VEVO) at:
+http://www.homeaffairs.gov.au/Busi/visas-and-migration/visa-entitlement-verification-online-(vevo)
+To apply for your student visa to study in Australia go to http://www.homeaffairs.gov.au/Trav/Stud. Follow the information on the website to lodge your
+application online. Please note you are able to attach supporting documentation when lodging your application.
+B. COURSE DETAILS
+Provider: Charles Darwin University (CDU) [00300K] (trading as: Charles Darwin University)
+Telephone: [PHONE_1], Fax: [PHONE_2]
+Course: Master of Information Technology (Information Systems) [116328A]
+Course Level: Masters Degree (Coursework)
+Course Start Date: 22/02/2027
+Course End Date: 30/11/2028
+Initial Pre-Paid Tuition Fee:$AU 11,091
+Other Pre-Paid Non-Tuition Fee:$AU 180
+Total Tuition Fee: $AU 63,376
+C. STUDENT DETAILS
+Provide rStudent Id:[ID_1]
+Courtesy Title:Ms
+Family Name: [PERSON_1]
+Given Names:[PERSON_1]
+Gender: Female
+Date of Birth:[DOB_1]
+Country of Birth:Nepal
+Nationality: Nepalese
+Provider arranged Overseas
+Student Health Cover (OSHC):No
+Comments: Marital status of the student is Single. Student has own OSHC and is responsible for maintaining it for the
+duration of study. Student has been awarded CDU Global Merit Scholarship (30%) for the duration of the
+course. Compulsory orientation date is one week prior to commencement of classes. Agent: Global Education
+Alliance - Kuala Lumpur
+D. NOTES
+Thei nformation provided on this form is required by the Australian Government Department of Education, and the Australian Government Department
+of Home Affairs as evidence of enrolment in a course registered on the Commonwealth Register of Institutions and Courses for Overseas Students
+(CRICOS) - http://cricos.education.gov.au
+-
+1.The offer of a place and enrolment of the student must be made in accordance with the provisions of the Education Services for Overseas
+Students (ESOS) Act 2000; the ESOS Regulations 2019 and the National Code of Practice for Registration Authorities and Providers of
+Education to Overseas Students (The National Code 2018).
+2.This information will be made available to other [PLACE_1], State or Territory government agencies.
+-
+IMPORTANT
+- Keep this [PERSON_2] and your Written Agreement while you are in Australia
+- Find out more about living and studying in Australia (including quality assurance) at https://www.studyaustralia.gov.au/
+-
+Created: 01/10/2026 09:02:09 Updated: 02/10/2026 10:32:15

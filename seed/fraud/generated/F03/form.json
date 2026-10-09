@@ -1,0 +1,69 @@
+{
+  "code": "F03",
+  "title": "A referee says five years; the same letter's dates cover eight months",
+  "display_name": "Nguyet Hallowell",
+  "email": "nguyet.hallowell@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Nguyet Hallowell",
+      "date_of_birth": "2003-11-22",
+      "email": "nguyet.hallowell@example.com",
+      "phone": "0491 570 157",
+      "nationality": "Vietnam",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "31 Lotus Lane, Hue 49000, Vietnam",
+      "residential_country": "Vietnam",
+      "postal_address": "31 Lotus Lane, Hue 49000, Vietnam",
+      "postal_country": "Vietnam",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Health Science",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Nguyet Hallowell",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I am finishing my last year at Quoc Hoc High School in Hue.",
+      "academic_achievements": "I scored 9.4 out of 10 in chemistry and took second place in the provincial science fair.",
+      "leadership": "I lead a group of nine students who run a recycling programme at our school.",
+      "community_engagement": "I help in a university research group on weekday afternoons and tutor primary students on weekends.",
+      "nt_contribution": "I want to study health science in Darwin and come to understand how health services reach people in very remote places, because I want to build programmes that help families who live far from clinics.",
+      "biography": "Nguyet lives in Hue, the old imperial city, and is the first in her family to plan for university overseas. She loves chemistry and spends most afternoons in a small laboratory run by a local university, where she helps prepare samples and record results. She also leads a student recycling team that collects and sorts plastic from six schools each month. Friends describe her as organised, curious and happy to share her notes before every exam. She enjoys drawing, cooking bun bo with her grandmother and walking along the Perfume River at dusk. After the scholarship she hopes to complete a health science degree in Darwin, volunteer with community health groups and return to Vietnam to work on programmes that bring screening and advice to families who live far from a clinic."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "The first letter says 'known for five years' but also 'first joined my research group in January 2026': about eight months."
+}

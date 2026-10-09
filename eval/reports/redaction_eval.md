@@ -1,6 +1,6 @@
 # Redaction evaluation report
 
-Generated 2026-10-09 06:59 UTC in 5 s. Detector `presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-1`, config `c68750c709ac`.
+Generated 2026-10-09 08:35 UTC in 5 s. Detector `presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-1`, config `c68750c709ac`.
 
 **Synthetic data only.** Every name, number and address below is fictional. This report shows how the redaction behaves on a small hand-made set; it is not a guarantee for real applications. Redaction cannot promise zero leaks.
 

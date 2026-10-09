@@ -73,5 +73,10 @@ class DocumentUpload(BaseModel):
     content_base64: str = Field(min_length=1, max_length=7_100_000)  # 5 MB file, base64-encoded
 
 
+class FlagReview(BaseModel):
+    action: Literal["confirm", "dismiss"]
+    note: str | None = Field(default=None, max_length=2000)
+
+
 class SubmitIn(BaseModel):
     manual_assessment: bool = False

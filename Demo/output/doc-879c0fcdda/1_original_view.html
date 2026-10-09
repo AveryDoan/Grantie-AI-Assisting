@@ -1,0 +1,89 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Original view (officer only)</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+</style></head><body><main>
+<div class="banner officer">OFFICER-ONLY · contains personal information · local file: never commit, upload or share</div>
+<h1>Original view (officer only)</h1><p class="muted">doc-879c0fcdda · detected spans are highlighted by type (hover for the token)</p>
+<div class="legend"><mark class="DOB">Date of birth</mark><mark class="PERSON">Name</mark><mark class="PHONE">Phone</mark><mark class="PLACE">Place</mark></div>
+<div class="card"><pre class="doc">[page 1]
+Application Responses
+Grant: 2026-27 Scholarship Program Round 1, Higher Education, Study in Australia&#x27;s <mark class="PLACE" title="[PLACE_1] · Place">Northern</mark>
+<mark class="PLACE" title="[PLACE_2] · Place">Territory</mark>
+Applicant: <mark class="PERSON" title="[PERSON_1] · Name">Sita Karki</mark> | Date of birth: <mark class="DOB" title="[DOB_1] · Date of birth">14 March 2003</mark> | <mark class="PERSON" title="[PERSON_2] · Name">Email</mark>: <mark class="DOB" title="[DOB_2] · Date of birth">sita.karki.sample@gmail.com |</mark>
+Mobile: <mark class="PHONE" title="[PHONE_1] · Phone">+977 9841 555 201</mark>
+What are you studying now, and where?
+I am in the final semester of a Bachelor of Engineering in Computer Engineering at Himalayan
+Institute of Technology in <mark class="PLACE" title="[PLACE_3] · Place">Kathmandu</mark>, Nepal. I graduate in December 2026. I have accepted an
+offer to start a Master of Data Science at Charles Darwin University in Darwin in Semester 1, 2027.
+Academic achievements
+I rank 3rd in a cohort of 142 students, with a GPA of 3.84 out of 4.0. I received the <mark class="PERSON" title="[PERSON_3] · Name">Dean</mark>&#x27;s Merit
+Award in 2023, 2024 and 2025. My final year project, a low bandwidth crop disease detection app
+for farmers in <mark class="PERSON" title="[PERSON_4] · Name">Gorkha</mark> district, won first place at the National Student Innovation Showcase 2025
+and was published as a short paper at the Himalayan Computing Conference. I also scored 7.5
+overall in IELTS Academic (August 2026).
+Leadership
+In 2022 I founded Code Pahadi, a free weekend coding club for girls in rural schools. It started with
+9 students in one classroom and now runs in 6 schools with more than 180 participants and 14
+volunteer mentors, most of them my former students. Two graduates have since won places in
+engineering programs. I served as President of the Women in Technology Society at my institute in
+2024, where I tripled membership from 40 to 125 and negotiated 12 paid internships with local
+employers. In 2025 I led a team of 6 volunteers to deliver digital skills training to 300 villagers after
+the <mark class="PERSON" title="[PERSON_4] · Name">Gorkha</mark> floods, helping 41 small businesses move their orders online.
+How will studying in the NT contribute to your future and the <mark class="PLACE" title="[PLACE_1] · Place">Northern</mark> <mark class="PLACE" title="[PLACE_2] · Place">Territory</mark>?
+The <mark class="PLACE" title="[PLACE_1] · Place">Northern</mark> <mark class="PLACE" title="[PLACE_2] · Place">Territory</mark> faces a problem I know well: spread out communities, patchy connectivity
+and limited access to data skills. In Nepal I have built tools for exactly these conditions, so I want to
+learn how to do it at a larger scale. The Master of Data Science at Charles Darwin University,
+which is accredited by the Australian Computer Society, includes units such as Data Analytics and
+Advanced Data Management that match my goals. Its Casuarina campus and its links with
+<mark class="PLACE" title="[PLACE_2] · Place">Territory</mark> agencies, health services and industry are a major reason I chose Darwin.
+During my studies I plan to volunteer with local community organisations, mentor other
+international students and join <mark class="PLACE" title="[PLACE_2] · Place">Territory</mark> hackathons. After graduating I want to work in the <mark class="PLACE" title="[PLACE_2] · Place">Territory</mark>,
+ideally in a government or health data role, helping agencies use data to plan services for remote
+communities. I would also like to start a Code Pahadi chapter in Darwin to encourage girls and
+young women into technology. I want to give back to the place that gave me this opportunity, and
+to build my career here for the long term.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></div></main></body></html>

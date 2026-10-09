@@ -1,0 +1,19 @@
+{
+  "code": "F07",
+  "control": false,
+  "should_raise": [
+    "cross_application.shared_referee_phone",
+    "cross_application.shared_referee_email_domain",
+    "cross_application.reused_wording",
+    "cross_application.shared_contact_phone"
+  ],
+  "may_raise": [
+    "cross_application.identical_text"
+  ],
+  "should_not_raise": [
+    "cross_document.*",
+    "timeline.*",
+    "narrative.*",
+    "document_integrity.*"
+  ]
+}

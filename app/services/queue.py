@@ -96,7 +96,7 @@ def _group(rows: list[dict[str, Any]], key: str) -> dict[str, list[dict[str, Any
     return out
 
 
-def list_queue(store: Store, actor: Actor) -> list[dict[str, Any]]:
+def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> list[dict[str, Any]]:
     """Batched: a fixed number of queries however many applications there are."""
     if not actor.is_staff:
         raise Forbidden("Officers only")
@@ -115,6 +115,9 @@ def list_queue(store: Store, actor: Actor) -> list[dict[str, Any]]:
     findings = store.select("findings", in_={"run_id": run_ids}) if run_ids else []
     reviews = latest_reviews(store, [f["id"] for f in findings])
     findings_by_app = _group(findings, "application_id")
+    from app.services import consistency as consistency_service
+
+    to_check = consistency_service.flags_to_check(store, ids, settings or get_settings())
 
     out = []
     for app in apps:
@@ -132,6 +135,8 @@ def list_queue(store: Store, actor: Actor) -> list[dict[str, Any]]:
                 "submitted_at": app.get("submitted_at"),
                 "attention": attention,
                 "open_items": _open_items(attention) if app["status"] != "signed_off" else 0,
+                # A count only (never a score). Not part of open_items, so it does not affect the order.
+                "flags_to_check": to_check.get(app["id"], 0) if app["status"] != "signed_off" else 0,
             }
         )
     # Most open work first, then oldest submission first. Not a ranking of applicants.
@@ -143,6 +148,8 @@ def list_queue(store: Store, actor: Actor) -> list[dict[str, Any]]:
 def application_detail(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any]:
     if actor.role == "applicant":
         return applicant_view(store, actor, application_id)
+    from app.services import consistency as consistency_service
+
     app = application_for_staff(store, actor, application_id)
     run = latest_run(store, application_id)
     restorer = QuoteRestorer(store, app, settings or get_settings())  # officer view: real words, from the encrypted map
@@ -190,6 +197,7 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
         "letters": store.select("letters", eq={"application_id": application_id}, order="version"),
         "sign_off": one(store.select("sign_offs", eq={"application_id": application_id}, limit=1)),
         "attention": _attention(store, app),
+        "consistency": consistency_service.application_flags(store, app, settings or get_settings()),
         "disclaimer": "AI output is a suggestion only. An officer decides every finding and signs off the decision.",
     }
 

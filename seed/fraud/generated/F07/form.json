@@ -1,0 +1,69 @@
+{
+  "code": "F07",
+  "title": "One of three applicants sharing a referee phone, an email domain and a letter template (F07)",
+  "display_name": "Dhruv Ashcombe",
+  "email": "dhruv.ashcombe@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Dhruv Ashcombe",
+      "date_of_birth": "2003-04-27",
+      "email": "dhruv.ashcombe@example.com",
+      "phone": "0491 570 313",
+      "nationality": "Nepal",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "16 Prayag Marg, Pokhara 33700, Nepal",
+      "residential_country": "Nepal",
+      "postal_address": "16 Prayag Marg, Pokhara 33700, Nepal",
+      "postal_country": "Nepal",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Engineering",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Dhruv Ashcombe",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I study at a technical campus in Pokhara.",
+      "academic_achievements": "I got a first-division result in my diploma examinations.",
+      "leadership": "I lead a team of four students building a low-cost water filter.",
+      "community_engagement": "I clean trails with a volunteer group on weekends.",
+      "nt_contribution": "I want to use engineering to design affordable systems for remote communities in the Northern Territory.",
+      "biography": "Dhruv grew up in Pokhara beside the lake and discovered engineering by repairing the bicycles and radios of his neighbours. He is studying at a technical campus, where he leads a small team that is building a low-cost water filter for mountain villages. Teachers describe him as practical, patient and unafraid to start again after a failed test. He volunteers on weekends with a trail-cleaning group, tutors younger students in mathematics and plays the madal at family festivals. In Darwin he hopes to complete his engineering degree, join a student sustainability society and later design small, affordable systems for communities that are far from the nearest town. He believes a simple machine that works every day is worth more than a clever one that sits in a cupboard, and he wants to prove it."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "Each application looks unrelated. Together: the same referee phone number (written two ways), one email domain, one reused letter template with a few words changed, and one shared contact phone number (F07 and F09)."
+}

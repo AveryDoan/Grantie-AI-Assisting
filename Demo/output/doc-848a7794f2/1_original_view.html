@@ -1,0 +1,87 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Original view (officer only)</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+</style></head><body><main>
+<div class="banner officer">OFFICER-ONLY · contains personal information · local file: never commit, upload or share</div>
+<h1>Original view (officer only)</h1><p class="muted">doc-848a7794f2 · detected spans are highlighted by type (hover for the token)</p>
+<div class="legend"><mark class="ADDRESS">Address</mark><mark class="EMAIL">Email</mark><mark class="PERSON">Name</mark><mark class="PHONE">Phone</mark><mark class="PLACE">Place</mark></div>
+<div class="card"><pre class="doc">[page 1]
+Himalayan Institute of Technology
+H
+Department of Computer Engineering
+Baneshwor Campus, <mark class="PLACE" title="[PLACE_1] · Place">Kathmandu</mark> 44600, Nepal | <mark class="PHONE" title="[PHONE_1] · Phone">+977 1 555 0100</mark> | hit.example.edu.np
+14 September 2026
+Study NT Scholarship Assessment Panel
+Department of Trade, Business and Asian Relations
+Northern Territory Government, Darwin <mark class="ADDRESS" title="[LOCATION: NT, Australia] · Address">NT 0800</mark>, Australia
+RE: Letter of support for <mark class="PERSON" title="[PERSON_2] · Name">Ms Sita Karki</mark>, 2026-27 Scholarship Program Round 1 (Study NT)
+To the Assessment Panel,
+I am Associate Professor of Computer Engineering at Himalayan Institute of Technology, and I
+have known <mark class="PERSON" title="[PERSON_1] · Name">Sita Karki</mark> for four years. I taught her in Data Structures and Machine Learning, I
+supervised her final year project, and I am the faculty adviser to the Women in Technology Society
+she led in 2024. I am pleased to give her my strongest support.
+Academic. <mark class="PERSON" title="[PERSON_1] · Name">Sita</mark> is one of the three strongest students I have taught in 17 years. She has a GPA of
+3.84 and her work shows real depth, not only high marks. Her project on crop disease detection for
+low bandwidth settings was technically careful, tested with 60 farmers, and won first place at the
+2025 National Student Innovation Showcase. She writes clear code and clear reports, and she
+accepts criticism well.
+Personal and leadership. <mark class="PERSON" title="[PERSON_1] · Name">Sita</mark> founded Code Pahadi, a free coding club for rural girls, without
+being asked and without funding. I have visited two of its classes. The students are engaged and
+the mentors are former students she trained. As President of the Women in Technology Society
+she grew membership from 40 to 125 and secured 12 internships. She is reliable, generous with
+her time and calm under pressure.
+I have no doubt she will do well in Darwin and give back to the community there. I recommend her
+without reservation. Please contact me if you need more information.
+Yours sincerely,
+<mark class="PERSON" title="[PERSON_3] · Name">Anita Rai</mark>
+Dr <mark class="PERSON" title="[PERSON_3] · Name">Anita Rai</mark>
+Associate Professor and Head of Department, Computer Engineering
+Himalayan Institute of Technology
+Relationship: lecturer, project supervisor and faculty adviser. Length of association: 4 years (since
+August 2022).
+<mark class="PERSON" title="[PERSON_4] · Name">Email</mark>: <mark class="EMAIL" title="[EMAIL_1] · Email">anita.rai@hit.example.edu.np</mark> | Mobile: <mark class="PHONE" title="[PHONE_2] · Phone">+977 9851 555 077</mark>
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></div></main></body></html>

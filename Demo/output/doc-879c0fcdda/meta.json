@@ -1,0 +1,50 @@
+{
+  "doc_id": "doc-879c0fcdda",
+  "created_at": "2026-10-09T08:25:32+00:00",
+  "file_kind": "pdf",
+  "text_source": "text layer",
+  "ocr": null,
+  "pages": 1,
+  "pages_without_text": [],
+  "pdf_metadata_keys": [
+    "Author",
+    "CreationDate",
+    "Creator",
+    "Keywords",
+    "ModDate",
+    "Producer",
+    "Subject",
+    "Title",
+    "Trapped"
+  ],
+  "status": "ok",
+  "ai_status": "ready",
+  "location_class": "unknown",
+  "counts": {
+    "DOB": 2,
+    "PERSON": 5,
+    "PHONE": 1,
+    "PLACE": 10
+  },
+  "pass1_counts": {
+    "DOB": 2,
+    "PERSON": 4,
+    "PHONE": 1,
+    "PLACE": 4
+  },
+  "leak_pass": true,
+  "leak_checks": {},
+  "inject_test": null,
+  "mrz": {
+    "lines": 0,
+    "td3_parsed": false,
+    "check_digits_ok": {},
+    "fields_used": [
+      "dob_label"
+    ]
+  },
+  "original_sha256": "917e4b9697a50776705331c8be4d74ca4833d2b592297464147f12405e902cbc",
+  "redacted_sha256": "5c868d2c885b8cbfaccc0c5fc8c72445e91d9f96541270cbe287b1d862b6e495",
+  "detector_version": "presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-1",
+  "config_hash": "c68750c709ac9d9a650f1da6cfa89bd7b2c57375a2e5c232b0679fe26cfc7f90"
+}

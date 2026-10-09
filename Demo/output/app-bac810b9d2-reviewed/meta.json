@@ -1,0 +1,31 @@
+{
+  "app_id": "app-bac810b9d2-reviewed",
+  "llm": "offline keyword stub (NOT an LLM; can be wrong)",
+  "marked_not_personal": [
+    "Code",
+    "Email"
+  ],
+  "ai_status": "ready",
+  "counts": {
+    "ADDRESS": 7,
+    "DOB": 2,
+    "EMAIL": 8,
+    "ID": 7,
+    "PERSON": 66,
+    "PHONE": 8,
+    "PLACE": 2,
+    "URL": 1
+  },
+  "leak_without_ids": {
+    "long_digit_string": 1
+  },
+  "leak_with_ids": {},
+  "location_class": "outside_australia",
+  "statuses": {
+    "Met": 17,
+    "Not met": 2,
+    "Needs evidence": 2,
+    "Unclear": 2,
+    "Evidence only": 5
+  }
+}

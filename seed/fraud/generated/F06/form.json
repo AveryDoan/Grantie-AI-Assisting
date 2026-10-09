@@ -1,0 +1,73 @@
+{
+  "code": "F06",
+  "title": "A letter's PDF was made after its printed date, with an editing program (weak signals only)",
+  "display_name": "Sofia Quennell",
+  "email": "sofia.quennell@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Sofia Quennell",
+      "date_of_birth": "2003-09-14",
+      "email": "sofia.quennell@example.com",
+      "phone": "0491 570 110",
+      "nationality": "Brazil",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "42 Ipe Avenue, Curitiba 80010, Brazil",
+      "residential_country": "Brazil",
+      "postal_address": "42 Ipe Avenue, Curitiba 80010, Brazil",
+      "postal_country": "Brazil",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Education (Primary)",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Sofia Quennell",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I am in the final term of my teaching preparation course in Curitiba.",
+      "academic_achievements": "I graduated near the top of my class and received the faculty's prize for classroom practice.",
+      "leadership": "I lead a reading programme where six volunteers read to children at a local shelter.",
+      "community_engagement": "Twice a week I run a homework hour for children at the shelter near my neighbourhood.",
+      "nt_contribution": "I want to become a primary teacher and work in remote schools in the Northern Territory, where I can use what I have learned about teaching children who are learning in a second language.",
+      "biography": "Sofia comes from Curitiba and has loved reading aloud since she was a child. At university she is training to teach primary students, and her supervisors praise the way she keeps a whole class interested and still has time for the quietest child. She leads a volunteer reading programme at a local shelter and runs a homework hour twice a week, where children bring workbooks, snacks and plenty of questions. Friends describe her as warm, patient and wonderfully organised. She plays the guitar, bakes pao de queijo for her classmates and spends holidays visiting her grandparents in the countryside. In Darwin she plans to complete her education degree, learn from teachers who work with many languages in one classroom and later teach in a remote school, helping children discover that stories can take them anywhere."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    },
+    {
+      "file": "other_1.pdf",
+      "declared_type": "other"
+    }
+  ],
+  "notes": "The shelter's letter is dated 20 May 2026 but the PDF was made on 2 October 2026 with an image editor. Weak signals only."
+}

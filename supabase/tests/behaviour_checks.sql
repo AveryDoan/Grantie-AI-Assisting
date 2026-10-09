@@ -197,5 +197,31 @@ rollback;
 begin; select checks.as_user('00000000-0000-0000-0000-0000000000c1');
 select checks.expect_count('select * from storage.objects',0,'applicant cannot see others objects');
 rollback;
+
+-- ---------- consistency layer (flags are signals for officers: never verdicts) ----------
+insert into consistency_flags (id,application_id,flag_key,check_id,check_type,strength,description) values
+ ('a0000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','k1','cross_document.arrival_vs_start','cross_document','strong','The arrival date is 28 days after the course starts.');
+select checks.expect_error($$insert into consistency_flags (application_id,flag_key,check_id,check_type,strength,description) values ('60000000-0000-0000-0000-000000000001','k2','document_integrity.x','document_integrity','strong','A PDF signal')$$,'integrity_is_weak','document signals can never be strong');
+select checks.expect_error($$insert into consistency_flags (application_id,flag_key,check_id,check_type,strength,description) values ('60000000-0000-0000-0000-000000000001','k3','narrative.x','narrative','strong','This looks like fraud')$$,'neutral_wording','an accusing description is refused');
+select checks.expect_error($$insert into consistency_flags (application_id,flag_key,check_id,check_type,strength,description) values ('60000000-0000-0000-0000-000000000001','k1','cross_document.arrival_vs_start','cross_document','strong','duplicate key')$$,'duplicate key','the same flag is stored once per application');
+select checks.expect_error($$update consistency_flags set status='dismissed', reviewed_by='00000000-0000-0000-0000-0000000000a1', reviewed_at=now() where id='a0000000-0000-0000-0000-000000000001'$$,'dismissal_needs_note','a dismissal needs a note');
+select checks.expect_error($$update consistency_flags set status='dismissed', note='  ' , reviewed_by='00000000-0000-0000-0000-0000000000a1', reviewed_at=now() where id='a0000000-0000-0000-0000-000000000001'$$,'dismissal_needs_note','a blank note is not a note');
+select checks.expect_error($$update consistency_flags set status='confirmed' where id='a0000000-0000-0000-0000-000000000001'$$,'decision_recorded','a decision records who and when');
+insert into identifier_hashes (application_id,kind,hash,source) values ('60000000-0000-0000-0000-000000000001','contact_phone',repeat('ab',32),'form');
+select checks.expect_error($$insert into identifier_hashes (application_id,kind,hash) values ('60000000-0000-0000-0000-000000000001','contact_phone','0491 570 006')$$,'identifier_hashes_hash_check','a raw identifier cannot be stored: only a 64-character hash');
+select checks.expect_error($$insert into identifier_hashes (application_id,kind,hash) values ('60000000-0000-0000-0000-000000000001','passport_number',repeat('ab',32))$$,'identifier_hashes_kind_check','only the known identifier kinds are hashed');
+begin; select checks.as_user('00000000-0000-0000-0000-0000000000a1');
+select checks.expect_count('select * from consistency_flags',1,'officer of the organisation sees the flag');
+select checks.expect_count('select * from identifier_hashes',1,'officer of the organisation sees the hashes');
+select checks.expect_error($$update consistency_flags set status='confirmed' where id='a0000000-0000-0000-0000-000000000001'$$,'permission denied','officers decide through the API, not the table');
+rollback;
+begin; select checks.as_user('00000000-0000-0000-0000-0000000000b1');
+select checks.expect_count('select * from consistency_flags',0,'another organisation cannot see the flag');
+select checks.expect_count('select * from identifier_hashes',0,'another organisation cannot see the hashes');
+rollback;
+begin; select checks.as_user('00000000-0000-0000-0000-0000000000c1');
+select checks.expect_count('select * from consistency_flags',0,'an applicant never sees flags');
+select checks.expect_count('select * from document_fingerprints',0,'an applicant never sees fingerprints');
+rollback;
 drop schema checks cascade;
 \echo ALL BEHAVIOUR CHECKS PASSED

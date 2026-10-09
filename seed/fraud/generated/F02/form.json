@@ -1,0 +1,70 @@
+{
+  "code": "F02",
+  "title": "CoE length does not match the typed dates; one letter is dated 2022",
+  "display_name": "Tomasz Brindleworth",
+  "email": "tomasz.brindleworth@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Tomasz Brindleworth",
+      "date_of_birth": "2002-08-03",
+      "email": "tomasz.brindleworth@example.com",
+      "phone": "0491 570 156",
+      "nationality": "Poland",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "27 Linden Row, Gdansk 80-001, Poland",
+      "residential_country": "Poland",
+      "postal_address": "27 Linden Row, Gdansk 80-001, Poland",
+      "postal_country": "Poland",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Information Technology",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Tomasz Brindleworth",
+      "declaration_date": "2026-10-12",
+      "course_end_date": "2029-11-15"
+    },
+    "answers": {
+      "current_study": "I am in the final year of upper secondary school at a technical school in Gdansk.",
+      "academic_achievements": "I rank fourth of 120 students and won the regional programming contest in my second year.",
+      "leadership": "I started a robotics club that now has fourteen members and meets twice a week.",
+      "community_engagement": "I teach basic computer skills to older residents at the public library on Saturdays.",
+      "nt_contribution": "Studying information technology in Darwin will let me build software for small businesses and community groups in the Territory, such as simple booking and records systems that save volunteers hours of paperwork.",
+      "biography": "Tomasz grew up in Gdansk, where he learned to program on an old laptop his uncle repaired for him. He studies at a technical school, ranks near the top of his class and has won a regional programming contest. He founded the school robotics club, which builds small line-following robots and visits primary schools to show younger children how they work. On Saturdays he volunteers at the public library, helping older residents use email, online banking and video calls to stay in touch with family overseas. His teachers say he explains difficult ideas patiently and never gives up on a bug. He speaks Polish, English and some German, plays chess and sails on the Baltic in summer. In Darwin he wants to study information technology and later build tools that help community groups work together."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "The CoE's own dates cover about 5 years while it states 3, the typed end date follows the 3 years, and one letter is dated 2022. Rule D5 will also fail on its own for the 2022 letter; the other rules pass."
+}

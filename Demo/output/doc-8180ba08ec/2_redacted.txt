@@ -1,0 +1,21 @@
+[page 1]
+Horizon Travel
+E-ticket itinerary and receipt | [PLACE_1], Nepal | [PHONE_1]
+Travel Itinerary and E-ticket Receipt
+Booking reference (PNR) XK7R2P
+E-ticket number 618-2204871935
+Passenger [PERSON_1] / [PERSON_1] MS
+Passport PA [ID_1] (Nepal)
+Booked by Horizon Travel, on behalf of passenger
+Booking date 04/10/2026
+Baggage 2 x 23 kg checked, 7 kg cabin
+Total paid AUD 1,184.00 (Visa ending 4417)
+Contact [EMAIL_1] / [PHONE_2]
+Status CONFIRMED (HK)
+Flight details
+Date Flight From To Departs Arrives
+Fri 12 Feb 2027 SQ 0413 (Economy) [PLACE_1] (KTM) Singapore (SIN) 07:40 15:35
+Fri 12 Feb 2027 SQ 0211 (Economy) Singapore (SIN) Darwin (DRW) 21:15 03:50 +1
+Arrival in Darwin: Saturday 13 February 2027, 03:50 local time. Check in at least 3 hours before international departures.
+Passengers must carry a valid passport and visa. Fare rules: changes permitted for a fee; refundable less AUD 150.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

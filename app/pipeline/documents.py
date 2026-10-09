@@ -28,7 +28,9 @@ _TYPE_KEYWORDS: dict[DocType, list[str]] = {
     "visa": ["visa grant", "visa subclass", "grant notice", "visa expiry", "must not arrive after", "stay until"],
     "travel_document": ["passport", "travel document", "nationality", "place of birth", "document number"],
     "travel_booking": ["booking reference", "itinerary", "e-ticket", "passenger", "flight number", "booking confirmation"],
-    "referee_letter": ["to whom it may concern", "referee", "i have known", "letter of reference", "reference letter"],
+    # Not the bare word "referee": it appears in a résumé's "Referees" section and in many footers.
+    "referee_letter": ["to whom it may concern", "referee name", "i have known", "letter of reference", "reference letter",
+                       "letter of support", "length of association", "yours sincerely", "i recommend"],
     "headshot": ["headshot", "photograph"],
 }
 # Checked first: a screenshot of a flight search is not a booking, and a
@@ -102,6 +104,10 @@ _FIELD_ALIASES: dict[str, str] = {
     "expiry date": "document_expiry_date",
     "nationality": "nationality",
     "study load": "study_load",
+    "mode of study": "study_load",
+    "date coe issued": "coe_issue_date",
+    "coe issue date": "coe_issue_date",
+    "course duration": "course_duration",
     "attendance": "study_load",
     "booking reference": "booking_reference",
     "arrival": "arrival_date",
@@ -130,6 +136,7 @@ DATE_FIELDS = {
     "visa_grant_date",
     "visa_expiry_date",
     "document_expiry_date",
+    "coe_issue_date",
 }
 
 # typed form field -> document field to compare against
@@ -182,19 +189,49 @@ def is_english(text: str, *, min_words: int = 20, threshold: float = 0.06) -> bo
     return labelled >= 3
 
 
+# Labels that may also appear WITHOUT a colon ("Course start date 22/02/2027"). Only labels that
+# cannot be ordinary words; "course" alone needs a qualification word after it.
+_COLONLESS = sorted({a for a in _FIELD_ALIASES if " " in a or a in ("surname", "nationality")}, key=len, reverse=True)
+_QUALIFICATION = re.compile(r"(?i)^(master|bachelor|diploma|certificate|doctor|graduate|associate|advanced)\b")
+_LETTERHEAD = re.compile(r"^(?:[A-Z][\w'’&.-]*\s+){0,6}(?:University|College|Institute)(?:\s+(?:of|for|and|[A-Z][\w'’&.-]*)){0,4}$")
+
+
+def _split_label(line: str) -> tuple[str, str] | None:
+    """(label, value) from 'Label: value' or, for safe labels, 'Label value'."""
+    if ":" in line:
+        label, _, value = line.partition(":")
+        return label, value
+    norm = re.sub(r"\s+", " ", line.strip())
+    low = norm.lower()
+    for alias in _COLONLESS:
+        if low.startswith(alias + " "):
+            return alias, norm[len(alias) + 1:]
+    if low.startswith("course ") and _QUALIFICATION.match(norm[7:]):
+        return "course", norm[7:]
+    return None
+
+
 def extract_fields(text: str) -> dict[str, str]:
     fields: dict[str, str] = {}
     for line in text.splitlines():
-        if ":" not in line:
+        parts = _split_label(line)
+        if not parts:
             continue
-        label, _, value = line.partition(":")
-        key = _FIELD_ALIASES.get(re.sub(r"\s+", " ", label.strip().lower()))
+        label, value = parts
+        norm_label = re.sub(r"\s+", " ", label.strip().lower())
+        key = _FIELD_ALIASES.get(norm_label) or ("arrival_date" if norm_label.startswith("arrival in ") else None)
         if key and value.strip() and key not in fields:
             value = value.strip()
             if key == "arrival_date":  # e.g. "Darwin (DRW) 20 September 2026 14:05"
                 m = re.search(r"(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4})", value)
                 value = m.group(1) if m else value
             fields[key] = value
+    if "provider_name" not in fields and "course_name" in fields:
+        # A CoE often has no "Provider:" label: the letterhead (one of the first lines) names the provider.
+        head = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("[page")][:4]
+        letterhead = next((l for l in head if _LETTERHEAD.match(l)), None)
+        if letterhead:
+            fields["provider_name"] = letterhead
     if "full_name" not in fields and ("given_names" in fields or "family_name" in fields):
         fields["full_name"] = " ".join(x for x in (fields.get("given_names"), fields.get("family_name")) if x)
     for k in DATE_FIELDS & fields.keys():

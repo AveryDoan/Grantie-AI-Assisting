@@ -42,10 +42,14 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
     store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
     from redaction.crypto import generate_key
 
-    update = {"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48))}
+    update = {"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48)), "consistency_layer": True}
+    if not settings.identifier_hash_key.get_secret_value():  # keyed hashes that link applications; ephemeral in demo
+        update["identifier_hash_key"] = SecretStr(secrets.token_urlsafe(32))
     if not settings.redaction_key.get_secret_value():  # demo data is in memory: an ephemeral key is fine
         update["redaction_key"] = SecretStr(generate_key())
     demo_settings = settings.model_copy(update=update)
+
+    _seed_consistency_cases(store, demo_settings, DEMO_USERS["officer"])
 
     # Populate the evaluation dashboard (clearly labelled as the offline stub).
     from eval.harness import run_evaluation
@@ -72,3 +76,22 @@ def demo_token(settings: Settings, user_id: str, hours: int = 8) -> str:
         settings.supabase_jwt_secret.get_secret_value(),
         algorithm="HS256",
     )
+
+
+def _seed_consistency_cases(store: MemoryStore, settings: Settings, officer: dict) -> None:
+    """F01 to F10 (fictional, with deliberate inconsistencies), assessed with the offline stub so flags are ready to look at.
+
+    The runs are labelled with the stub's model name. An officer can run the check again with the configured AI.
+    """
+    from app.pipeline.orchestrator import run_assessment
+    from app.services.access import Actor
+    from seed.fraud.load import seed_fraud
+
+    ids = seed_fraud(store)
+    actor = Actor(user_id=officer["id"], role="officer", organisation_id=officer["org"])
+    stub = LLMClient(OfflineStubProvider(), temperature=0.0)
+    for app_id in ids.values():
+        try:
+            run_assessment(store, actor, app_id, stub, settings)
+        except Exception:  # the demo must start even if one case cannot be assessed
+            pass

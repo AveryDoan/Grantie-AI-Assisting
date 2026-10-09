@@ -1,0 +1,282 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>What the AI reads and finds</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+
+.rule { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; display: grid; gap: 8px; }
+.rule.ok { border-left-color: var(--ok); } .rule.bad { border-left-color: var(--bad); } .rule.warn { border-left-color: var(--warn); } .rule.unclear { border-left-color: #6a4fb3; } .rule.judge { border-left-color: var(--muted); }
+.rule header { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; } .rule header strong { flex: 1; min-width: 220px; font-weight: 600; }
+.code { font: 700 13px ui-monospace, Menlo, monospace; background: var(--token); border-radius: 4px; padding: 1px 6px; }
+.chip { border-radius: 999px; padding: 2px 12px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.unclear { background: #eee8f8; color: #5b3e96; } .chip.judge { background: var(--line); color: var(--fg); }
+.q { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; } .q > span { grid-column: 1 / -1; font-size: 13px; }
+@media (max-width: 800px) { .q { grid-template-columns: 1fr; } }
+blockquote { margin: 4px 0 0; padding: 8px 12px; background: var(--bg); border-left: 3px solid #e0b100; border-radius: 6px; font-size: 14px; }
+small { color: var(--muted); } details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; background: var(--surface); } summary { cursor: pointer; }
+h2 { margin: 18px 0 4px; }
+</style></head><body><main>
+<div class="banner officer">OFFICER-ONLY · contains the applicant's personal information · local file: never commit, upload or share</div>
+<div><h1>What the AI reads, and what it finds</h1><p class="muted">app-bac810b9d2-reviewed · AI: offline keyword stub (NOT an LLM; can be wrong) · built from your documents · fully local</p></div>
+<div class="card"><h2>How to read this page</h2><ol><li><strong>The application</strong> built from your documents, and where each answer came from.</li>
+<li><strong>What the AI reads</strong>: the same text with personal details replaced by placeholders. Nothing else reaches the AI.</li>
+<li><strong>What it finds</strong>: each of the 28 rules, the quote behind it as the AI saw it, and the applicant's own words restored for you.</li></ol></div>
+<div class="card"><h2>1 · The application</h2><p class="muted">Form answers</p><table><thead><tr><th>Field</th><th>Answer</th><th>Source</th></tr></thead><tbody><tr><td>applicant name</td><td>Sita KARKI</td><td class=muted>you supplied (--known)</td></tr><tr><td>date of birth</td><td>2003-03-14</td><td class=muted>you supplied (--known)</td></tr><tr><td>email</td><td>sita.karki.sample@gmail.com</td><td class=muted>your resume (header)</td></tr><tr><td>phone</td><td>+977 9841 555 201</td><td class=muted>your application-responses file</td></tr><tr><td>residential address</td><td>House 22, Ward 5, Baneshwor, Kathmandu 44600, Nepal</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>residential country</td><td>Nepal</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>postal address</td><td>House 22, Ward 5, Baneshwor, Kathmandu 44600, Nepal</td><td class=muted>your documents</td></tr><tr><td>postal country</td><td>Nepal</td><td class=muted>your documents</td></tr><tr><td>nationality</td><td>Nepal</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>australian or nz citizen or pr</td><td>No</td><td class=muted>derived from the citizenship on the Confirmation of Enrolment</td></tr><tr><td>education provider</td><td>Charles Darwin University</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>course name</td><td>Master of Data Science (SDASC3)</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>course start date</td><td>2027-02-22</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>study load</td><td>Full time, on campus</td><td class=muted>your Confirmation of Enrolment</td></tr><tr><td>arrival date</td><td>2027-02-13</td><td class=muted>your flight booking</td></tr><tr><td>under 18</td><td>No</td><td class=muted>derived from the date of birth</td></tr><tr><td>declaration agreed</td><td>Yes</td><td class=muted>added for the sample (a declaration is not a document)</td></tr><tr><td>declaration name</td><td>Sita KARKI</td><td class=muted>added for the sample (a declaration is not a document)</td></tr><tr><td>declaration date</td><td>2026-10-09</td><td class=muted>added for the sample (a declaration is not a document)</td></tr></tbody></table>
+<p class="muted" style="margin-top:14px">Written answers</p><table><thead><tr><th>Question</th><th>Answer</th><th>Source</th></tr></thead><tbody><tr><td>current study</td><td>I am in the final semester of a Bachelor of Engineering in Computer Engineering at Himalayan Institute of Technology in Kathmandu, Nepal. I graduate in December 2026. I have accepted an offer to start a Master of Data Science at Charles Darwin University in Darwin in Semester 1, 2027.</td><td class=muted>your application-responses file</td></tr><tr><td>academic achievements</td><td>I rank 3rd in a cohort of 142 students, with a GPA of 3.84 out of 4.0. I received the Dean&#x27;s Merit Award in 2023, 2024 and 2025. My final year project, a low bandwidth crop disease detection app for farmers in Gorkha district, won first place at the National Student Innovation Showcase 2025 and was published as a short paper at the Himalayan Computing Conference. I also scored 7.5 overall in IELTS Academic (August 2026).</td><td class=muted>your application-responses file</td></tr><tr><td>leadership</td><td>In 2022 I founded Code Pahadi, a free weekend coding club for girls in rural schools. It started with 9 students in one classroom and now runs in 6 schools with more than 180 participants and 14 volunteer mentors, most of them my former students. Two graduates have since won places in engineering programs. I served as President of the Women in Technology Society at my institute in 2024, where I tripled membership from 40 to 125 and negotiated 12 paid internships with local employers. In 2025 I led a team of 6 volunteers to deliver digital skills training to 300 villagers after the Gorkha floods, helping 41 small businesses move their orders online.</td><td class=muted>your application-responses file</td></tr><tr><td>nt contribution</td><td>The Northern Territory faces a problem I know well: spread out communities, patchy connectivity and limited access to data skills. In Nepal I have built tools for exactly these conditions, so I want to learn how to do it at a larger scale. The Master of Data Science at Charles Darwin University, which is accredited by the Australian Computer Society, includes units such as Data Analytics and Advanced Data Management that match my goals. Its Casuarina campus and its links with Territory agencies, health services and industry are a major reason I chose Darwin. During my studies I plan to volunteer with local community organisations, mentor other international students and join Territory hackathons. After graduating I want to work in the Territory, ideally in a government or health data role, helping agencies use data to plan services for remote communities. I would also like to start a Code Pahadi chapter in Darwin to encourage girls and young women into technology. I want to give back to the place that gave me this opportunity, and to build my career here for the long term.</td><td class=muted>your application-responses file</td></tr><tr><td>community engagement</td><td>Most of my free time goes into community projects. Since 2022 I have run Code Pahadi, a free weekend coding club for girls in rural schools. It has grown from 9 students in one classroom to more than 180 girls in 6 schools, with 14 volunteer mentors, most of them my former students. In 2025 I gave my weekends to the Gorkha flood recovery project, where I led 6 volunteers to train 300 villagers in digital skills. We helped 41 small businesses move their orders online. I also mentor younger students whenever I can find the time. In Darwin I plan to volunteer with local community organisations and mentor other international students.</td><td class=muted>written for the sample (not in your documents)</td></tr><tr><td>biography</td><td>Sita Karki
+Sita Karki is a computer engineer from Kathmandu, Nepal, who is passionate about using data to
+solve real community problems. She graduates in December 2026 from Himalayan Institute of
+Technology with a GPA of 3.84 and will begin a Master of Data Science in Darwin in 2027. Sita
+founded Code Pahadi, a free coding club that now teaches more than 180 rural girls across six
+schools. She has also led the Women in Technology Society, worked as a data analyst for a
+Kathmandu consultancy and led flood recovery training for 300 villagers. Her crop disease
+detection app for farmers won first place at the 2025 National Student Innovation Showcase. In the
+Northern Territory she hopes to build her data analytics skills, volunteer in the community and later
+work on data projects that help remote communities. Outside study, she enjoys hiking, cooking
+momo for friends and mentoring younger students whenever she can find the time.</td><td class=muted>your biography file</td></tr></tbody></table></div>
+<div class="banner officer">Leak scan on the documents as they stand: FAIL (long_digit_string ×1). The AI would be blocked from reading this application until an officer supplies the missing identifier (CoE number, student ID) as a known value, as a form field would.</div><div class="banner warn">An officer marked these ordinary words as NOT personal for this run (the name detector mistook them for people): <strong>Code, Email</strong>. Nothing else was changed.</div><div class="banner ok">Leak scan with the identifiers supplied (CoE number, student ID): PASS. AI may read it: yes.</div>
+<div class="card"><h2>2 · What the AI reads</h2><p class="muted">Placeholders such as <mark class="tok">[PERSON_1]</mark> stand in for personal details; countries, providers, courses and dates other than the date of birth are kept because the rules need them.</p>
+<h3>The application form</h3><pre class="doc">applicant_name: <mark class="tok">[PERSON_1]</mark>
+date_of_birth: <mark class="tok">[DOB_1]</mark>
+email: <mark class="tok">[EMAIL_1]</mark>
+phone: <mark class="tok">[PHONE_1]</mark>
+residential_address: <mark class="tok">[LOCATION: outside Australia]</mark>
+residential_country: Nepal
+postal_address: <mark class="tok">[LOCATION: outside Australia]</mark>
+postal_country: Nepal
+nationality: Nepal
+australian_or_nz_citizen_or_pr: No
+education_provider: Charles Darwin University
+course_name: Master of Data Science (SDASC3)
+course_start_date: 2027-02-22
+study_load: Full time, on campus
+arrival_date: 2027-02-13
+under_18: No
+declaration_agreed: Yes
+declaration_name: <mark class="tok">[PERSON_1]</mark>
+declaration_date: 2026-10-09
+current_study: I am in the final semester of a Bachelor of Engineering in Computer Engineering at Himalayan Institute of Technology in <mark class="tok">[PERSON_5]</mark>, Nepal. I graduate in December 2026. I have accepted an offer to start a Master of Data Science at Charles Darwin University in Darwin in Semester 1, 2027.
+academic_achievements: I rank 3rd in a cohort of 142 students, with a GPA of 3.84 out of 4.0. I received the <mark class="tok">[PERSON_2]</mark>&#x27;s Merit Award in 2023, <mark class="tok">[PERSON_3]</mark> and 2025. My final year project, a low bandwidth crop disease detection app for farmers in <mark class="tok">[PERSON_4]</mark> district, won first place at the National Student Innovation Showcase 2025 and was published as a short paper at the Himalayan Computing Conference. I also scored 7.5 overall in IELTS Academic (August 2026).
+leadership: In 2022 I founded Code <mark class="tok">[PERSON_6]</mark>, a free weekend coding club for girls in rural schools. It started with 9 students in one classroom and now runs in 6 schools with more than 180 participants and 14 volunteer mentors, most of them my former students. Two graduates have since won places in engineering programs. I served as President of the Women in Technology Society at my institute in <mark class="tok">[PERSON_3]</mark>, where I tripled membership from 40 to 125 and negotiated 12 paid internships with local employers. In 2025 I led a team of 6 volunteers to deliver digital skills training to 300 villagers after the <mark class="tok">[PERSON_4]</mark> floods, helping 41 small businesses move their orders online.
+nt_contribution: The Northern Territory faces a problem I know well: spread out communities, patchy connectivity and limited access to data skills. In Nepal I have built tools for exactly these conditions, so I want to learn how to do it at a larger scale. The Master of Data Science at Charles Darwin University, which is accredited by the Australian Computer Society, includes units such as Data Analytics and Advanced Data Management that match my goals. Its Casuarina campus and its links with Territory agencies, health services and industry are a major reason I chose Darwin. During my studies I plan to volunteer with local community organisations, mentor other international students and join Territory hackathons. After graduating I want to work in the Territory, ideally in a government or health data role, helping agencies use data to plan services for remote communities. I would also like to start a Code <mark class="tok">[PERSON_6]</mark> chapter in Darwin to encourage girls and young women into technology. I want to give back to the place that gave me this opportunity, and to build my career here for the long term.
+community_engagement: Most of my free time goes into community projects. Since 2022 I have run Code <mark class="tok">[PERSON_6]</mark>, a free weekend coding club for girls in rural schools. It has grown from 9 students in one classroom to more than 180 girls in 6 schools, with 14 volunteer mentors, most of them my former students. In 2025 I gave my weekends to the <mark class="tok">[PERSON_4]</mark> flood recovery project, where I led 6 volunteers to train 300 villagers in digital skills. We helped 41 small businesses move their orders online. I also mentor younger students whenever I can find the time. In Darwin I plan to volunteer with local community organisations and mentor other international students.
+biography: <mark class="tok">[PERSON_1]</mark> is a computer engineer from <mark class="tok">[PERSON_5]</mark>, Nepal, who is passionate about using data to
+solve real community problems. She graduates in December 2026 from Himalayan Institute of
+Technology with a GPA of 3.84 and will begin a Master of Data Science in Darwin in 2027. <mark class="tok">[PERSON_1]</mark>
+founded Code <mark class="tok">[PERSON_6]</mark>, a free coding club that now teaches more than 180 rural girls across six
+schools. She has also led the Women in Technology Society, worked as a data analyst for a
+<mark class="tok">[PERSON_5]</mark> consultancy and led flood recovery training for 300 villagers. Her crop disease
+detection app for farmers won first place at the 2025 National Student Innovation Showcase. In the
+Northern Territory she hopes to build her data analytics skills, volunteer in the community and later
+work on data projects that help remote communities. Outside study, she enjoys hiking, cooking
+momo for friends and mentoring younger students whenever she can find the time.</pre><h3 style="margin-top:14px">The documents</h3><details><summary>Document 1 · coe · 1 page(s) · <strong>read by the AI</strong></summary><pre class="doc">[page 1]
+Charles Darwin University
+CRICOS Provider Code: 00300K | ABN <mark class="tok">[ID_1]</mark>
+Casuarina Campus, <mark class="tok">[PLACE_1]</mark>, Casuarina <mark class="tok">[LOCATION: unknown]</mark> | cdu.edu.au
+CONFIRMATION OF ENROLMENT
+This document confirms that the student named below has accepted an offer and is enrolled in the course specified,
+subject to the conditions of the offer.
+Confirmation of Enrolment (CoE) number <mark class="tok">[ID_2]</mark>
+Student ID <mark class="tok">[ID_3]</mark>
+Family name <mark class="tok">[PERSON_1]</mark>
+Given names <mark class="tok">[PERSON_1]</mark>
+Date of birth <mark class="tok">[DOB_1]</mark>
+Sex Female
+Country of citizenship Nepal
+Passport number <mark class="tok">[ID_4]</mark>
+Passport expiry 08/11/2031
+Residential address (home country) <mark class="tok">[LOCATION: outside Australia]</mark>
+Course Master of Data Science (SDASC3)
+CRICOS course code 116326C
+Course level Masters Degree (Coursework)
+Campus Casuarina Campus, Darwin NT
+Mode of study Full time, on campus
+Course start date 22/02/2027
+Course end date 20/11/2028
+Orientation 15/02/2027
+Course duration 2 years (4 semesters)
+Tuition fee per year (AUD) $31,688.00
+Total tuition fee (AUD) $63,376.00
+Initial prepaid tuition $15,844.00 (paid 30/09/2026)
+Overseas Health Cover (OSHC) provider Allianz Care Australia
+OSHC policy number OSH-<mark class="tok">[ID_5]</mark>
+OSHC period 15/02/2027 to 31/03/2029
+English test IELTS Academic 7.5 (21/08/2026)
+Date CoE issued 02/10/2026
+Issued by: CDU Global Admissions (sample record). This CoE is issued under the ESOS Act 2000. The student must hold
+a valid student visa to study in Australia.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></details><details><summary>Document 2 · travel booking · 1 page(s) · <strong>read by the AI</strong></summary><pre class="doc">[page 1]
+Horizon Travel
+E-ticket itinerary and receipt | <mark class="tok">[PERSON_5]</mark>, Nepal | <mark class="tok">[PHONE_2]</mark>
+Travel Itinerary and E-ticket Receipt
+Booking reference (PNR) XK7R2P
+E-ticket number 618-2204871935
+Passenger <mark class="tok">[PERSON_1]</mark> / <mark class="tok">[PERSON_1]</mark> MS
+Passport <mark class="tok">[ID_4]</mark> (Nepal)
+Booked by Horizon Travel, on behalf of passenger
+Booking date 04/10/2026
+Baggage 2 x 23 kg checked, 7 kg cabin
+Total paid AUD 1,184.00 (Visa ending 4417)
+Contact <mark class="tok">[EMAIL_1]</mark> / <mark class="tok">[PHONE_1]</mark>
+Status CONFIRMED (HK)
+Flight details
+Date Flight From To Departs Arrives
+Fri 12 Feb 2027 SQ 0413 (Economy) <mark class="tok">[PERSON_5]</mark> (KTM) Singapore (SIN) 07:40 15:35
+Fri 12 Feb 2027 SQ 0211 (Economy) Singapore (SIN) Darwin (DRW) 21:15 03:50 +1
+Arrival in Darwin: Saturday 13 February 2027, 03:50 local time. Check in at least 3 hours before international departures.
+Passengers must carry a valid passport and visa. Fare rules: changes permitted for a fee; refundable less AUD 150.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></details><details><summary>Document 3 · referee letter · 1 page(s) · <strong>read by the AI</strong></summary><pre class="doc">[page 1]
+Himalayan Institute of Technology
+H
+Department of Computer Engineering
+Baneshwor Campus, <mark class="tok">[PERSON_5]</mark> 44600, Nepal | <mark class="tok">[PHONE_3]</mark> | hit.example.edu.np
+14 September 2026
+Study NT Scholarship Assessment Panel
+Department of Trade, Business and Asian Relations
+Northern Territory Government, Darwin <mark class="tok">[LOCATION: NT, Australia]</mark>, Australia
+RE: Letter of support for <mark class="tok">[PERSON_15]</mark>, 2026-27 Scholarship Program Round 1 (Study NT)
+To the Assessment Panel,
+I am Associate Professor of Computer Engineering at Himalayan Institute of Technology, and I
+have known <mark class="tok">[PERSON_1]</mark> for four years. I taught her in Data Structures and Machine Learning, I
+supervised her final year project, and I am the faculty adviser to the Women in Technology Society
+she led in <mark class="tok">[PERSON_3]</mark>. I am pleased to give her my strongest support.
+Academic. <mark class="tok">[PERSON_1]</mark> is one of the three strongest students I have taught in 17 years. She has a GPA of
+3.84 and her work shows real depth, not only high marks. Her project on crop disease detection for
+low bandwidth settings was technically careful, tested with 60 farmers, and won first place at the
+2025 National Student Innovation Showcase. She writes clear code and clear reports, and she
+accepts criticism well.
+Personal and leadership. <mark class="tok">[PERSON_1]</mark> founded Code <mark class="tok">[PERSON_6]</mark>, a free coding club for rural girls, without
+being asked and without funding. I have visited two of its classes. The students are engaged and
+the mentors are former students she trained. As President of the Women in Technology Society
+she grew membership from 40 to 125 and secured 12 internships. She is reliable, generous with
+her time and calm under pressure.
+I have no doubt she will do well in Darwin and give back to the community there. I recommend her
+without reservation. Please contact me if you need more information.
+Yours sincerely,
+<mark class="tok">[PERSON_10]</mark>
+Dr <mark class="tok">[PERSON_10]</mark>
+Associate Professor and Head of Department, Computer Engineering
+Himalayan Institute of Technology
+Relationship: lecturer, project supervisor and faculty adviser. Length of association: 4 years (since
+August 2022).
+Email: <mark class="tok">[EMAIL_2]</mark> | Mobile: <mark class="tok">[PHONE_4]</mark>
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></details><details><summary>Document 4 · referee letter · 1 page(s) · <strong>read by the AI</strong></summary><pre class="doc">[page 1]
+<mark class="tok">[PERSON_7]</mark> Pvt. Ltd.
+K
+Analytics and Software Consulting
+<mark class="tok">[PLACE_2]</mark> 14, <mark class="tok">[PERSON_5]</mark> 44600, Nepal | <mark class="tok">[PHONE_5]</mark> | <mark class="tok">[EMAIL_4]</mark>
+16 September 2026
+Study NT Scholarship Assessment Panel
+Department of Trade, Business and Asian Relations
+Northern Territory Government, Darwin <mark class="tok">[LOCATION: NT, Australia]</mark>, Australia
+RE: Letter of support for <mark class="tok">[PERSON_15]</mark>, 2026-27 Scholarship Program Round 1 (Study NT)
+To the Assessment Panel,
+I am the Founder and Managing Director of <mark class="tok">[PERSON_7]</mark>. <mark class="tok">[PERSON_1]</mark> worked for us as a
+part time data analyst intern from June <mark class="tok">[PERSON_3]</mark> to August 2025, and has continued as a casual
+contractor since. I supervised her directly for the whole period, a total of about 27 months.
+Work and academic ability. <mark class="tok">[PERSON_1]</mark> joined us while studying full time and still delivered. She built a
+dashboard for a hospital client that cut their monthly reporting from three days to four hours. She
+taught herself Python libraries we had not used before and documented her work so others could
+follow it. In my view her technical skill is already at graduate level.
+Personal qualities and leadership. <mark class="tok">[PERSON_1]</mark> is honest about what she does not know and quick to ask
+for help. When two interns joined after her, she trained them without being asked. She also gave
+her own weekends to the <mark class="tok">[PERSON_4]</mark> flood relief project and asked for leave only twice. Colleagues
+trust her and clients ask for her by name.
+I recommend <mark class="tok">[PERSON_1]</mark> fully for this scholarship. She would be a credit to the Northern Territory
+community, and we would welcome her back after her studies if she chooses to return. I am happy
+to be contacted.
+Yours sincerely,
+<mark class="tok">[PERSON_11]</mark>
+Mr <mark class="tok">[PERSON_11]</mark>
+Founder and Managing Director, <mark class="tok">[PERSON_7]</mark> Pvt. Ltd.
+Relationship: direct employer and supervisor. Length of association: 27 months (since June <mark class="tok">[PERSON_3]</mark>).
+Email: <mark class="tok">[EMAIL_3]</mark> | Mobile: <mark class="tok">[PHONE_6]</mark>
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></details><details><summary>Document 5 · other · 1 page(s) · <strong>read by the AI</strong></summary><pre class="doc">[page 1]
+<mark class="tok">[PERSON_1]</mark>
+<mark class="tok">[LOCATION: outside Australia]</mark> | <mark class="tok">[PHONE_1]</mark> | <mark class="tok">[EMAIL_1]</mark> |
+<mark class="tok">[URL_1]</mark>
+Education
+Bachelor of Engineering, Computer Engineering, Himalayan Institute of Technology,
+<mark class="tok">[PERSON_5]</mark>. Jan 2023 to Dec 2026 (expected). GPA 3.84/4.0. <mark class="tok">[PERSON_2]</mark>&#x27;s Merit Award 2023, <mark class="tok">[PERSON_3]</mark>,
+2025.
+Higher Secondary (Science), <mark class="tok">[PERSON_4]</mark> Model College. 2019 to 2021. Result: 3.92 GPA.
+Experience
+Data Analyst (part time intern, then contractor), <mark class="tok">[PERSON_7]</mark>. <mark class="tok">[PERSON_8]</mark> to present.
+Built hospital reporting dashboard, cutting reporting time from 3 days to 4 hours. Trained 2 new
+interns. Python, SQL, Power BI.
+Founder and Lead Mentor, Code <mark class="tok">[PERSON_6]</mark> (free coding club for rural girls). 2022 to present.
+Grew from 9 students in 1 school to 180+ students in 6 schools with 14 volunteer mentors.
+President, Women in Technology Society, Himalayan Institute of Technology. <mark class="tok">[PERSON_3]</mark>.
+Membership up from 40 to 125. Secured 12 internships with local employers.
+Volunteer Team Lead, <mark class="tok">[PERSON_4]</mark> Flood Recovery Digital Skills Project. 2025.
+Led 6 volunteers, trained 300 villagers, moved 41 small businesses online.
+Awards and publications
+First place, National Student Innovation Showcase 2025. Short paper: &#x27;Offline first crop disease
+detection for low bandwidth farms&#x27;, Himalayan Computing Conference 2025.
+Skills and languages
+Python, SQL, TensorFlow, Power BI, React Native, <mark class="tok">[PERSON_9]</mark>. English (IELTS 7.5), Nepali (native), Hindi
+(fluent).
+Referees
+Dr <mark class="tok">[PERSON_10]</mark> (HIT), <mark class="tok">[EMAIL_2]</mark>. Mr <mark class="tok">[PERSON_11]</mark> (<mark class="tok">[PERSON_7]</mark>),
+<mark class="tok">[EMAIL_3]</mark>.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></details><details><summary>Document 6 · other · 1 page(s) · <strong>read by the AI</strong></summary><pre class="doc">[page 1]
+HIMALAYAN INSTITUTE OF TECHNOLOGY
+Office of the <mark class="tok">[PERSON_2]</mark>, Faculty of Engineering
+<mark class="tok">[PERSON_2]</mark>&#x27;s Merit Award
+is proudly presented to
+<mark class="tok">[PERSON_1]</mark>
+Student ID <mark class="tok">[ID_6]</mark>, Bachelor of Engineering (Computer Engineering)
+in recognition of outstanding academic achievement, placing in the top 5% of the cohort
+for the 2025 academic year.
+<mark class="tok">[PERSON_12]</mark>
+Prof. <mark class="tok">[PERSON_13]</mark>, <mark class="tok">[PERSON_14]</mark>: 20 January 2026 | Cert. No. DMA-2025-0381
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></details><details><summary>Document 7 · headshot · 1 page(s) · <strong>NOT sent: needs a person to read it</strong></summary><p class=muted>The AI never sees this file.</p></details>
+<h3 style="margin-top:14px">Replaced in total</h3><table><tbody><tr><td>Address</td><td class=num>7</td></tr><tr><td>Date of birth</td><td class=num>2</td></tr><tr><td>Email</td><td class=num>8</td></tr><tr><td>ID number</td><td class=num>7</td></tr><tr><td>Name</td><td class=num>66</td></tr><tr><td>Phone</td><td class=num>8</td></tr><tr><td>Place</td><td class=num>2</td></tr><tr><td>URL</td><td class=num>1</td></tr></tbody></table><p class="muted">Location class (from the address, before redaction): outside_australia</p></div>
+<div class="card"><h2>3 · What the AI extracted</h2><table><thead><tr><th>Fact</th><th>Value</th><th>Quote as the AI saw it</th><th></th></tr></thead><tbody><tr><td>arrival date</td><td>2027-02-13</td><td>2027-02-13</td><td><span class=pass>verified</span></td></tr><tr><td>australian or nz citizen or pr</td><td>No</td><td>No</td><td><span class=pass>verified</span></td></tr><tr><td>residential country</td><td>Nepal</td><td>Nepal</td><td><span class=pass>verified</span></td></tr><tr><td>under 18</td><td>No</td><td>No</td><td><span class=pass>verified</span></td></tr></tbody></table><h3 style="margin-top:14px">Typed answers compared with the documents</h3><table><thead><tr><th>Typed answer</th><th>Compared with the document</th><th>Result</th></tr></thead><tbody><tr><td>applicant name</td><td class=muted>document text</td><td>match</td></tr><tr><td>date of birth</td><td class=muted>document text</td><td>match</td></tr><tr><td>course name</td><td class=muted>document text</td><td>match</td></tr></tbody></table>
+</div>
+<div class="card"><h2>4 · The result, rule by rule</h2><p><span class="chip ok">Met 17</span> · <span class="chip bad">Not met 2</span> · <span class="chip warn">Needs evidence 2</span> · <span class="chip unclear">Unclear 2</span> · <span class="chip judge">Officer judgement 5</span></p><p class="muted">No overall score or recommendation. The officer confirms or overrides every finding.</p><h2>A. Eligibility</h2><article class="rule ok"><header><span class="code">S1</span><strong>Applicant has an offer from an NT education provider, and a CoE is provided.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The Confirmation of Enrolment shows &quot;Charles Darwin University&quot;, which is on the nt education providers (&quot;Charles Darwin University&quot;).</p></article><article class="rule bad"><header><span class="code">S2</span><strong>Course starts between 1 October 2026 and 31 December 2026 (Round 1).</strong><span class="chip bad">Not met</span></header><p class=muted>Checked by: code · confidence high</p><p>The Confirmation of Enrolment shows course start date 22 February 2027; the allowed window is 01 October 2026 to 31 December 2026.</p></article><article class="rule unclear"><header><span class="code">S3</span><strong>Course leads to an occupation on the NT Skilled Occupation Priority List.</strong><span class="chip unclear">Unclear</span></header><p class=muted>Checked by: code · confidence low</p><p>This rule needs the official nt skilled occupation priority list, which has not been loaded yet.</p></article><article class="rule judge"><header><span class="code">S4</span><strong>Applicant meets the provider&#x27;s academic and English entry requirements.</strong><span class="chip judge">Officer judgement</span></header><p class=muted>Checked by: officer only</p><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>I also scored 7.5 overall in IELTS Academic (August 2026).</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>I also scored 7.5 overall in IELTS Academic (August 2026).</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule ok"><header><span class="code">S5</span><strong>Application is submitted at least 2 weeks before arrival in Australia.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>Submitted 09 October 2026; arrival 13 February 2027 is 127 days later (at least 14 needed).</p><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>2027-02-13</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>2027-02-13</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule ok"><header><span class="code">S6</span><strong>Applicant is living outside Australia when applying.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The residential address is in Nepal, outside Australia.</p><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>Nepal</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>Nepal</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule ok"><header><span class="code">S7</span><strong>Applicant is not already living in the NT.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>Neither the residential nor the postal address is in the Northern Territory.</p></article><article class="rule bad"><header><span class="code">S8</span><strong>Applicant is not studying with an NT provider at the time of applying.</strong><span class="chip bad">Not met</span></header><p class=muted>Checked by: AI finds passages · confidence medium</p><p>The applicant&#x27;s words contradict the rule.</p><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>I have accepted an offer to start a Master of Data Science at Charles Darwin University in Darwin in Semester 1, 2027.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>I have accepted an offer to start a Master of Data Science at Charles Darwin University in Darwin in Semester 1, 2027.</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule warn"><header><span class="code">S9</span><strong>Applicant has a valid Student Visa (subclass 500).</strong><span class="chip warn">Needs evidence</span></header><p class=muted>Checked by: code · confidence high · ask the applicant</p><p>No visa grant notice was provided.</p></article><article class="rule ok"><header><span class="code">S10</span><strong>Applicant holds no other scholarship, except the CDU Global Merit Scholarship.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>No conflicting scholarship records were found.</p></article><article class="rule ok"><header><span class="code">S11</span><strong>Applicant is not an Australian or New Zealand citizen, or an Australian permanent resident.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>Answered &quot;No&quot; to &quot;Are you an Australian or New Zealand citizen, or an Australian permanent resident?&quot;.</p></article><article class="rule ok"><header><span class="code">S12</span><strong>Applicant plans to study full-time.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The study load is given as &quot;Full time, on campus&quot;.</p></article><article class="rule ok"><header><span class="code">S13</span><strong>Applicant has not also received the 2026/27 International Student Accommodation Grant (one program only).</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>No conflicting grant records were found.</p></article><article class="rule ok"><header><span class="code">S14</span><strong>Only one higher-education application is submitted in the period.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>No conflicting application records were found.</p></article><article class="rule ok"><header><span class="code">S15</span><strong>The under-18 answer is recorded.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>Answered &quot;No&quot; to &quot;Are you under 18?&quot;.</p></article><article class="rule ok"><header><span class="code">S16</span><strong>The declaration is completed.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The declaration is agreed, named and dated.</p></article><h2>B. Documents</h2><article class="rule ok"><header><span class="code">D1</span><strong>A CoE is uploaded and is the right document type.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>A Confirmation of Enrolment was uploaded and looks like the right document.</p></article><article class="rule ok"><header><span class="code">D2</span><strong>Evidence of arrival date is uploaded (a booking or itinerary; a screenshot of a flight is not enough).</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The booking shows arrival on 13 February 2027.</p></article><article class="rule ok"><header><span class="code">D3</span><strong>Two referee letters are uploaded.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>2 referee letters were uploaded (at least 2 needed).</p></article><article class="rule warn"><header><span class="code">D4</span><strong>Each referee letter has the referee&#x27;s name, position, organisation, relationship, length of association, signature and date, and is on letterhead.</strong><span class="chip warn">Needs evidence</span></header><p class=muted>Checked by: code · confidence medium · ask the applicant</p><p>Missing from the referee letters - letter 1: referee name, position, organisation, length of association, letter date; letter 2: referee name, position, organisation, length of association, letter date.</p></article><article class="rule unclear"><header><span class="code">D5</span><strong>Each referee letter is dated 2024 to 2026 (no older than 24 months where possible).</strong><span class="chip unclear">Unclear</span></header><p class=muted>Checked by: code · confidence low · ask the applicant</p><p>2 referee letter(s) have no readable date.</p></article><article class="rule ok"><header><span class="code">D6</span><strong>A biography of about 150 words is provided, with a headshot.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The biography has 157 words and a headshot was uploaded (check the photo by eye).</p></article><article class="rule ok"><header><span class="code">D7</span><strong>All documents are in English, or a certified translation is provided with the original.</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>All documents appear to be in English.</p></article><h2>C. Merit (officer judges; no AI score)</h2><article class="rule judge"><header><span class="code">M1</span><strong>Academic merit (grades, achievements, transcripts). Weight on the form: 40%.</strong><span class="chip judge">Officer judgement</span></header><p class=muted>Checked by: AI finds passages</p></article><article class="rule judge"><header><span class="code">M2</span><strong>Supporting evidence (references). Weight on the form: 30%.</strong><span class="chip judge">Officer judgement</span></header><p class=muted>Checked by: officer only</p><div class="q"><div><small>What the AI quoted (document, with placeholders)</small><blockquote>Relationship: lecturer, project supervisor and faculty adviser. Length of association: 4 years (since</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>Relationship: lecturer, project supervisor and faculty adviser. Length of association: 4 years (since</blockquote></div><span class="pass">found in the text</span></div><div class="q"><div><small>What the AI quoted (document, with placeholders)</small><blockquote>I taught her in Data Structures and Machine Learning, I supervised her final year project, and I am the faculty adviser to the Women in Technology Society she led in <mark class="tok">[PERSON_3]</mark>.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>I taught her in Data Structures and Machine Learning, I
+supervised her final year project, and I am the faculty adviser to the Women in Technology Society
+she led in 2024.</blockquote></div><span class="pass">found in the text</span></div><div class="q"><div><small>What the AI quoted (document, with placeholders)</small><blockquote>Relationship: direct employer and supervisor. Length of association: 27 months (since June <mark class="tok">[PERSON_3]</mark>).</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>Relationship: direct employer and supervisor. Length of association: 27 months (since June 2024).</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule judge"><header><span class="code">M3</span><strong>Leadership (roles, initiatives, impact). Weight on the form: 20%.</strong><span class="chip judge">Officer judgement</span></header><p class=muted>Checked by: AI finds passages</p><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>In 2025 I led a team of 6 volunteers to deliver digital skills training to 300 villagers after the <mark class="tok">[PERSON_4]</mark> floods, helping 41 small businesses move their orders online.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>In 2025 I led a team of 6 volunteers to deliver digital skills training to 300 villagers after the Gorkha floods, helping 41 small businesses move their orders online.</blockquote></div><span class="pass">found in the text</span></div><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>In 2025 I gave my weekends to the <mark class="tok">[PERSON_4]</mark> flood recovery project, where I led 6 volunteers to train 300 villagers in digital skills.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>In 2025 I gave my weekends to the Gorkha flood recovery project, where I led 6 volunteers to train 300 villagers in digital skills.</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule judge"><header><span class="code">M4</span><strong>Community engagement (volunteering, contribution). Weight on the form: 10%.</strong><span class="chip judge">Officer judgement</span></header><p class=muted>Checked by: AI finds passages</p><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>It started with 9 students in one classroom and now runs in 6 schools with more than 180 participants and 14 volunteer mentors, most of them my former students.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>It started with 9 students in one classroom and now runs in 6 schools with more than 180 participants and 14 volunteer mentors, most of them my former students.</blockquote></div><span class="pass">found in the text</span></div><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>During my studies I plan to volunteer with local community organisations, mentor other international students and join Territory hackathons.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>During my studies I plan to volunteer with local community organisations, mentor other international students and join Territory hackathons.</blockquote></div><span class="pass">found in the text</span></div><div class="q"><div><small>What the AI quoted (form, with placeholders)</small><blockquote>Most of my free time goes into community projects.</blockquote></div><div><small>The applicant's words (restored for the officer)</small><blockquote>Most of my free time goes into community projects.</blockquote></div><span class="pass">found in the text</span></div></article><article class="rule ok"><header><span class="code">M5</span><strong>The “How will studying in the NT contribute?” question is answered (4,000 characters maximum).</strong><span class="chip ok">Met</span></header><p class=muted>Checked by: code · confidence high</p><p>The question is answered (1,089 of 4,000 characters). Read it alongside the merit criteria.</p></article></div>
+<p class="muted">A person must check every finding. Redaction and the stub are not guarantees. Detector presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-1.</p></main></body></html>

@@ -286,6 +286,11 @@ def run_assessment(
             redaction=redaction,
         )
         _persist(store, app, run, outcome, documents)
+        if settings.consistency_layer:
+            # Never raises, never changes a rule result, never blocks sign-off: flags are for the officer to check.
+            from app.services import consistency as consistency_service
+
+            consistency_service.run_for_assessment(store, actor, app, run, outcome, documents, pack, llm, settings)
     except Exception as exc:
         from redaction.pipeline import RedactionBlocked
 
