@@ -78,12 +78,14 @@ def test_application_is_built_from_the_documents_and_assessed_locally(folder):
         assert v.casefold() not in stdout.casefold(), v
 
 
-def test_unrecognised_identifiers_block_the_ai_until_supplied(folder):
+def test_a_coe_number_is_now_recognised_on_its_own_so_the_ai_is_not_blocked(folder):
+    # Before the CoE / student ID / booking reference patterns were added, this number format leaked and blocked the AI
+    # until the officer supplied it. Those formats are now recognised without help.
     out, stdout = run(folder)
     meta = json.loads((out / "meta.json").read_text())
-    assert "long_digit_string" in meta["leak_without_ids"]  # the CoE number format is not recognised on its own
+    assert "long_digit_string" not in meta["leak_without_ids"]
     assert not meta["leak_with_ids"]
-    assert "the AI would be blocked" in stdout
+    assert "the AI would be blocked" not in stdout
 
 
 def test_words_the_detector_mistakes_for_people_can_be_marked_by_an_officer(folder):

@@ -231,6 +231,9 @@ def letter_subject(ctx: ConsistencyContext) -> list[Flag]:
 
 def run(ctx: ConsistencyContext) -> list[Flag]:
     flags: list[Flag] = []
-    for fn in (arrival_vs_start, typed_vs_documents, coe_length, referee_dates, known_for_vs_timeline, letter_subject):
+    from app.pipeline.consistency import claims
+
+    for fn in (arrival_vs_start, typed_vs_documents, coe_length, referee_dates, known_for_vs_timeline, letter_subject,
+               claims.claim_needs_evidence, claims.known_since_vs_degree_start):
         flags.extend(fn(ctx))
     return flags

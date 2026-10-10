@@ -1,100 +1,141 @@
-// Merit criterion viewer: the whole text on the left (with paragraph and page markers), the AI's notes on the right.
-// Every note points at a passage code found in the text. Clicking a note scrolls to and highlights its passage;
-// clicking a highlighted passage selects its note. A failed quote or a summary with no source is listed apart, never
-// shown as a normal note. There is no score, rating or strength anywhere, and the weight is not shown.
+// Merit criterion viewer. Left: the AI summary bullets (in the order they appear in the document), then the source text,
+// collapsed when long, with the highlighted passage. Right: other passages, anything code could not link or verify, and the
+// officer's own mark. Every bullet points at a passage code found in the text; clicking it shows that passage highlighted in the
+// applicant's own words. A bullet with no source is listed apart. No strength, quality or ranking cue appears anywhere.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Decision, type Detail, type Finding } from "../../api";
-import { Button, ErrorNotice, Icon, StatusChip, effectiveStatus, formatDate } from "../../ui";
+import type { Detail, Finding } from "../../api";
+import { Icon, StatusChip, effectiveStatus } from "../../ui";
 import type { DialogState } from "./Dialogs";
-import { MAX_QUOTES, MAX_SUMMARIES, highlightsFor, notesOf, sourcesOf, type QuoteNote, type SummaryNote } from "./highlight";
+import { collapsedBlocks, forMode, highlightsFor, notesOf, sourcesOf, whereIs, type QuoteNote, type SummaryNote } from "./highlight";
+import { MarkControl } from "./MarkControl";
+import { docForSource, pdfTargets, type EvidenceSpan } from "./pdfTargets";
+import { PdfViewer, type PdfItem } from "./PdfViewer";
 import { CHECKED_BY_LABEL, checkedBy, plainRule } from "./model";
 import { TextView } from "./TextView";
 
-const CRITERIA: Record<string, string> = { M1: "Academic Merit", M2: "Supporting Evidence", M3: "Leadership", M4: "Community Engagement", M5: "Short answer" };
-const CHOICES: { label: string; status: Decision }[] = [
-  { label: "Meets", status: "Met" }, { label: "Does not meet", status: "Not met" }, { label: "Not assessed", status: "Unclear" },
-];
+export const CRITERIA: Record<string, string> = { M1: "Academic Merit", M2: "Supporting Evidence", M3: "Leadership", M4: "Community Engagement", M5: "Short answer" };
+const SUMMARY_LABEL = "AI summary, check the original";
 
-function Slot({ n, kind }: { n: number; kind: "quote" | "summary" }) {
-  return <div className="rv-slot" aria-label={`Empty ${kind} slot ${n}`}>{kind === "quote" ? "No further passage found" : "No summary for this slot"}</div>;
-}
-
-function Card({ note, selected, onSelect, sourceLabel }: { note: QuoteNote | SummaryNote; selected: boolean; onSelect: () => void; sourceLabel: string }) {
-  const unlocated = note.state === "unlocated";
-  const isQuote = note.kind === "quote";
-  return (
-    <button className={`rv-note ${note.kind} ${selected ? "sel" : ""}`} aria-pressed={selected} onClick={onSelect} disabled={unlocated}>
-      <span className="rv-note-label">{isQuote ? "Verified quote" : "AI summary, check the original"}</span>
-      {isQuote && (note as QuoteNote).label && <small className="rv-note-sub">{(note as QuoteNote).label}</small>}
-      <span className="rv-note-text">{isQuote ? <>“{note.text}”</> : note.text}</span>
-      {unlocated
-        ? <small className="rv-note-warn"><Icon name="question" size={14} />Could not locate in the document</small>
-        : <small className="rv-note-act"><Icon name="search" size={14} />Show in document · {sourceLabel}</small>}
-    </button>
-  );
-}
-
-export function MeritViewer({ f, detail, locked, busy, onClose, onChanged, onTrace, onDialog, onConfirm }: {
-  f: Finding; detail: Detail; locked: boolean; busy: boolean; onClose: () => void; onChanged: () => void; onTrace: (item: string) => void;
-  onDialog: (d: DialogState) => void; onConfirm: (f: Finding) => void;
+export function MeritViewer({ f, detail, mode = "criterion", locked, onClose, onChanged, onTrace }: {
+  f: Finding; detail: Detail; mode?: "criterion" | "referee"; locked: boolean; busy?: boolean; onClose: () => void; onChanged: () => void;
+  onTrace: (item: string) => void; onDialog?: (d: DialogState) => void; onConfirm?: (f: Finding) => void;
 }) {
-  const notes = useMemo(() => notesOf(f), [f]);
   const texts = detail.source_texts ?? {};
+  const order = useMemo(() => Object.keys(texts), [texts]);
+  const notes = useMemo(() => notesOf(forMode(f, mode), order), [f, mode, order]);
   const tabs = useMemo(() => sourcesOf(notes).filter((k) => texts[k]), [notes, texts]);
-  const fallback = Object.keys(texts)[0];
-  const [source, setSource] = useState(tabs[0] ?? fallback ?? "application_text");
+  const [source, setSource] = useState(tabs[0] ?? order[0] ?? "application_text");
   const [selected, setSelected] = useState<string | null>(null);
+  const [full, setFull] = useState(false);
+  const [mode_, setMode] = useState<"text" | "pdf">("pdf");
   const head = useRef<HTMLDivElement>(null);
-  useEffect(() => { head.current?.focus(); }, [f.id]);
+  useEffect(() => { head.current?.focus(); }, [f.id, mode]);
 
   const label = (k: string) => texts[k]?.label ?? "Application form";
   const sourceOf = (n: QuoteNote | SummaryNote) => (n.kind === "quote" ? n.at?.source : n.at[0]?.source) ?? source;
+  const startOf = (n: QuoteNote | SummaryNote) => (n.kind === "quote" ? n.at?.start : n.at[0]?.start);
+  const where = (n: QuoteNote | SummaryNote) => {
+    const src = sourceOf(n);
+    const start = startOf(n);
+    const w = start !== undefined && texts[src] ? whereIs(texts[src].text, start) : null;
+    return `${label(src)}${w ? ` · page ${w.page}, paragraph ${w.paragraph}` : ""}`;
+  };
   const pick = (n: QuoteNote | SummaryNote) => { setSelected(n.id); setSource(sourceOf(n)); };
   const pickByNote = (id: string) => { setSelected(id); document.querySelector<HTMLElement>(`[data-card="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
+
   const current = texts[source];
   const highlights = highlightsFor(notes, source, selected);
-  const judgement = f.ai_status === "Evidence only";
-  const slots = (kind: "quote" | "summary") => {
-    const list = kind === "quote" ? notes.quotes : notes.summaries;
-    const max = kind === "quote" ? MAX_QUOTES : MAX_SUMMARIES;
-    return Array.from({ length: max }, (_, i) => {
-      const n = list[i];
-      return n ? <div key={n.id} data-card={n.id}><Card note={n} selected={selected === n.id} onSelect={() => pick(n)} sourceLabel={label(sourceOf(n))} /></div> : <Slot key={`e${i}`} n={i + 1} kind={kind} />;
-    });
-  };
+  const view = current ? collapsedBlocks(current.text, highlights) : null;
+  const collapsed = !!view?.collapsible && !full;
+  const title = mode === "referee" ? "Referee check" : (CRITERIA[f.rule_code] ?? plainRule(f));
+
+  // Evidence on this source as highlights on its PDF: the bullets' passages (blue) and the other verified passages (yellow).
+  const pdfDoc = docForSource(detail, source);
+  const spanText = (a: { source: string; start: number; end: number }) => texts[a.source]?.text.slice(a.start, a.end);
+  const evidence: EvidenceSpan[] = [
+    ...notes.bullets.flatMap((b) => b.at.filter((a) => a.source === source).map((a, i) => ({ id: `${b.id}~${i}`, group: b.id, kind: "summary" as const, source, start: a.start, end: a.end, text: spanText(a), label: "AI summary source" }))),
+    ...notes.others.filter((q) => q.at && q.at.source === source).map((q) => ({ id: q.id, group: q.id, kind: "quote" as const, source, start: q.at!.start, end: q.at!.end, text: spanText(q.at!), label: "Verified quote" })),
+  ] as (EvidenceSpan & { group: string })[];
+  const pdfItems: PdfItem[] = pdfTargets(detail, evidence)[0]?.items.map((it, i) => ({ ...it, group: (evidence[i] as { group?: string }).group })) ?? [];
+
+  const NoteCard = ({ n }: { n: QuoteNote }) => (
+    <div data-card={n.id}>
+      <button className={`rv-note quote ${selected === n.id ? "sel" : ""}`} aria-pressed={selected === n.id} onClick={() => pick(n)} disabled={n.state === "unlocated"}>
+        <span className="rv-note-label">Verified quote</span>
+        {n.label && <small className="rv-note-sub">{n.label}</small>}
+        <span className="rv-note-text">“{n.text}”</span>
+        {n.state === "unlocated"
+          ? <small className="rv-note-warn"><Icon name="question" size={14} />Could not locate in the document</small>
+          : <small className="rv-note-act"><Icon name="search" size={14} />Show in document · {where(n)}</small>}
+      </button>
+    </div>
+  );
 
   return (
     <div className="rv-viewer-wrap">
       <div className="rv-backdrop" onClick={onClose} aria-hidden="true" />
-      <section className="rv-viewer" aria-label={`${CRITERIA[f.rule_code] ?? plainRule(f)}: document and AI notes`}>
+      <section className="rv-viewer" aria-label={`${title}: summary, source text and mark`}>
         <header className="rv-viewer-head">
           <div ref={head} tabIndex={-1}>
-            <p className="eyebrow">Merit criterion</p>
-            <h2>{CRITERIA[f.rule_code] ?? plainRule(f)}</h2>
-            <div className="rv-chips"><StatusChip status={effectiveStatus(f)} /><span className="rv-tag">{judgement ? "Officer judgement required. No AI score or suggestion." : CHECKED_BY_LABEL[checkedBy(f)]}</span></div>
+            <p className="eyebrow">{mode === "referee" ? "Is the referee identified and contactable?" : "Merit criterion"}</p>
+            <h2>{title}</h2>
+            <div className="rv-chips">
+              {mode === "criterion" && f.ai_status === "Evidence only" ? <StatusChip status="Evidence only" /> : mode === "criterion" ? <StatusChip status={effectiveStatus(f)} /> : null}
+              <span className="rv-tag">{mode === "referee" ? "Check only. Not marked." : f.ai_status === "Evidence only" ? "Officer judgement required. No AI mark or suggestion." : CHECKED_BY_LABEL[checkedBy(f)]}</span>
+            </div>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close (Esc)"><Icon name="close" /></button>
         </header>
-        <div className="rv-viewer-body">
-          <div className="rv-doc">
+        <div className="rv-viewer-body three">
+          <div className="rv-pane rv-pane-doc" role="region" aria-label="Original document">
+            <h3 className="rv-pane-title">Original document</h3>
             {tabs.length > 1 && (
               <div className="rv-tabs" role="tablist" aria-label="Documents for this criterion">
-                {tabs.map((k) => <button key={k} role="tab" aria-selected={k === source} className={k === source ? "active" : ""} onClick={() => setSource(k)}>{label(k)}</button>)}
+                {tabs.map((k) => <button key={k} role="tab" aria-selected={k === source} className={k === source ? "active" : ""} onClick={() => { setSource(k); setFull(false); }}>{label(k)}</button>)}
               </div>
             )}
-            {tabs.length <= 1 && current && <p className="rv-doc-title">{current.label}</p>}
-            {current ? <TextView text={current.text} highlights={highlights} selected={selected} onPick={pickByNote} />
-              : <p className="empty-state">The text could not be loaded. Please read the original application.</p>}
+            {pdfDoc && (
+              <div className="rv-viewtoggle" role="group" aria-label="How to read the source">
+                <button className={mode_ === "pdf" ? "active" : ""} aria-pressed={mode_ === "pdf"} onClick={() => setMode("pdf")}>Original PDF</button>
+                <button className={mode_ === "text" ? "active" : ""} aria-pressed={mode_ === "text"} onClick={() => setMode("text")}>Text</button>
+              </div>
+            )}
+            {pdfDoc && mode_ === "pdf" ? (
+              <PdfViewer docId={pdfDoc.id} appId={detail.application.id} items={pdfItems} selectedId={selected} onSelect={pickByNote} height={760} />
+            ) : current ? (
+              <>
+                <div className="rv-srchead">
+                  <strong>{current.label}</strong>
+                  {view?.collapsible && <button className="link-button" onClick={() => setFull(!full)} aria-expanded={full}>{full ? "Show less" : `Show full text (${view.words} words)`}</button>}
+                </div>
+                {collapsed && view && view.blocks.length === 0 && <p className="muted">Long text, collapsed. Choose a bullet to see its passage, or show the full text.</p>}
+                <TextView text={current.text} highlights={highlights} selected={selected} onPick={pickByNote} only={collapsed ? view!.blocks : undefined} />
+              </>
+            ) : <p className="empty-state">The text could not be loaded. Please read the original application.</p>}
           </div>
-          <aside className="rv-notes" aria-label="AI notes">
-            <h3>AI notes</h3>
-            <p className="muted">Passages the AI pointed at, found in the text by code and shown in the applicant’s own words. Wording, spelling and English level are not assessed here.</p>
-            <div className="rv-legend"><span className="rv-key quote" />Verified quote <span className="rv-key summary" />AI summary</div>
-            <h4>Quotes</h4>
-            {slots("quote")}
-            {notes.moreQuotes > 0 && <p className="muted">{notes.moreQuotes} more passage{notes.moreQuotes === 1 ? "" : "s"} not shown here. Read the document on the left.</p>}
-            <h4>AI summaries</h4>
-            {slots("summary")}
+          <div className="rv-pane rv-pane-ai" role="region" aria-label="AI summary">
+            <h3 className="rv-pane-title">AI summary</h3>
+            {notes.bullets.length > 0 ? (
+              <>
+                <ul className="rv-bulletlist">
+                  {notes.bullets.map((b) => (
+                    <li key={b.id} data-card={b.id}>
+                      <button className={`rv-bullet ${selected === b.id ? "sel" : ""}`} aria-pressed={selected === b.id} onClick={() => pick(b)} disabled={b.state === "unlocated"}>
+                        <span className="rv-bullet-label">{SUMMARY_LABEL}</span>
+                        <span className="rv-bullet-text">{b.text}</span>
+                        {b.state === "unlocated"
+                          ? <small className="rv-note-warn"><Icon name="question" size={14} />Could not locate in the document</small>
+                          : <small className="rv-note-act"><Icon name="search" size={14} />{where(b)}</small>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {notes.moreBullets > 0 && <p className="muted">{notes.moreBullets} more point{notes.moreBullets === 1 ? "" : "s"} are in the text.</p>}
+              </>
+            ) : <p className="empty-state">There is no AI summary for this item. Read the original document.</p>}
+            {mode === "referee" && notes.others.length > 0 && <><h4>Referee details found</h4>{notes.others.map((n) => <NoteCard key={n.id} n={n} />)}</>}
+            {mode === "criterion" && notes.others.length > 1 && <><h4>Other passages</h4>{notes.others.map((n) => <NoteCard key={n.id} n={n} />)}</>}
+            {mode === "criterion" && notes.others.length === 1 && <NoteCard n={notes.others[0]} />}
             {notes.unlinked.length > 0 && (
               <div className="rv-failed"><h4>Could not be linked to the text</h4>
                 <p className="muted">The AI wrote these without a passage code could find. Do not rely on them.</p>
@@ -105,65 +146,22 @@ export function MeritViewer({ f, detail, locked, busy, onClose, onChanged, onTra
                 <p className="muted">Code did not find these quotes in the text, so they are not shown as quotes and not highlighted.</p>
                 {notes.unverified.map((n) => <p key={n.id} className="rv-failed-item">Could not verify a quote{n.label ? ` (${n.label})` : ""}.</p>)}</div>
             )}
-            <div className="rv-assess">
-              <h3>Your assessment</h3>
-              {f.latest_review && f.latest_review.action !== "ask_applicant" && (
-                <p className="decision-line">Recorded {formatDate(f.latest_review.reviewed_at, true)}: <strong>{CHOICES.find((c) => c.status === f.latest_review!.final_status)?.label ?? f.latest_review.final_status}</strong></p>
-              )}
-              {judgement
-                ? <AssessForm f={f} locked={locked} onChanged={onChanged} />
-                : <RuleDecision f={f} locked={locked} busy={busy} onDialog={onDialog} onConfirm={onConfirm} />}
-            </div>
             <div className="rv-pfoot">
               <button className="link-button" onClick={() => onTrace(`rule:${f.rule_code}`)}>See how this was redacted and how the AI read it <Icon name="arrow" size={14} /></button>
             </div>
+          </div>
+          <aside className="rv-pane rv-pane-mark" aria-label="Your mark">
+            {mode === "criterion" ? (
+              <div className="rv-assess">
+                <h3 className="rv-pane-title">Your mark</h3>
+                {f.rationale && f.ai_status !== "Evidence only" && <p className="muted">Length check, by code: {f.rationale}</p>}
+                <p className="muted">Your own mark, 0 to 100, for this criterion only. The AI does not suggest one. Marks are not added up or compared. Wording, spelling and English level are not assessed here.</p>
+                <MarkControl f={f} applicationId={detail.application.id} locked={locked} onChanged={onChanged} />
+              </div>
+            ) : <p className="muted">The referee check is a check only. It is not marked.</p>}
           </aside>
         </div>
       </section>
     </div>
-  );
-}
-
-/** The officer's own assessment: a note and a choice. Nothing is pre-filled by AI (only the officer's earlier entry). */
-export function AssessForm({ f, locked, onChanged }: { f: Finding; locked: boolean; onChanged: () => void }) {
-  const last = f.latest_review;
-  const [choice, setChoice] = useState<string>(CHOICES.find((c) => c.status === last?.final_status)?.label ?? "");
-  const [note, setNote] = useState(last?.reason ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  if (locked) return <p className="muted">This application is signed off. Decisions are locked.</p>;
-  const save = async () => {
-    setBusy(true); setError(null);
-    try { await api.review(f.id, { action: "override", final_status: CHOICES.find((c) => c.label === choice)!.status, reason: note.trim() }); onChanged(); } catch (e) { setError(e); }
-    setBusy(false);
-  };
-  return (
-    <>
-      <label className="field"><span>Your assessment <b>*</b></span>
-        <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-          <option value="">Choose…</option>
-          {CHOICES.map((c) => <option key={c.label}>{c.label}</option>)}
-        </select></label>
-      <label className="field"><span>Your note <b>*</b></span>
-        <textarea rows={5} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What you read and how you weighed it" />
-        <small>Saved in the audit trail.</small></label>
-      <ErrorNotice error={error} />
-      <div className="rule-actions"><Button disabled={busy || !choice || !note.trim()} onClick={() => void save()}>Record assessment</Button></div>
-    </>
-  );
-}
-
-/** Merit rows that are calculated by code (the short answer's length): the usual confirm / override / ask. */
-function RuleDecision({ f, locked, busy, onDialog, onConfirm }: { f: Finding; locked: boolean; busy: boolean; onDialog: (d: DialogState) => void; onConfirm: (f: Finding) => void }) {
-  if (locked) return <p className="muted">This application is signed off. Decisions are locked.</p>;
-  return (
-    <>
-      <p className="rv-reason"><strong>Short reason:</strong> {f.rationale ?? "No explanation was given."}</p>
-      <div className="rule-actions">
-        <Button icon="check" disabled={busy || !f.is_valid || f.error_flag} onClick={() => f.ai_status === "Not met" ? onDialog({ kind: "confirm-not-met", finding: f }) : onConfirm(f)}>Confirm {f.ai_status.toLowerCase()}</Button>
-        <Button variant="secondary" icon="edit" disabled={busy} onClick={() => onDialog({ kind: "override", finding: f })}>Override</Button>
-        <Button variant="quiet" icon="send" disabled={busy} onClick={() => onDialog({ kind: "ask", finding: f })}>Ask applicant</Button>
-      </div>
-    </>
   );
 }

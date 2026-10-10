@@ -140,10 +140,10 @@ def run_for_assessment(store: Store, actor: Actor, app: dict[str, Any], run: dic
 # ---------------------------------------------------------------- reading
 
 
-def _restored(store: Store, app: dict[str, Any], settings: Settings, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _restored(store: Store, app: dict[str, Any], settings: Settings, rows: list[dict[str, Any]], restorer: Any = None) -> list[dict[str, Any]]:
     from app.services.redaction_service import QuoteRestorer
 
-    restorer = QuoteRestorer(store, app, settings)
+    restorer = restorer or QuoteRestorer(store, app, settings)
     out = []
     for r in rows:
         evidence = []
@@ -159,8 +159,9 @@ def _restored(store: Store, app: dict[str, Any], settings: Settings, rows: list[
     return out
 
 
-def application_flags(store: Store, app: dict[str, Any], settings: Settings) -> dict[str, Any]:
-    """The officer's view of one application's flags (quotes restored to the applicant's words)."""
+def application_flags(store: Store, app: dict[str, Any], settings: Settings, restorer: Any = None) -> dict[str, Any]:
+    """The officer's view of one application's flags (quotes restored to the applicant's words), and the overview rows
+    ("Consistency of information": every comparison, including the ones that agree)."""
     if not enabled(settings):
         return {"enabled": False, "flags": [], "trace": {}}
     try:
@@ -169,8 +170,15 @@ def application_flags(store: Store, app: dict[str, Any], settings: Settings) -> 
     except StoreError:
         log.warning("consistency tables are not available (has migration 0011 been applied?)")
         return {"enabled": False, "flags": [], "trace": {}, "unavailable": True}
-    return {"enabled": True, "flags": _restored(store, app, settings, rows),
-            "trace": (runs[0].get("consistency_trace") if runs else None) or {}}
+    from app.services import consistency_overview
+    from app.services.redaction_service import QuoteRestorer
+
+    restorer = restorer or QuoteRestorer(store, app, settings)
+    flags = _restored(store, app, settings, rows, restorer)
+    trace = (runs[0].get("consistency_trace") if runs else None) or {}
+    overview = consistency_overview.build(app, [d for d in store.select("documents", eq={"application_id": app["id"]}) if not d.get("superseded")], flags, trace,
+                                          restorer, restorer.source_texts()) if runs else []
+    return {"enabled": True, "flags": flags, "trace": trace, "overview": overview}
 
 
 def flags_to_check(store: Store, app_ids: list[str], settings: Settings) -> dict[str, int]:

@@ -45,8 +45,12 @@ def _fold(s: str) -> str:
     return re.sub(r"[^\w@.+]+", " ", s.casefold()).strip()
 
 
+# Titles are not part of a name: "Ms Sita Karki" and "Sita Karki" are the same person and share one token.
+_TITLES = frozenset({"mr", "mrs", "ms", "miss", "mx", "dr", "prof", "professor", "sir", "madam", "dame", "rev", "fr", "sr"})
+
+
 def _name_parts(s: str) -> frozenset[str]:
-    return frozenset(p for p in _fold(s).split() if len(p) > 1)
+    return frozenset(p for p in _fold(s).split() if len(p) > 1 and p not in _TITLES)
 
 
 class TokenMap:

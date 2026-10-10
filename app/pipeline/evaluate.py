@@ -10,12 +10,16 @@ Any LLM failure becomes "Unclear" + error_flag (never "Met").
 
 from __future__ import annotations
 
+import logging
+
 from app.domain import Finding, Rule
 from app.llm import LLMClient, LLMError
 from app.pipeline.code_checks import CodeContext, run_code_check
 from app.pipeline.documents import DocumentChecks
 from app.pipeline.facts import FactSet
 from app.pipeline.prompts import MAX_QUOTES, MAX_SUMMARIES, EvidenceOut, RuleAssessmentOut, evidence_prompt, rule_prompt
+
+log = logging.getLogger(__name__)
 
 
 def _llm_failure(rule: Rule, exc: Exception | str) -> Finding:
@@ -45,6 +49,36 @@ def evidence_from_referees(rule: Rule, referees: list | None) -> Finding:
         quotes.extend({**h, "label": "about the applicant"} for h in l.highlights)
     return Finding(rule_id=rule.id, rule_code=rule.rule_code, ai_status="Evidence only", supporting_quotes=quotes,
                    check_source=rule.check_method, is_valid=True)
+
+
+def summaries_only(llm: LLMClient | None, rule: Rule, text: str, pack_version: str) -> list[dict]:
+    """Neutral summary bullets (each tied to exact passages) for a merit criterion that has its own verdict-free finding.
+
+    A failure here only means there are no bullets: it never changes a rule result and is not an error flag."""
+    if llm is None:
+        return []
+    try:
+        out = llm.call_llm(evidence_prompt(rule, text, pack_version), EvidenceOut)
+    except Exception as exc:  # an LLM failure or a refused prompt: no bullets, never a changed result
+        log.warning("summary bullets unavailable for %s: %s", rule.rule_code, type(exc).__name__)
+        return []
+    return [{"text": sm.summary.strip(), "passages": [{"quote": p.strip()} for p in dict.fromkeys(sm.passages) if p.strip()][:2]}
+            for sm in out.summaries if sm.summary.strip()][:MAX_SUMMARIES]
+
+
+def _with_letters(llm: LLMClient | None, form_text: str, referees: list | None) -> str:
+    """The redacted form followed by each redacted referee letter, so one call can summarise all supporting evidence.
+    The guard builds the combined text from texts that already passed redaction. Code (not the AI) works out which
+    text each passage came from."""
+    parts = [("Application form", form_text)] + [(f"Referee letter {i}", r.redacted_text) for i, r in enumerate(referees or [], 1)
+                                                if getattr(r, "redacted_text", None)]
+    combine = getattr(llm, "combine", None)
+    if combine is not None:
+        try:
+            return combine(parts)[0]
+        except Exception:  # a part did not pass redaction: summarise the form alone
+            return form_text
+    return "\n\n".join(t for _l, t in parts)
 
 
 def evaluate_evidence_only(llm: LLMClient | None, rule: Rule, redacted_text: str, pack_version: str) -> Finding:
@@ -116,13 +150,19 @@ def evaluate_rules(
     findings: list[Finding] = []
     for rule in rules:
         if rule.evidence_only and rule.params.get("evidence_source") == "referee_letters":
-            findings.append(evidence_from_referees(rule, referees))
+            f = evidence_from_referees(rule, referees)
+            # Supporting evidence covers the referee letters AND the community and contribution answers.
+            f.ai_summaries = summaries_only(llm, rule, _with_letters(llm, redacted_text, referees), pack_version)
+            findings.append(f)
         elif rule.evidence_only:
             findings.append(evaluate_evidence_only(llm, rule, redacted_text, pack_version))
         elif rule.check_method == "code":
             ctx = CodeContext(rule, facts, documents, register_rows, grant_program_id, application or {},
                               reference_lists or {}, referees, raw_documents or [])
-            findings.append(run_code_check(ctx))
+            f = run_code_check(ctx)
+            if rule.params.get("section") == "merit":   # the short answer: summary bullets next to the length check
+                f.ai_summaries = summaries_only(llm, rule, redacted_text, pack_version)
+            findings.append(f)
         else:
             findings.append(evaluate_llm_rule(llm, rule, redacted_text, pack_version))
     return findings

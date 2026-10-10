@@ -3,7 +3,7 @@ import { api } from "./api";
 import { useAuth } from "./auth";
 import { AIBanner, Button, ErrorNotice, Icon, Loading } from "./ui";
 import Queue from "./screens/Queue";
-import Review from "./screens/Review";
+import Application from "./screens/Application";
 import Signoff from "./screens/Signoff";
 import LetterScreen from "./screens/Letter";
 import Audit from "./screens/Audit";
@@ -27,7 +27,7 @@ export type Route =
   | { name: "queue"; q?: string }
   | { name: "pool" }
   | { name: "lists" }
-  | { name: "review"; id: string }
+  | { name: "review"; id: string; step?: number }
   | { name: "trace"; id: string; item?: string }
   | { name: "signoff"; id: string }
   | { name: "letter"; id: string }
@@ -38,10 +38,10 @@ function parse(hash: string): Route {
   const [path, query = ""] = hash.replace(/^#\/?/, "").split("?");
   const parts = path.split("/").filter(Boolean);
   if (parts[0] === "applications" && parts[1]) {
-    if (parts[2] === "signoff") return { name: "signoff", id: parts[1] };
-    if (parts[2] === "letter") return { name: "letter", id: parts[1] };
+    if (parts[2] === "signoff" || parts[2] === "letter") return { name: "review", id: parts[1], step: 4 };
     if (parts[2] === "trace") return { name: "trace", id: parts[1], item: new URLSearchParams(query).get("item") ?? undefined };
-    return { name: "review", id: parts[1] };
+    const stepParam = Number(new URLSearchParams(query).get("step"));
+    return { name: "review", id: parts[1], step: stepParam >= 1 && stepParam <= 4 ? stepParam : undefined };
   }
   if (parts[0] === "queue") return { name: "queue", q: new URLSearchParams(query).get("q") ?? undefined };
   if (parts[0] === "apply") return { name: "apply" };
@@ -59,7 +59,7 @@ export function href(route: Route): string {
     case "pool": return "#/pool";
     case "lists": return "#/lists";
     case "queue": return route.q ? `#/queue?q=${encodeURIComponent(route.q)}` : "#/queue";
-    case "review": return `#/applications/${route.id}`;
+    case "review": return route.step ? `#/applications/${route.id}?step=${route.step}` : `#/applications/${route.id}`;
     case "trace": return `#/applications/${route.id}/trace${route.item ? `?item=${encodeURIComponent(route.item)}` : ""}`;
     case "signoff": return `#/applications/${route.id}/signoff`;
     case "letter": return `#/applications/${route.id}/letter`;
@@ -101,10 +101,7 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
 
   const nav: { route: Route; label: string; icon: string; active: boolean; badge?: number | null }[] = [
     { route: { name: "queue" }, label: "Applications", icon: "list", active: ["queue", "review", "signoff", "letter", "trace"].includes(route.name), badge: attention },
-    { route: { name: "pool" }, label: "Linked applications", icon: "grid", active: route.name === "pool" },
-    { route: { name: "lists" }, label: "Reference lists", icon: "file", active: route.name === "lists" },
     { route: { name: "audit" }, label: "Audit trail", icon: "clock", active: route.name === "audit" },
-    { route: { name: "evaluation" }, label: "Evaluation", icon: "shield", active: route.name === "evaluation" },
   ];
   const name = me?.display_name ?? "Officer";
   const initials = name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "OF";
@@ -211,7 +208,7 @@ export default function App() {
     <Shell route={route} navigate={navigate}>
       {route.name === "queue" && <Queue key={route.q ?? ""} navigate={navigate} initialSearch={route.q} />}
       {/* A new key per application: the screen never shows one application's content (or buttons) under another's address. */}
-      {route.name === "review" && <Review key={route.id} id={route.id} navigate={navigate} />}
+      {route.name === "review" && <Application key={route.id} id={route.id} step={route.step} navigate={navigate} />}
       {route.name === "trace" && <AiTrace key={`${route.id}-${route.item ?? ""}`} id={route.id} item={route.item} navigate={navigate} />}
       {route.name === "pool" && <Pool navigate={navigate} />}
       {route.name === "lists" && <Lists />}

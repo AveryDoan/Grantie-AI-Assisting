@@ -66,6 +66,12 @@ def test_full_officer_flow_has_no_scores(client, settings, officer, applicant_ac
     assert bad.status_code == 422
 
     for f in findings:
+        if f["section"] == "merit":  # merit criteria are marked by the officer
+            resp = client.put(f"/applications/{app_id('N04')}/merit-marks/{f['rule_code']}", headers=h,
+                              json={"mark": 65, "reason": "Officer read the evidence"})
+            assert resp.status_code == 200, resp.text
+            responses.append(resp.json())
+            continue
         if f["ai_status"] == "Evidence only" or not f["is_valid"]:
             body = {"action": "override", "final_status": "Met", "reason": "Officer judgement on the evidence"}
         elif f["ai_status"] == "Not met":

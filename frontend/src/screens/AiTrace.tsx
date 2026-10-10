@@ -63,7 +63,7 @@ function ConsistencyTrace({ detail }: { detail: Detail }) {
     { key: "narrative", title: "Statements that conflict", blurb: "The AI points at two passages that appear to disagree and quotes both. It never judges why." },
   ];
   return (
-    <Section eyebrow="Step 4 · Consistency checks" title="Does the story add up? What the AI was given and what code made of it"
+    <Section eyebrow="Step 4 · Consistency checks" title="Consistency of information: what the AI was given and what code made of it"
       intro="Both AI checks read the redacted form and documents above, combined into one text, through the same guard. Every quote they return is searched for by code. An item whose quote is not found is dropped.">
       {!ran && <p className="empty-state">The AI check has not run yet.</p>}
       {ran && ai.map(({ key, title, blurb }) => {

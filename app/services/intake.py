@@ -30,7 +30,7 @@ MAX_BYTES = 5 * 1024 * 1024
 CONTENT_TYPES = {"pdf": "application/pdf", "text": "text/plain", "image:png": "image/png", "image:jpeg": "image/jpeg",
                  "image:gif": "image/gif", "image:webp": "image/webp", "image:heic": "image/heic", "image:tiff": "image/tiff"}
 DECLARED_TYPES = {"coe", "travel booking", "referee letter", "headshot", "biography", "transcript",
-                  "offer letter", "visa", "certified translation", "other"}
+                  "offer letter", "visa", "certified translation", "other", "application responses", "resume", "certificate"}
 
 
 class InvalidUpload(ServiceError):
@@ -132,9 +132,16 @@ def prepare_upload(data: bytes, file_name: str, *, applicant_name: str | None = 
 
 def add_document(store: Store, actor: Actor, application_id: str, *, file_name: str, declared_type: str,
                  content_base64: str, consistency: bool = False) -> dict[str, Any]:
+    return store_document(store, actor, _draft(store, actor, application_id), file_name=file_name, declared_type=declared_type,
+                          content_base64=content_base64, consistency=consistency)
+
+
+def store_document(store: Store, actor: Actor, app: dict[str, Any], *, file_name: str, declared_type: str,
+                   content_base64: str, consistency: bool = False, replaces_id: str | None = None) -> dict[str, Any]:
+    """Validate, clean and store one uploaded file (shared by the draft upload and a reply to an officer's request)."""
     from redaction.extract import sniff_kind
 
-    app = _draft(store, actor, application_id)
+    application_id = app["id"]
     declared = declared_type.strip().lower()
     if declared not in DECLARED_TYPES:
         raise InvalidUpload("Unknown document type")
@@ -165,6 +172,12 @@ def add_document(store: Store, actor: Actor, application_id: str, *, file_name: 
         "declared_type": declared, "extracted_text": extracted.text or None,
         "detected_type": None, "is_sample": True,
     }
+    if replaces_id:
+        values["replaces_id"] = replaces_id   # column added by migration 0015
+    if kind == "pdf":
+        from redaction.layout import extract_layout
+
+        values["pdf_layout"] = extract_layout(extracted, data)   # word boxes for highlighting and blur (migration 0016)
     if consistency:
         values["integrity_signals"] = signals   # column added by migration 0011
     row = store.insert("documents", values)[0]

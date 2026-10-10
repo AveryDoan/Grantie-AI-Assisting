@@ -56,9 +56,11 @@ class Settings(BaseSettings):
     redaction_key: SecretStr = SecretStr("")
     redaction_key_previous: SecretStr = SecretStr("")
 
-    # --- Consistency layer ("the story doesn't add up" signals) --------------
+    # --- Consistency layer (consistency of information: signals, not findings) --------------
     # Off by default in supabase mode: it needs migration 0011. Demo mode turns it on.
     consistency_layer: bool = False
+    # The AI may not read an application until an officer approves its redaction check (step 2 of the guided flow).
+    require_redaction_approval: bool = True
     # HMAC key for the identifier hashes used to link applications (base64/url-safe, >= 32 bytes).
     # Identifiers are never stored or logged, only keyed hashes. Never commit this value.
     identifier_hash_key: SecretStr = SecretStr("")

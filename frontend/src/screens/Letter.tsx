@@ -12,7 +12,7 @@ const LABELS = [
 ];
 
 /** Render the fixed-structure letter text produced by the API. */
-function LetterBody({ text }: { text: string }) {
+export function LetterBody({ text }: { text: string }) {
   const lines = text.split("\n");
   const out: ReactNode[] = [];
   lines.forEach((line, i) => {
@@ -43,7 +43,7 @@ function Check({ ok, children }: { ok: boolean; children: ReactNode }) {
   return <div className={`quality-item ${ok ? "" : "warn"}`}><Icon name={ok ? "check" : "close"} /><span>{children}</span></div>;
 }
 
-function QualityPanel({ letter }: { letter: Letter }) {
+export function QualityPanel({ letter }: { letter: Letter }) {
   const q = letter.quality_checks;
   const all = (k: keyof (typeof q.checklist)[number]) => q.checklist.length > 0 && q.checklist.every((c) => c[k]);
   return (
@@ -53,12 +53,16 @@ function QualityPanel({ letter }: { letter: Letter }) {
         <div><small>Reading grade</small><strong>{q.reading_grade}</strong>
           <p>{q.reading_grade_ok ? `At or below the target (${q.reading_grade_target}, about Year 8)` : `Above the target of ${q.reading_grade_target} – simplify the wording`}</p></div>
       </div>
-      <h2>Reason quality</h2>
-      <Check ok={all("cites_rule")}>States what the rule requires</Check>
-      <Check ok={all("quotes_applicant")}>Quotes the applicant’s words</Check>
-      <Check ok={all("explains_link")}>Explains why the rule was not met</Check>
-      <Check ok={all("says_what_would_change")}>Says what could change the outcome</Check>
-      <Check ok={q.includes_review_info}>Explains how to ask for a review</Check>
+      {q.checklist.length > 0 && (
+        <>
+          <h2>Reason quality</h2>
+          <Check ok={all("cites_rule")}>States what the rule requires</Check>
+          <Check ok={all("quotes_applicant")}>Quotes the applicant’s words</Check>
+          <Check ok={all("explains_link")}>Explains why the rule was not met</Check>
+          <Check ok={all("says_what_would_change")}>Says what could change the outcome</Check>
+        </>
+      )}
+      <Check ok={q.includes_review_info}>{q.checklist.length > 0 ? "Explains how to ask for a review" : "Gives a contact for questions"}</Check>
       <h2>Required checks</h2>
       <Check ok={q.quotes_match_application}>Every quote matches the application{q.unmatched_quotes.length ? ` (${q.unmatched_quotes.length} do not)` : ""}</Check>
       <Check ok={q.every_reason_cites_confirmed_rule}>Every reason cites a rule you decided</Check>
@@ -142,5 +146,53 @@ export default function LetterScreen({ id, navigate }: { id: string; navigate: N
         </div>
       )}
     </main>
+  );
+}
+
+/** The letter, its quality checks and the officer's edit / approve controls. Used on the Outcome step. */
+export function LetterEditor({ letter, programName, signedOff, onChanged, onRegenerate }: {
+  letter: Letter; programName: string | null; signedOff: boolean; onChanged: () => void; onRegenerate?: () => Promise<unknown>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>(null);
+  const approved = letter.status === "approved";
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true); setFailure(null);
+    try { await fn(); setEditing(false); onChanged(); } catch (e) { setFailure(e); } finally { setBusy(false); }
+  };
+  const chip = approved ? `Approved ${formatDate(letter.approved_at)}` : letter.status === "edited" ? "Edited draft, not sent" : "Draft, not sent";
+  return (
+    <div className="letter-layout">
+      <section className="letter-paper">
+        <div className="letter-mast">
+          <img className="letter-logo" src={studyNtLogo} alt="Study NT" />
+          <div><strong>{programName}</strong><small>Sample correspondence · fictional · version {letter.version}</small></div>
+        </div>
+        {editing
+          ? <textarea className="letter-editor" rows={26} value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Letter text" />
+          : <LetterBody text={letter.body_text} />}
+      </section>
+      <aside className="quality-panel">
+        <span className="draft-chip">{chip}</span>
+        <QualityPanel letter={letter} />
+        <ErrorNotice error={failure} />
+        {!approved && (editing ? (
+          <>
+            <Button icon="check" disabled={busy} onClick={() => void act(() => api.patchLetter(letter.id, { body_text: draft }))}>Save changes</Button>
+            <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
+          </>
+        ) : <Button variant="secondary" icon="edit" onClick={() => { setDraft(letter.body_text); setEditing(true); }}>Edit letter</Button>)}
+        {!approved && (
+          <Button icon="check" disabled={busy || editing || !signedOff}
+            title={signedOff ? undefined : "Sign off the application before approving its letter"}
+            onClick={() => void act(() => api.patchLetter(letter.id, { approve: true }))}>Approve letter</Button>
+        )}
+        {!approved && !signedOff && <small className="locked"><Icon name="clock" />The letter is released only after you sign off. The applicant only sees an approved letter.</small>}
+        {!approved && onRegenerate && <Button variant="quiet" disabled={busy} onClick={() => void act(onRegenerate)}>Draft again from my decisions</Button>}
+        <Button variant="secondary" icon="download" onClick={() => window.print()}>Print / save as PDF</Button>
+      </aside>
+    </div>
   );
 }

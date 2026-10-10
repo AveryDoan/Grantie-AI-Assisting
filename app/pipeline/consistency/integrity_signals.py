@@ -44,6 +44,24 @@ def classify_software(*strings: str | None) -> tuple[str, str | None]:
     return "other", None
 
 
+def expected_fixture(producer: str | None, creator: str | None) -> str | None:
+    """The name of a synthetic fixture that is EXPECTED to share this producer (config/document_signals.yaml), else None."""
+    import yaml
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[3] / "config" / "document_signals.yaml"
+    try:
+        entries = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("expected_shared_producer") or []
+    except (OSError, yaml.YAMLError):
+        return None
+    blob = f"{producer or ''} {creator or ''}".lower()
+    for e in entries:
+        needle = str(e.get("producer_contains") or "").lower()
+        if needle and needle in blob:
+            return str(e.get("fixture"))
+    return None
+
+
 def _iso(d: Any) -> str | None:
     if not isinstance(d, datetime):
         return None
@@ -92,6 +110,8 @@ def read_integrity_signals(data: bytes, *, text: str = "", applicant_name: str |
             "author_matches_applicant": bool(author_tokens and applicant_tokens and len(author_tokens & applicant_tokens) >= min(2, len(applicant_tokens))),
             "author_in_text": (bool(author_tokens & head) if author_tokens and text else None),
             "has_text": bool(text.strip()),
+            # A synthetic fixture that is expected to share one producer and one creation time (derived name only).
+            "expected_fixture": expected_fixture(producer, creator),
         }
     except Exception:
         return {"kind": "pdf", "unreadable": True}

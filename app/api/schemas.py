@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 from app.domain import DecisionStatus
 
@@ -52,7 +52,7 @@ class PrecheckRequest(BaseModel):
 class DemoLogin(BaseModel):
     """Demo mode only (APP_MODE=demo)."""
 
-    role: Literal["officer", "admin", "applicant"] = "officer"
+    role: Literal["officer", "admin", "applicant", "sita"] = "officer"
 
 
 class RedactRequest(BaseModel):
@@ -89,3 +89,70 @@ class ReferenceListText(BaseModel):
 class ReferenceListSave(ReferenceListText):
     edition: str | None = Field(None, max_length=80, description="For example: 31 August 2026")
     source: str | None = Field(None, max_length=300)
+
+
+class MeritMarkIn(BaseModel):
+    """The officer's own mark. There is no AI-suggested value and no default."""
+
+    mark: StrictInt | None = Field(None, description="Whole number from 0 to 100, or null with not_assessed")
+    not_assessed: bool = False
+    reason: str | None = Field(None, max_length=2000)
+
+
+class DocumentDecisionIn(BaseModel):
+    slot: str
+    decision: Literal["confirmed", "wrong_slot", "request_again", "not_needed"]
+    reason: str | None = Field(None, max_length=1000)
+
+
+class RequestItemIn(BaseModel):
+    slot: str
+    kind: Literal["missing", "wrong_slot", "unreadable", "differs", "other"] = "other"
+    reason: str | None = Field(None, max_length=500)
+    note: str | None = Field(None, max_length=500)
+
+
+class RequestDraftIn(BaseModel):
+    items: list[RequestItemIn] = Field(..., min_length=1, max_length=8)
+
+
+class RequestEditIn(BaseModel):
+    message_text: str = Field(..., max_length=6000)
+
+
+class RevealIn(BaseModel):
+    item_id: str = Field(..., max_length=200)
+
+
+class AddMissedIn(BaseModel):
+    source: str = Field(..., max_length=200)
+    text: str = Field(..., max_length=300)
+    kind: str = Field(..., max_length=40)
+
+
+class UnmaskIn(BaseModel):
+    item_id: str = Field(..., max_length=200)
+    reason: str | None = Field(None, max_length=1000)
+
+
+class ReopenIn(BaseModel):
+    reason: str | None = Field(None, max_length=2000)
+
+
+class ReplyIn(BaseModel):
+    documents: list[DocumentUpload] = Field(..., min_length=1, max_length=8)
+
+
+class LocateItem(BaseModel):
+    id: str = Field(..., max_length=200)
+    start: int | None = None
+    end: int | None = None
+    text: str | None = Field(None, max_length=2000)
+
+
+class LocateIn(BaseModel):
+    items: list[LocateItem] = Field(..., max_length=200)
+
+
+class EvidenceDraftIn(BaseModel):
+    finding_ids: list[str] | None = None

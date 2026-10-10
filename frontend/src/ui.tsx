@@ -143,12 +143,14 @@ export function humanise(key: string): string {
 }
 
 export function isDecided(f: Finding): boolean {
+  // A merit criterion is done once the officer has marked it (or set it to Not assessed); every other rule by a review.
+  if (f.section === "merit") return !!f.merit_mark;
   return !!f.latest_review && f.latest_review.action !== "ask_applicant";
 }
 
 /** Status to show: the officer's decision once made, otherwise the AI suggestion. */
 export function effectiveStatus(f: Finding): AIStatus {
-  return isDecided(f) ? (f.latest_review!.final_status as Decision) : f.ai_status;
+  return isDecided(f) && f.latest_review && f.section !== "merit" ? (f.latest_review.final_status as Decision) : f.ai_status;
 }
 
 export const CHECK_SOURCE_LABEL: Record<Finding["check_source"], string> = {

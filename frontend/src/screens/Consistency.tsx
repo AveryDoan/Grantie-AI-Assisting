@@ -1,4 +1,4 @@
-// Consistency flags: places where an application's story may not add up.
+// Consistency flags: details that do not match across an application.
 // Signals for the officer to check, never findings or verdicts. A flag never changes a rule result and never
 // blocks sign-off. Each flag is confirmed or dismissed by the officer; a dismissal needs a note.
 // The table lives on the review screen; this file holds one flag's evidence and its Confirm / Dismiss actions.
@@ -102,5 +102,35 @@ export function FlagDetail({ flag, onChanged, locked }: { flag: ConsistencyFlag;
       )}
       {dialog && <DismissDialog flag={flag} close={() => setDialog(false)} done={() => { setDialog(false); onChanged(); }} />}
     </article>
+  );
+}
+
+/** Just the officer's decision for one flag: Confirm (needs follow-up) or Dismiss (a reason is required). */
+export function FlagActions({ flag, onChanged, locked }: { flag: ConsistencyFlag; onChanged: () => void; locked?: boolean }) {
+  const [dialog, setDialog] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const decided = flag.status !== "open";
+  const confirm = async () => {
+    setBusy(true); setError(null);
+    try { await api.reviewFlag(flag.id, { action: "confirm" }); onChanged(); } catch (e) { setError(e); setBusy(false); }
+  };
+  if (flag.verification !== "verified") return <p className="muted">The AI pointed at a possible difference but code could not find its passages. Please check the documents yourself.</p>;
+  return (
+    <>
+      {flag.note && <p className="cx-note"><strong>Your note:</strong> {flag.note}</p>}
+      <ErrorNotice error={error} />
+      {!locked && (
+        <div className="rule-actions">
+          <Button icon="check" variant={decided ? "secondary" : "primary"} disabled={busy || flag.status === "confirmed"} onClick={() => void confirm()}>
+            {flag.status === "confirmed" ? "Confirmed: needs follow-up" : "Confirm: needs follow-up"}
+          </Button>
+          <Button variant="secondary" icon="close" disabled={busy || flag.status === "dismissed"} onClick={() => setDialog(true)}>
+            {flag.status === "dismissed" ? "Dismissed" : "Dismiss"}
+          </Button>
+        </div>
+      )}
+      {dialog && <DismissDialog flag={flag} close={() => setDialog(false)} done={() => { setDialog(false); onChanged(); }} />}
+    </>
   );
 }

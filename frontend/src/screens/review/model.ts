@@ -1,7 +1,7 @@
 // What the review screen shows, worked out from the data the API already returns. Nothing here calls the API,
 // scores anything, or changes a rule result: it only decides how rows are grouped, labelled and ordered.
 import type { AIStatus, ConsistencyFlag, Detail, DocumentRow, Finding } from "../../api";
-import { effectiveStatus, humanise, isDecided } from "../../ui";
+import { effectiveStatus, isDecided } from "../../ui";
 
 export const DOC_LABEL: Record<string, string> = {
   coe: "Confirmation of Enrolment", visa: "Visa grant notice", travel_document: "Passport / travel document",
@@ -151,101 +151,6 @@ export function slotDecision(s: Slot, findings: Finding[]): DecisionLabel {
 export function slotSort(a: Slot, b: Slot, findings: Finding[]): number {
   const k = (s: Slot) => NEED_RANK[slotNeed(s).level] * 10 + (slotDecision(s, findings) === "Not decided" ? 0 : 1);
   return k(a) - k(b);
-}
-
-// ---------------------------------------------------------------- story flags
-
-export const FLAG_LABEL: Record<string, string> = {
-  "cross_application.identical_text": "Same wording as another application",
-  "cross_application.reused_wording": "Similar wording to another application",
-  "cross_application.shared_contact_email": "Shares a contact email address",
-  "cross_application.shared_contact_phone": "Shares a contact phone number",
-  "cross_application.shared_contact_address": "Shares an address",
-  "cross_application.shared_referee_name": "Same referee as another application",
-  "cross_application.shared_referee_email": "Shares a referee email address",
-  "cross_application.shared_referee_phone": "Shares a referee phone number",
-  "cross_application.shared_referee_email_domain": "Shares a referee email domain",
-  "cross_document.arrival_vs_start": "Arrival date and course start do not fit",
-  "cross_document.coe_length": "Course length differs between documents",
-  "cross_document.course": "Course differs between documents",
-  "cross_document.known_for_vs_timeline": "“Known for” time does not fit the timeline",
-  "cross_document.letter_subject": "Letter is about a different person",
-  "cross_document.provider": "Provider differs between documents",
-  "cross_document.referee_date_future": "Letter is dated in the future",
-  "cross_document.referee_date_old": "Letter is dated long ago",
-  "cross_document.referee_date_window": "Letter date is outside the allowed period",
-  "document_integrity.author_is_applicant": "File author matches the applicant",
-  "document_integrity.created_after_dated": "File created after the date it shows",
-  "document_integrity.created_before_dated": "File created long before the date it shows",
-  "document_integrity.editing_software": "Saved with editing software",
-  "document_integrity.modified_after_created": "File changed after it was created",
-  "narrative.conflicting_statements": "Two statements disagree",
-  "narrative.unverified": "Possible disagreement, not verified",
-  "timeline.dates_backwards": "Dates run backwards",
-  "timeline.overlapping_full_time": "Full-time activities overlap",
-  "timeline.role_before_age": "Role starts before a plausible age",
-  "timeline.visa_before_coe": "Visa dated before the CoE",
-};
-export const TYPE_ORDER: ConsistencyFlag["check_type"][] = ["cross_document", "timeline", "document_integrity", "cross_application", "narrative"];
-export const TYPE_CHIP: Record<ConsistencyFlag["check_type"], string> = {
-  cross_document: "Across documents", timeline: "Timeline", document_integrity: "Document signals (weak)",
-  cross_application: "Across applications", narrative: "Statements that conflict",
-};
-export const flagLabel = (f: ConsistencyFlag) => FLAG_LABEL[f.check_id] ?? humanise(f.check_id.split(".").pop() ?? f.check_id);
-
-export type FlagStatusLabel = "To check" | "Needs follow-up" | "Dismissed" | "Not verified";
-export function flagStatus(f: ConsistencyFlag): FlagStatusLabel {
-  if (f.verification === "unclear") return "Not verified";
-  return f.status === "open" ? "To check" : f.status === "confirmed" ? "Needs follow-up" : "Dismissed";
-}
-/** "APP-61214F" from a link's label, when the flag points at another application. */
-export function linkedRef(f: ConsistencyFlag): string | null {
-  for (const e of f.evidence) {
-    if (e.kind !== "link") continue;
-    const m = e.label.match(/APP-[A-Z0-9]+/i);
-    if (m) return m[0].toUpperCase();
-  }
-  return null;
-}
-
-export interface StoryRow {
-  id: string;
-  type: ConsistencyFlag["check_type"];
-  check: string;
-  text: string;
-  linked: string | null;
-  strength: "Strong" | "Weak";
-  status: FlagStatusLabel;
-  flags: ConsistencyFlag[];
-}
-
-/** Flags that point at the same linked application become one row ("3 items" expands them). */
-export function buildStoryRows(flags: ConsistencyFlag[]): StoryRow[] {
-  const rows: StoryRow[] = [];
-  const grouped = new Map<string, ConsistencyFlag[]>();
-  for (const f of flags) {
-    const ref = f.check_type === "cross_application" ? linkedRef(f) : null;
-    if (!ref) { rows.push(storyRowOf(f)); continue; }
-    const key = ref;
-    grouped.set(key, [...(grouped.get(key) ?? []), f]);
-  }
-  for (const [ref, fs] of grouped) {
-    if (fs.length === 1) { rows.push(storyRowOf(fs[0])); continue; }
-    const open = fs.some((f) => flagStatus(f) === "To check");
-    const statuses = [...new Set(fs.map(flagStatus))];
-    const kinds = [...new Set(fs.map(flagLabel))];
-    rows.push({
-      id: `group:${ref}`, type: "cross_application", check: kinds.length === 1 ? kinds[0] : `Several matches with ${ref}`,
-      text: kinds.length === 1 ? `${fs.length} matches with ${ref}: ${kinds[0].toLowerCase()}.` : `${kinds.length} kinds of match with ${ref}: ${kinds.map((k) => k.toLowerCase()).join("; ")}.`,
-      linked: ref, strength: fs.some((f) => f.strength === "strong") ? "Strong" : "Weak",
-      status: open ? "To check" : statuses.length === 1 ? statuses[0] : "Needs follow-up", flags: fs,
-    });
-  }
-  const rank = (r: StoryRow) => (r.status === "To check" ? 0 : r.status === "Not verified" ? 1 : r.status === "Needs follow-up" ? 2 : 3) * 10 + (r.strength === "Strong" ? 0 : 1);
-  return rows.sort((a, b) => rank(a) - rank(b) || TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type));
-}
-export function storyRowOf(f: ConsistencyFlag): StoryRow {
-  return { id: f.id, type: f.check_type, check: flagLabel(f), text: f.description, linked: linkedRef(f), strength: f.strength === "strong" ? "Strong" : "Weak", status: flagStatus(f), flags: [f] };
 }
 
 export const openFlagCount = (flags: ConsistencyFlag[]) => flags.filter((f) => f.verification === "verified" && f.status === "open").length;

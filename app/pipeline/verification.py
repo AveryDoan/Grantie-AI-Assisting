@@ -104,9 +104,17 @@ def verify_findings(
         for sm in f.ai_summaries:
             # A summary is only as good as its passages: code must find at least one in the text.
             # An unlinked summary never invalidates the finding; it is listed apart for the officer.
+            # A passage with no named source is looked for in the form first, then in each document: code, not the AI,
+            # says where it came from.
             for ps in sm.get("passages", []):
-                text = (extra_sources or {}).get(ps.get("source") or "", source)
-                qc = verify_quote(ps.get("quote"), text, threshold=threshold, min_fuzzy_length=min_fuzzy_length)
+                candidates = {ps["source"]: (extra_sources or {}).get(ps["source"], source)} if ps.get("source") else {"application_text": source, **(extra_sources or {})}
+                qc = QuoteCheck(False, "none")
+                for name, text in candidates.items():
+                    qc = verify_quote(ps.get("quote"), text, threshold=threshold, min_fuzzy_length=min_fuzzy_length)
+                    if qc.verified:
+                        if name != "application_text":
+                            ps["source"] = name
+                        break
                 ps["verified"], ps["method"] = qc.verified, qc.method
             sm["linked"] = any(ps.get("verified") for ps in sm.get("passages", []))
         if rule.id in duplicates:

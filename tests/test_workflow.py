@@ -3,7 +3,7 @@
 import pytest
 
 from app.pipeline.orchestrator import run_assessment
-from app.services import letters, precheck, review
+from app.services import letters, merit, precheck, review
 from app.services.errors import Conflict, NotFound, SignOffBlocked, ValidationFailed
 from app.store.base import StoreError
 from seed import data
@@ -20,6 +20,10 @@ def assess(store, officer, stub_llm, settings, code="N04"):
 def decide_all(store, officer, findings, *, skip=()):
     for code, f in findings.items():
         if code in skip:
+            continue
+        app = store.select("applications", eq={"id": f["application_id"]})[0]
+        if code in merit.merit_codes(store, app):  # merit criteria are marked by the officer, not confirmed
+            merit.set_mark(store, officer, app["id"], code, mark=70, not_assessed=False, reason="Officer read the evidence")
             continue
         if f["ai_status"] == "Evidence only" or not f["is_valid"]:
             review.review_finding(store, officer, f["id"], action="override", final_status="Met", reason="Officer read the evidence")

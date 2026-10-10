@@ -1,22 +1,22 @@
-// Side panel for one item: a rule, a document, or a story flag. The tables stay visible beside it.
+// Side panel for one item: a rule or a document. The tables stay visible beside it.
 // Order: A title and source, B what the application says, C flags and language notes, D actions, E the trace link.
 // The redaction detail is one more click away (E), never shown here.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Detail, DocumentRow, Finding } from "../../api";
 import { Button, Icon, StatusChip, effectiveStatus, formatDate, humanise } from "../../ui";
-import { FlagDetail } from "../Consistency";
 import type { DialogState } from "./Dialogs";
 import { DOCUMENT_FIELD_LABELS, fieldLabel } from "./labels";
-import { compareValues, resolveTarget, searchedSections, sectionAround, toBlocks, type Match } from "./highlight";
-import { TextView } from "./TextView";
-import { AssessForm } from "./MeritViewer";
+import { compareValues, resolveTarget, type Match } from "./highlight";
+import { SourceDrawer } from "./SourceDrawer";
+import { PdfModal } from "./PdfModal";
+import { pdfTargets, ruleEvidence } from "./pdfTargets";
+import { AssessForm } from "./AssessForm";
 import {
   CHECKED_BY_LABEL, DOC_LABEL, SECTION_LABEL, checkedBy, detailsCheck, plainRule, slotCheck, slotFindings, slotStatus,
-  type Slot, type StoryRow, TYPE_CHIP,
+  type Slot,
 } from "./model";
 
-export type PanelItem = { kind: "rule"; code: string } | { kind: "doc"; key: string } | { kind: "story"; id: string };
+export type PanelItem = { kind: "rule"; code: string } | { kind: "doc"; key: string };
 
 interface Common {
   detail: Detail;
@@ -91,14 +91,19 @@ function DecisionLine({ f }: { f: Finding }) {
   );
 }
 
-function Notes({ f }: { f: Finding }) {
+/** Flags and language notes for one finding. Empty when there is nothing to say (no filler line). */
+export function noteLines(f: Finding): string[] {
   const items: string[] = [];
   if (!f.is_valid || f.error_flag) items.push(`Could not assess this item. Please review manually.${f.error_detail ? ` (${f.error_detail.replace(/_/g, " ")})` : ""}`);
   if (f.language_flag) items.push("The wording may be the obstacle. Consider asking the applicant before deciding “Not met”.");
   else if (f.needs_applicant_clarification) items.push("May need clarification from applicant.");
   if (f.confidence && f.check_source === "llm") items.push(`AI confidence: ${humanise(f.confidence)}.`);
-  if (!items.length) return <p className="muted">No flags or language notes for this item.</p>;
-  return <ul className="cx-list">{items.map((t) => <li key={t}>{t}</li>)}</ul>;
+  return items;
+}
+
+function Notes({ f }: { f: Finding }) {
+  const items = noteLines(f);
+  return items.length ? <ul className="cx-list">{items.map((t) => <li key={t}>{t}</li>)}</ul> : null;
 }
 
 // ---------------------------------------------------------------- rule panel
@@ -143,63 +148,25 @@ function SourceTable({ rows }: { rows: SourceRow[] }) {
   return (
     <div className="rv-src">
       <h4>Where this came from</h4>
-      <table className="data-table rv-compare">
-        <thead><tr><th>Field name</th><th>What the applicant typed</th><th>What the document says</th><th>Document</th></tr></thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key} className={r.match === "differs" ? "rv-differs" : ""}>
-              <td><strong>{r.label}</strong></td>
-              <td>{r.typed ?? <span className="rv-muted">Not provided</span>}</td>
-              <td>{r.docName ? (r.doc ?? <span className="rv-muted">Not provided</span>) : <span className="rv-muted">No document needed</span>}
-                {r.match === "differs" && <small className="rv-note-differs"><Icon name="question" size={13} />These do not match</small>}</td>
-              <td>{r.docName ?? <span className="rv-muted">–</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ul className="rv-srclist">
+        {rows.map((r) => (
+          <li key={r.key} className={r.match === "differs" ? "rv-differs" : ""}>
+            <div><small>Stated in the application</small><p>{r.typed ?? <span className="rv-muted">Not provided</span>}</p></div>
+            {r.docName && (
+              <div><small>Stated in the document: {r.docName}</small><p>{r.doc ?? <span className="rv-muted">Not provided</span>}</p></div>
+            )}
+            {r.match === "differs" && <small className="rv-note-differs"><Icon name="question" size={13} />These do not match</small>}
+          </li>
+        ))}
+      </ul>
     </div>
-  );
-}
-
-/** Side drawer: the part of the form or the document the result came from, with the exact words highlighted. */
-function SourceDrawer({ f, detail, onBack }: { f: Finding; detail: Detail; onBack: () => void }) {
-  const target = resolveTarget(f, detail);
-  const text = target ? detail.source_texts?.[target.source] : null;
-  const isForm = target?.source === "application_text";
-  const blocks = useMemo(() => (target && text ? (isForm ? sectionAround(toBlocks(text.text), target.start, target.end, 2) : undefined) : undefined), [target, text, isForm]);
-  const back = useRef<HTMLButtonElement>(null);
-  useEffect(() => { back.current?.focus(); }, []);
-  return createPortal(
-    <div className="rv-drawer-wrap">
-      <div className="rv-backdrop" onClick={onBack} aria-hidden="true" />
-      <aside className="rv-drawer" role="dialog" aria-modal="true" aria-label="Application text">
-        <header>
-          <button ref={back} className="link-button" onClick={onBack}><Icon name="left" size={16} />Back to finding</button>
-          <p className="eyebrow">{target && text ? text.label : "Application text"}</p>
-          <h2>{plainRule(f)}</h2>
-        </header>
-        <div className="rv-drawer-body">
-          {target && text ? (
-            <>
-              <p className="muted">{isForm ? "The part of the form around this answer. The highlighted words are the source." : "The document. The highlighted words are the source."}</p>
-              <TextView text={text.text} only={blocks} highlights={[{ id: "focus", start: target.start, end: target.end, kind: "focus" }]} focusId="focus" />
-            </>
-          ) : (
-            <div className="rv-nomatch">
-              <h3>No matching text found</h3>
-              <p>Nothing in the application covers this rule. These were searched:</p>
-              <ul className="cx-list">{searchedSections(detail).map((l) => <li key={l}>{l}</li>)}</ul>
-            </div>
-          )}
-        </div>
-      </aside>
-    </div>,
-    document.body,
   );
 }
 
 function RulePanel({ f, c }: { f: Finding; c: Common }) {
   const [drawer, setDrawer] = useState(false);
+  const [pdf, setPdf] = useState(false);
+  const targets = pdfTargets(c.detail, ruleEvidence(f, c.detail));
   const rows = sourceRows(f, c.detail);
   const quote = f.evidence_quote_restored;
   const fromDocuments = (f.rule_sources ?? []).some((r) => r.document_type);
@@ -221,9 +188,12 @@ function RulePanel({ f, c }: { f: Finding; c: Common }) {
             {f.rationale && <p className="rv-reason"><strong>Short reason:</strong> {f.rationale}</p>}
           </div>
         )}
-        <button className="button button-secondary rv-showtext" onClick={() => setDrawer(true)}><Icon name="file" size={16} />Show the application text</button>
+        <div className="rv-showrow">
+          <button className="button button-secondary rv-showtext" onClick={() => setDrawer(true)}><Icon name="file" size={16} />Show the application text</button>
+          {targets.length > 0 && <button className="button button-secondary rv-showtext" onClick={() => setPdf(true)}><Icon name="search" size={16} />Show on the PDF</button>}
+        </div>
       </Section>
-      <Section letter="C" title="Flags and notes"><Notes f={f} /></Section>
+      {noteLines(f).length > 0 && <Section letter="C" title="Flags and notes"><Notes f={f} /></Section>}
       <Section letter="D" title="Your decision">
         <DecisionLine f={f} />
         {f.ai_status === "Evidence only"
@@ -231,7 +201,8 @@ function RulePanel({ f, c }: { f: Finding; c: Common }) {
           : <RuleActions f={f} locked={c.locked} busy={c.busy} onDialog={c.onDialog} onConfirm={c.onConfirm} />}
       </Section>
       <TraceLink item={`rule:${f.rule_code}`} onTrace={c.onTrace} />
-      {drawer && <SourceDrawer f={f} detail={c.detail} onBack={() => setDrawer(false)} />}
+      {pdf && <PdfModal appId={c.detail.application.id} title={plainRule(f)} targets={targets} onClose={() => setPdf(false)} />}
+      {drawer && <SourceDrawer title={plainRule(f)} detail={c.detail} target={resolveTarget(f, c.detail)} onBack={() => setDrawer(false)} />}
     </>
   );
 }
@@ -287,13 +258,8 @@ function DocPanel({ slot, c }: { slot: Slot; c: Common }) {
         )}
         {slot.extraDocs && slot.extraDocs.length > 0 && <p className="muted">{slot.extraDocs.length} more file{slot.extraDocs.length === 1 ? "" : "s"} of this kind: {slot.extraDocs.map((x) => x.file_name).join(", ")}.</p>}
       </Section>
-      <Section letter="C" title="Flags and notes">
-        {rules.some((f) => f.language_flag || f.needs_applicant_clarification || !f.is_valid || f.error_flag)
-          ? rules.map((f) => <Notes key={f.id} f={f} />)
-          : <p className="muted">No flags or language notes for this item.</p>}
-      </Section>
+      {rules.some((f) => noteLines(f).length > 0) && <Section letter="C" title="Flags and notes">{rules.map((f) => <Notes key={f.id} f={f} />)}</Section>}
       <Section letter="D" title="Your decision">
-        {rules.length === 0 && <p className="muted">No rule reads this document.</p>}
         {rules.map((f) => (
           <div className="rv-rulebox" key={f.id}>
             <div className="rv-rulebox-head"><strong>Rule {f.rule_code}</strong><StatusChip status={effectiveStatus(f)} /></div>
@@ -310,38 +276,11 @@ function DocPanel({ slot, c }: { slot: Slot; c: Common }) {
   );
 }
 
-// ---------------------------------------------------------------- story panel
-
-function StoryPanel({ row, c }: { row: StoryRow; c: Common }) {
-  return (
-    <>
-      <Section letter="A" title="Signal">
-        <p className="rv-id">{TYPE_CHIP[row.type]}{row.linked ? ` · linked to ${row.linked}` : ""}</p>
-        <p className="rv-ptitle">{row.check}</p>
-        <div className="rv-chips"><span className="rv-tag">{row.strength} signal</span><span className="rv-tag">{row.status}</span></div>
-        <p className="muted">A signal, not a finding. It does not change any rule result and does not stop sign-off.</p>
-      </Section>
-      <Section letter="B" title="What doesn’t fit">
-        {row.flags.map((fl, i) => (
-          <div key={fl.id} className="rv-rulebox">
-            {row.flags.length > 1 && <div className="rv-rulebox-head"><strong>Item {i + 1} of {row.flags.length}</strong><span className="rv-tag">{fl.status === "open" ? "To check" : fl.status === "confirmed" ? "Needs follow-up" : "Dismissed"}</span></div>}
-            <FlagDetail flag={fl} onChanged={c.onChanged} locked={c.locked} />
-          </div>
-        ))}
-      </Section>
-      <Section letter="C" title="Notes">
-        <p className="muted">{row.type === "document_integrity" ? "Scans, re-saves and edits all change file details, so this is a weak signal on its own." : row.type === "cross_application" ? "Families, schools and organisations can legitimately share contacts, addresses and letter templates." : "Check the quotes against the application before you decide."}</p>
-      </Section>
-      <TraceLink item={`flag:${row.flags[0].id}`} onTrace={c.onTrace} />
-    </>
-  );
-}
-
 // ---------------------------------------------------------------- panel shell
 
-export function ReviewPanel({ item, slots, story, onClose, ...c }: Common & { item: PanelItem; slots: Slot[]; story: StoryRow[]; onClose: () => void }) {
+export function ReviewPanel({ item, slots, onClose, ...c }: Common & { item: PanelItem; slots: Slot[]; onClose: () => void }) {
   const head = useRef<HTMLDivElement>(null);
-  const key = item.kind === "rule" ? item.code : item.kind === "doc" ? item.key : item.id;
+  const key = item.kind === "rule" ? item.code : item.key;
   useEffect(() => { head.current?.focus(); }, [key]);
   let body: ReactNode = null;
   let title = "";
@@ -353,10 +292,6 @@ export function ReviewPanel({ item, slots, story, onClose, ...c }: Common & { it
     const s = slots.find((x) => x.key === item.key);
     title = s?.label ?? "Document";
     body = s ? <DocPanel slot={s} c={c} /> : <p className="muted">This item is no longer available.</p>;
-  } else {
-    const r = story.find((x) => x.id === item.id);
-    title = r?.check ?? "Story flag";
-    body = r ? <StoryPanel row={r} c={c} /> : <p className="muted">This item is no longer available.</p>;
   }
   return (
     <aside className="rv-panel" aria-label={`Details: ${title}`}>

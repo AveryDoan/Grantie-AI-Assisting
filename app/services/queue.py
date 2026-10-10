@@ -10,9 +10,12 @@ from __future__ import annotations
 from typing import Any
 
 from app.config import Settings, get_settings
+from app.pipeline import injection
+from app.services import rule_guidance
 from app.services.redaction_service import QuoteRestorer
 from app.services.access import Actor, application_for_applicant, application_for_staff
 from app.services.errors import Forbidden
+from app.services.merit import marks_for, public as public_mark
 from app.services.review import latest_reviews, latest_run
 from app.store.base import Store, one
 
@@ -48,8 +51,12 @@ def _compute_attention(
     docs: list[dict[str, Any]],
     findings: list[dict[str, Any]],
     reviews: dict[str, dict[str, Any]],
+    merit_codes: dict[str, str] | None = None,
+    marked: set[str] | None = None,
 ) -> dict[str, Any]:
-    """Pure: the officer's open work items for one application."""
+    """Pure: the officer's open work items for one application.
+
+    `merit_codes` maps a merit rule's id to its code; a merit criterion counts as done once it is marked (or Not assessed)."""
     run = _latest_complete(runs)
     items: dict[str, Any] = {
         "not_yet_assessed": run is None and not app.get("manual_assessment_requested"),
@@ -65,8 +72,12 @@ def _compute_attention(
     }
     if run:
         current = [f for f in findings if f["run_id"] == run["id"]]
+        merit_codes = merit_codes or {}
+        marked = marked or set()
         items["unreviewed_findings"] = sum(
-            1 for f in current if f["id"] not in reviews or reviews[f["id"]]["action"] == "ask_applicant"
+            (merit_codes[f["rule_id"]] not in marked) if f["rule_id"] in merit_codes
+            else (f["id"] not in reviews or reviews[f["id"]]["action"] == "ask_applicant")
+            for f in current
         )
         items["invalid_findings"] = sum(not f["is_valid"] for f in current)
         items["error_findings"] = sum(bool(f["error_flag"]) for f in current)
@@ -79,10 +90,16 @@ def _attention(store: Store, app: dict[str, Any]) -> dict[str, Any]:
     runs = store.select("assessment_runs", eq={"application_id": app["id"]})
     run = _latest_complete(runs)
     findings = store.select("findings", eq={"run_id": run["id"]}) if run else []
+    merit = _merit_rule_codes(store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]})) if run else {}
     return _compute_attention(
-        app, runs, store.select("documents", eq={"application_id": app["id"]}), findings,
-        latest_reviews(store, [f["id"] for f in findings]),
+        app, runs, [d for d in store.select("documents", eq={"application_id": app["id"]}) if not d.get("superseded")], findings,
+        latest_reviews(store, [f["id"] for f in findings]), merit,
+        {m["rule_code"] for m in store.select("merit_marks", eq={"application_id": app["id"]})},
     )
+
+
+def _merit_rule_codes(rules: list[dict[str, Any]]) -> dict[str, str]:
+    return {r["id"]: r["rule_code"] for r in rules if (r.get("params") or {}).get("section") == "merit"}
 
 
 def _open_items(a: dict[str, Any]) -> int:
@@ -109,12 +126,19 @@ def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> 
     ids = [a["id"] for a in apps]
     applicants = {x["id"]: x for x in store.select("applicants", in_={"id": list({a["applicant_id"] for a in apps})})}
     runs = _group(store.select("assessment_runs", in_={"application_id": ids}), "application_id")
-    docs = _group(store.select("documents", in_={"application_id": ids}), "application_id")
+    docs = _group([d for d in store.select("documents", in_={"application_id": ids}) if not d.get("superseded")], "application_id")
     latest = {app_id: _latest_complete(rs) for app_id, rs in runs.items()}
     run_ids = [r["id"] for r in latest.values() if r]
     findings = store.select("findings", in_={"run_id": run_ids}) if run_ids else []
     reviews = latest_reviews(store, [f["id"] for f in findings])
     findings_by_app = _group(findings, "application_id")
+    packs = list({r["rule_pack_id"] for r in latest.values() if r})
+    merit = _merit_rule_codes(store.select("rules", in_={"rule_pack_id": packs})) if packs else {}
+    marked_by_app = {a: set(m) for a, m in marks_for(store, ids).items()}
+    waiting = {}
+    for r in store.select("clarification_requests", in_={"application_id": ids}):
+        if r.get("kind") == "documents" and r.get("status") == "sent" and not r.get("resubmitted_at"):
+            waiting[r["application_id"]] = max(waiting.get(r["application_id"], ""), r.get("sent_at") or "")
     from app.services import consistency as consistency_service
 
     to_check = consistency_service.flags_to_check(store, ids, settings or get_settings())
@@ -122,7 +146,7 @@ def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> 
     out = []
     for app in apps:
         attention = _compute_attention(app, runs.get(app["id"], []), docs.get(app["id"], []),
-                                       findings_by_app.get(app["id"], []), reviews)
+                                       findings_by_app.get(app["id"], []), reviews, merit, marked_by_app.get(app["id"], set()))
         applicant = applicants.get(app["applicant_id"], {})
         out.append(
             {
@@ -137,6 +161,8 @@ def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> 
                 "open_items": _open_items(attention) if app["status"] != "signed_off" else 0,
                 # A count only (never a score). Not part of open_items, so it does not affect the order.
                 "flags_to_check": to_check.get(app["id"], 0) if app["status"] != "signed_off" else 0,
+                # When the officer's request for more documents was sent (only while the application waits for the applicant).
+                "waiting_since": waiting.get(app["id"]) if app["status"] == "awaiting_applicant" else None,
             }
         )
     # Most open work first, then oldest submission first. Not a ranking of applicants.
@@ -173,6 +199,7 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
     if actor.role == "applicant":
         return applicant_view(store, actor, application_id)
     from app.services import consistency as consistency_service
+    from app.services import linked as linked_service
 
     app = application_for_staff(store, actor, application_id)
     run = latest_run(store, application_id)
@@ -180,6 +207,7 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
     rules = {}
     findings_out = []
     facts = []
+    doc_rows = store.select("documents", eq={"application_id": application_id})
     if run:
         rules = {r["id"]: r for r in store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]})}
         findings = store.select("findings", eq={"run_id": run["id"]})
@@ -212,6 +240,7 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
                                       for ps in sm.get("passages", [])]}
                         for sm in (f.get("ai_summaries") or [])
                     ],
+                    **rule_guidance.for_rule(rule["rule_code"], doc_rows),
                     "section": (rule.get("params") or {}).get("section"),
                     "weight": (rule.get("params") or {}).get("weight"),
                     "display_label": "Not valid - do not rely on this" if not f["is_valid"] else None,
@@ -220,10 +249,16 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
                 }
             )
         facts = store.select("fact_extractions", eq={"run_id": run["id"]})
+        marks = marks_for(store, [application_id]).get(application_id, {})
+        for f in findings_out:
+            # The officer's own mark for a merit criterion (null until they mark it). Never AI-suggested, never totalled.
+            f["merit_mark"] = public_mark(marks.get(f["rule_code"])) if f.get("section") == "merit" else None
     return {
         "application": app | _names(store, app),
         "applicant": one(store.select("applicants", eq={"id": app["applicant_id"]}, limit=1)),
-        "documents": store.select("documents", eq={"application_id": application_id}),
+        # The word boxes are large and only the PDF viewer needs them (it asks the server): the screen gets a flag instead.
+        "documents": [{k: v for k, v in d.items() if k != "pdf_layout"} | {"is_pdf": str(d.get("file_name", "")).lower().endswith(".pdf")}
+                      for d in store.select("documents", eq={"application_id": application_id})],
         "source_texts": restorer.source_texts() if run else {},
         "latest_run": run,
         "runs": store.select("assessment_runs", eq={"application_id": application_id}, order="started_at", desc=True),
@@ -233,8 +268,26 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
         "letters": store.select("letters", eq={"application_id": application_id}, order="version"),
         "sign_off": one(store.select("sign_offs", eq={"application_id": application_id}, limit=1)),
         "attention": _attention(store, app),
-        "consistency": consistency_service.application_flags(store, app, settings or get_settings()),
+        "header_notices": _header_notices(app, doc_rows),
+        "consistency": consistency_service.application_flags(store, app, settings or get_settings(), restorer),
+        "linked_applications": linked_service.for_application(store, actor, app, reference) if (settings or get_settings()).consistency_layer else [],
         "disclaimer": "AI output is a suggestion only. An officer decides every finding and signs off the decision.",
+    }
+
+
+def _header_notices(app: dict[str, Any], docs: list[dict[str, Any]]) -> dict[str, Any]:
+    """What the officer should see at the top of an application: the applicant's declaration and AI opt-out, and any
+    instruction-like text found in the application (counts and places only, never the text)."""
+    fields = ((app.get("application_text") or {}).get("fields") or {})
+    answers = ((app.get("application_text") or {}).get("answers") or {})
+    agreed = {**fields, **answers}.get("declaration_agreed")
+    flags = injection.screen_application(app.get("application_text") or {}, [d for d in docs if not d.get("superseded")])
+    return {
+        "declaration": "Agreed" if str(agreed).strip().lower() in ("yes", "true", "agreed", "on", "1") else "Not recorded",
+        "ai_opt_out": bool(app.get("manual_assessment_requested")),
+        "ai_status_text": "The applicant asked for a person to assess this. The AI is not used." if app.get("manual_assessment_requested")
+        else "AI assessment allowed. The AI only reads redacted text.",
+        "injection": {"count": len(flags), "places": sorted({f.source.split(":")[0] if f.source.startswith("document:") else f.source for f in flags})[:6]},
     }
 
 

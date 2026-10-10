@@ -31,6 +31,7 @@ class DocView:
     fields: dict[str, str] = field(default_factory=dict)
     signals: dict[str, Any] = field(default_factory=dict)
     declared: str = "other"
+    raw_declared: str = ""       # what the applicant called the file ("resume", "certificate"...), lower case
 
     @property
     def source(self) -> str:
@@ -89,7 +90,7 @@ def build_docs(rows: list[dict[str, Any]], detected: dict[str, str], redacted: d
         counts[t] = counts.get(t, 0) + 1
         text = redacted.get(r["id"], "")
         out.append(DocView(
-            id=r["id"], type=t, declared=declared, text=text, original=(originals or {}).get(r["id"], ""),
+            id=r["id"], type=t, declared=declared, raw_declared=(r.get("declared_type") or "").strip().lower(), text=text, original=(originals or {}).get(r["id"], ""),
             fields=extract_fields(text) if text else {},
             signals=r.get("integrity_signals") or {}, label=doc_label(t, counts[t] if totals[t] > 1 else None)))
     return out

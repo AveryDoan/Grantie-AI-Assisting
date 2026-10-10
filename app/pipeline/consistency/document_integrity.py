@@ -44,6 +44,8 @@ def run(ctx: ConsistencyContext) -> list[Flag]:
         sig = doc.signals or {}
         if sig.get("kind") != "pdf" or sig.get("unreadable"):
             continue
+        if sig.get("expected_fixture"):
+            continue   # test data that is expected to share one producer and creation time (config/document_signals.yaml)
         created, modified, printed = _day(sig.get("created")), _day(sig.get("modified")), _printed_date(doc)
         caveat = " This is common when a document is scanned or saved again later."
         if created and printed:
@@ -74,7 +76,11 @@ def run(ctx: ConsistencyContext) -> list[Flag]:
         for doc in ctx.letters():
             ref = ctx.referee_for(doc.id)
             has_sig = bool(re.search(r"signature|signed|sincerely|faithfully|regards", doc.text, re.I)) or bool(ref and ref.stated("signature"))
-            has_head = bool(re.search(r"letterhead", doc.text, re.I)) or bool(ref and ref.stated("letterhead"))
+            top = "\n".join([l for l in doc.text.splitlines() if l.strip() and not l.startswith("[page")][:6])
+            # A letterhead shows an organisation's name (and usually its address and contacts) at the top of the letter.
+            org_at_top = bool(re.search(r"\b(?:institute|university|college|school|department|ltd|pvt|pty|limited|council|hospital|"
+                                        r"association|company|centre|center|office|ministry|foundation|clinic)\b", top, re.I))
+            has_head = bool(re.search(r"letterhead", doc.text, re.I)) or bool(ref and ref.stated("letterhead")) or org_at_top
             for ok, cid, what in ((has_sig, "missing_signature", "signature"), (has_head, "missing_letterhead", "letterhead")):
                 if not ok:
                     out.append(flag(f"document_integrity.{cid}", TYPE, "weak",

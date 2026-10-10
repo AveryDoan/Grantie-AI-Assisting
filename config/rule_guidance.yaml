@@ -1,0 +1,32 @@
+# Per-rule guidance for the evidence drawer: which uploaded document types each rule reads, and one plain sentence on what the
+# officer needs to verify. Data only. Rules without an entry show "No related documents are listed for this rule".
+# Document types are the declared types used at upload (coe, travel_booking, referee_letter, headshot, biography, resume, ...).
+rules:
+  S1:  {documents: [coe, offer_letter], verify: "The provider on the CoE is a registered NT education provider and the CoE is genuine and current."}
+  S2:  {documents: [coe], verify: "The course start date printed on the CoE, compared with the Round 1 window."}
+  S3:  {documents: [coe], verify: "The course named on the CoE leads to an occupation on the NT Skilled Occupation Priority List."}
+  S4:  {documents: [coe, offer_letter], verify: "The provider's academic and English entry requirements are met. This needs your own judgement."}
+  S5:  {documents: [travel_booking], verify: "The arrival date in the booking, and that the application was lodged at least 2 weeks before it."}
+  S6:  {documents: [], verify: "Where the applicant lived on the day they applied. A typed answer alone does not prove it."}
+  S7:  {documents: [], verify: "That the residential and postal addresses are outside the Northern Territory."}
+  S8:  {documents: [coe], verify: "Whether the applicant is already studying with an NT provider today, not only planning to."}
+  S9:  {documents: [visa], verify: "A Student Visa (subclass 500) is held and valid. Check it against the official visa record."}
+  S10: {documents: [], verify: "The applicant's declaration of other scholarships, checked against authorised records."}
+  S11: {documents: [visa], verify: "Citizenship or residency status from verified documents, not only the typed answer."}
+  S12: {documents: [coe], verify: "The CoE shows a full-time study load."}
+  S13: {documents: [], verify: "No other 2026/27 International Student Accommodation Grant is held (records check)."}
+  S14: {documents: [], verify: "Only one higher-education application in this period (records check)."}
+  S15: {documents: [], verify: "The under-18 answer is recorded and how it is handled is confirmed."}
+  S16: {documents: [], verify: "The declaration is ticked, named and dated."}
+  D1:  {documents: [coe], verify: "A CoE is uploaded, readable and is the right kind of document."}
+  D2:  {documents: [travel_booking], verify: "A booking or itinerary showing the arrival date (a screenshot of a flight is not enough)."}
+  D3:  {documents: [referee_letter], verify: "Two separate referee letters are uploaded."}
+  D4:  {documents: [referee_letter], verify: "Each letter shows the referee's name, position, organisation, relationship, length of association, signature, date and letterhead."}
+  D5:  {documents: [referee_letter], verify: "Each letter is dated between 2024 and 2026."}
+  D6:  {documents: [biography, headshot], verify: "A biography of about 150 words and a headshot are provided."}
+  D7:  {documents: [coe, referee_letter, travel_booking], verify: "All documents are in English, or a certified translation is supplied with the original."}
+  M1:  {documents: [resume, certificate, transcript], verify: "Grades and achievements are supported by the records provided. You give the mark."}
+  M2:  {documents: [referee_letter], verify: "The referees support the applicant's claims. You give the mark."}
+  M3:  {documents: [resume, referee_letter], verify: "Leadership roles, initiatives and their impact are supported. You give the mark."}
+  M4:  {documents: [resume, referee_letter], verify: "Volunteering and community contribution are supported. You give the mark."}
+  M5:  {documents: [], verify: "The question is answered and within 4,000 characters."}

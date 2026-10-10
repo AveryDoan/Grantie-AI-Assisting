@@ -53,7 +53,8 @@ export default function Queue({ navigate, initialSearch = "" }: { navigate: Navi
       </div>
       <section className="metrics">
         {metrics.map((m) => (
-          <article key={m.label}><span className={`metric-icon ${m.tone}`}><Icon name={m.icon} /></span><div><strong>{data ? m.n : "–"}</strong><span>{m.label}</span></div></article>
+          <article key={m.label} className={m.label === "Awaiting applicant" ? "metric-click" : undefined}
+            onClick={m.label === "Awaiting applicant" ? () => setStatus(status === "Awaiting applicant" ? "all" : "Awaiting applicant") : undefined}><span className={`metric-icon ${m.tone}`}><Icon name={m.icon} /></span><div><strong>{data ? m.n : "–"}</strong><span>{m.label}</span></div></article>
         ))}
       </section>
       <ErrorNotice error={error} />
@@ -79,7 +80,7 @@ export default function Queue({ navigate, initialSearch = "" }: { navigate: Navi
         {data && (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Application ID</th><th>Applicant</th><th>Date received</th><th>Rules needing attention</th><th>Status</th><th><span className="sr-only">Open</span></th></tr></thead>
+              <thead><tr><th>Application ID</th><th>Applicant</th><th>Date received</th><th>Rules needing attention</th><th>Status</th><th>Waiting since</th><th><span className="sr-only">Open</span></th></tr></thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} onClick={() => navigate({ name: "review", id: row.id })} className="clickable">
@@ -89,10 +90,11 @@ export default function Queue({ navigate, initialSearch = "" }: { navigate: Navi
                     <td>{formatDate(row.submitted_at)}</td>
                     <td><span className={rulesNeedingAttention(row) === "0" ? "attention zero" : "attention"}>{rulesNeedingAttention(row)}</span></td>
                     <td><AppStatus status={statusLabel(row)} /></td>
+                    <td>{row.waiting_since ? formatDate(row.waiting_since) : "–"}</td>
                     <td><Icon name="chevron" /></td>
                   </tr>
                 ))}
-                {rows.length === 0 && <tr><td colSpan={6} className="empty-state">No applications match.</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={7} className="empty-state">No applications match.</td></tr>}
               </tbody>
             </table>
           </div>

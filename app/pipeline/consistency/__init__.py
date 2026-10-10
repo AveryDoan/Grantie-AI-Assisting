@@ -1,4 +1,4 @@
-"""Consistency layer: signals that an application's story may not add up.
+"""Consistency layer: signals that details may not match across an application.
 
 Signals, never verdicts. Each check can only point at a disagreement and show the evidence; an officer confirms or
 dismisses every flag, a flag never changes a rule result, and nothing here is a score, rating or recommendation.

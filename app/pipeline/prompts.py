@@ -15,7 +15,7 @@ from app.llm.base import Prompt
 from app.pipeline.injection import neutralise_delimiters
 
 PROMPT_VERSION = "p1"
-EVIDENCE_PROMPT_VERSION = "p1-ev2"  # the evidence prompt also asks for linked summaries
+EVIDENCE_PROMPT_VERSION = "p1-ev3"  # the evidence prompt also asks for linked summaries
 ALT_PROMPT_VERSION = "p1-alt"  # different wording, used by the consistency check
 
 # --------------------------------------------------------------------------
@@ -51,12 +51,12 @@ class EvidenceOut(BaseModel):
     """Judgement rules: quotes and neutral summaries only. There is deliberately no status, score or rating field."""
 
     supporting_quotes: list[str] = Field(description="Exact verbatim passages relevant to the rule; may be empty")
-    summaries: list[SummaryOut] = Field(default_factory=list, description="At most 2 neutral summaries, each tied to its passages")
+    summaries: list[SummaryOut] = Field(default_factory=list, description="3 to 6 neutral summary bullets, each tied to its passages")
 
 
 # The review screen shows a fixed number of note slots for every applicant.
 MAX_QUOTES = 3
-MAX_SUMMARIES = 2
+MAX_SUMMARIES = 6
 
 
 # --------------------------------------------------------------------------
@@ -111,7 +111,8 @@ Return only exact, verbatim passages from the application data that the officer 
 criterion (at most 3). Do NOT give a status, score, opinion or conclusion. If nothing is relevant, return
 an empty list.
 
-Also return at most 2 "summaries". A summary is ONE neutral sentence that says what the applicant
+Also return 3 to 6 "summaries" (fewer only if the text has fewer distinct points), in the order the
+points appear in the text. A summary is ONE short neutral sentence that says what the applicant
 describes, in plain words. It must list the 1 or 2 exact verbatim passages it is based on. A summary
 never judges quality, strength, fit or writing style, never compares the applicant with anyone, and never
 says what the officer should decide. If you cannot point to the passage, do not write the summary.

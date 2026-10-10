@@ -36,12 +36,16 @@ _HINTS: dict[str, dict[str, list[str]]] = {
     "SNT-S8": {
         "field": ["current_study"],
         "negative": ["Charles Darwin University", "studying with an NT provider", "enrolled at CDU", "study at CDU"],
-        "positive": ["secondary school", "high school", "Year 12", "not studying", "working as"],
+        # a future offer is not current study
+        "not_if": ["accepted an offer", "offer to start", "offer to study", "will start", "will begin", "plan to", "intend to"],
+        "positive": ["secondary school", "high school", "Year 12", "not studying", "working as", "final semester", "final year", "currently studying", "I study at"],
     },
     "SNT-S4": {"evidence": ["IELTS", "English entry", "entry requirement", "academic requirement"]},
-    "SNT-M1": {"evidence": ["average", "prize", "examination", "exam", "grades", "results"]},
+    "SNT-M1": {"evidence": ["average", "prize", "examination", "examinations", "exam", "grades", "results", "distinction", "award", "certificate"]},
     "SNT-M3": {"evidence": ["lead", "leader", "led", "coordinator", "organised", "organise"]},
     "SNT-M4": {"evidence": ["volunteer", "community", "clinic"]},
+    "SNT-M2": {"evidence": ["volunteer", "community", "clinic", "recommend", "support", "patients", "helps", "helped", "mentor"]},
+    "SNT-M5": {"evidence": ["nurse", "Northern Territory", "remote", "community", "clinic", "families", "help"]},
     "CBF-C6": {"evidence": ["community", "residents", "benefit", "local people", "elders"]},
 }
 _AMBIGUOUS = ["might", "maybe", "not sure", "planning to", "hope to", "or possibly"]
@@ -59,6 +63,15 @@ def _sentences(source: str, fields: list[str] | None = None) -> list[str]:
         for s in re.split(r"(?<=[.!?])\s+", value):
             if s.strip():
                 out.append(s.strip())
+    return out
+
+
+def _free_sentences(source: str) -> list[str]:
+    """Every sentence in the text, with a form field's "name: " prefix dropped (each is a verbatim part of the text)."""
+    out = []
+    for line in source.splitlines():
+        value = re.sub(r"^[a-z][a-z0-9_]*: ", "", line.strip())
+        out.extend(s.strip() for s in re.split(r"(?<=[.!?])\s+", value) if s.strip())
     return out
 
 
@@ -93,8 +106,11 @@ class OfflineStubProvider:
             sentences = _sentences(source, hints["field"])
         if kind == "evidence":
             quotes = [s for s in sentences if any(re.search(rf"(?<!\w){re.escape(k)}(?!\w)", s, re.I) for k in hints.get("evidence", []))]
-            # The offline stub cannot paraphrase: its summary only says which passage it points at.
-            summaries = [{"summary": f"The applicant describes something relevant to this criterion in this passage.", "passages": [q]} for q in quotes[:1]]
+            # The offline stub cannot paraphrase: each bullet only names the keyword that made it point at a passage.
+            keys = hints.get("evidence", [])
+            matched = [(s, next(k for k in keys if re.search(rf"(?<!\w){re.escape(k)}(?!\w)", s, re.I)))
+                       for s in _free_sentences(source) if any(re.search(rf"(?<!\w){re.escape(k)}(?!\w)", s, re.I) for k in keys)]
+            summaries = [{"summary": f"Mentions {kw.lower()} in this passage.", "passages": [s]} for s, kw in matched[:6]]
             return json.dumps({"supporting_quotes": quotes[:3], "summaries": summaries})
         if kind == "rule":
             return json.dumps(self._rule(hints, sentences))
@@ -139,7 +155,8 @@ class OfflineStubProvider:
 
     @staticmethod
     def _rule(hints: dict[str, list[str]], sentences: list[str]) -> dict[str, Any]:
-        neg = _find(sentences, hints.get("negative", []))
+        past = hints.get("not_if", [])
+        neg = _find([x for x in sentences if not _find([x], past)], hints.get("negative", []))
         if neg:
             return {"status": "Not met", "rationale": "The applicant's words contradict the rule.", "evidence_quote": neg,
                     "confidence": "medium", "language_flag": False, "needs_applicant_clarification": False}

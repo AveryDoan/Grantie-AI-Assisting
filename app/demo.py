@@ -31,6 +31,8 @@ DEMO_USERS = {
     "officer": {"id": sid("user:officer"), "display_name": "Demo Officer (fictional)", "org": data.ORG_ID},
     "admin": {"id": sid("user:admin"), "display_name": "Demo Admin (fictional)", "org": data.ORG_ID},
     "applicant": {"id": sid("user:applicant"), "display_name": "Demo Applicant (fictional)", "org": None},
+    # A second fictional applicant, used to load the Sita Karki sample files through the real applicant upload flow.
+    "sita": {"id": sid("user:sita"), "display_name": "Sita Karki (fictional)", "org": None},
 }
 
 
@@ -38,7 +40,7 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
     store = MemoryStore()
     seed(store)
     for role, u in DEMO_USERS.items():
-        store.insert("profiles", {"id": u["id"], "role": role, "organisation_id": u["org"], "display_name": u["display_name"]})
+        store.insert("profiles", {"id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
     store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
     from redaction.crypto import generate_key
 

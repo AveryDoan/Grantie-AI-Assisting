@@ -1,7 +1,8 @@
 // Run with: npm test   (Node's built-in test runner; no extra packages)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compareValues, highlightsFor, notesOf, resolveTarget, searchedSections, sectionAround, segment, toBlocks } from "../src/screens/review/highlight.ts";
+import { COLLAPSE_WORDS, collapsedBlocks, compareValues, forMode, highlightsFor, notesOf, resolveTarget, searchedSections, sectionAround, segment, toBlocks, whereIs } from "../src/screens/review/highlight.ts";
+import { canSave, validMark } from "../src/screens/review/marks.ts";
 
 const span = (source: string, start: number, end: number) => ({ source, start, end, text: "" });
 const finding = (over: Record<string, unknown>) => ({ supporting_quotes_restored: [], ai_summaries_restored: [], ...over }) as never;
@@ -43,7 +44,7 @@ test("sectionAround: a section with context, not the whole text", () => {
 
 test("notes: a verified, located quote is a quote and is highlighted", () => {
   const n = notesOf(finding({ supporting_quotes_restored: [{ quote: "Q", verified: true, span: span("application_text", 5, 9) }] }));
-  assert.equal(n.quotes[0].state, "verified");
+  assert.equal(n.others[0].state, "verified");
   assert.deepEqual(highlightsFor(n, "application_text").map((h) => [h.kind, h.start, h.end]), [["quote", 5, 9]]);
 });
 
@@ -60,28 +61,30 @@ test("notes: a verified quote with no position says it could not be located and 
   assert.equal(highlightsFor(n, "application_text").length, 0);
 });
 
-test("notes: a summary with no verified source passage is listed as unlinked and never shown as a note", () => {
+test("notes: a summary with no verified source passage is listed as unlinked and never shown as a note (old slots test)", () => {
   const n = notesOf(finding({ ai_summaries_restored: [
     { text: "no source", linked: false, passages: [{ quote: "x", verified: false, span: null }] },
     { text: "no passages at all", linked: true, passages: [] },
     { text: "good", linked: true, passages: [{ quote: "y", verified: true, span: span("application_text", 2, 8) }] },
   ] }));
-  assert.deepEqual(n.summaries.map((s) => s.text), ["good"]);
+  assert.deepEqual(n.bullets.map((s) => s.text), ["good"]);
   assert.deepEqual(n.unlinked.map((s) => s.text), ["no source", "no passages at all"]);
   assert.equal(highlightsFor(n, "application_text")[0].kind, "summary");
 });
 
 test("notes: a linked summary whose passage cannot be positioned is not highlighted", () => {
   const n = notesOf(finding({ ai_summaries_restored: [{ text: "s", linked: true, passages: [{ quote: "y", verified: true, span: null }] }] }));
-  assert.equal(n.summaries[0].state, "unlocated");
+  assert.equal(n.bullets[0].state, "unlocated");
   assert.equal(highlightsFor(n, "application_text").length, 0);
 });
 
-test("notes: the number of slots is fixed", () => {
+test("notes: quote slots are capped at 3 and bullets at 6", () => {
   const many = Array.from({ length: 6 }, (_, i) => ({ quote: `q${i}`, verified: true, span: span("application_text", i * 10, i * 10 + 5) }));
-  const n = notesOf(finding({ supporting_quotes_restored: many }));
-  assert.equal(n.quotes.length, 3);
-  assert.equal(n.moreQuotes, 3);
+  assert.equal(notesOf(finding({ supporting_quotes_restored: many })).quotes.length, 3);
+  const bullets = Array.from({ length: 9 }, (_, i) => ({ text: `b${i}`, linked: true, passages: [{ quote: "x", verified: true, span: span("application_text", i * 10, i * 10 + 5) }] }));
+  const n = notesOf(finding({ ai_summaries_restored: bullets }));
+  assert.equal(n.bullets.length, 6);
+  assert.equal(n.moreBullets, 3);
 });
 
 test("notes: no field carries a score, rating or strength", () => {
@@ -114,13 +117,72 @@ test("compareValues: names, dates and empty values", () => {
   assert.equal(compareValues("x", null), "not_compared");
 });
 
-test("highlights: when a quote and a summary point at the same words, the selected note's highlight is the one shown", () => {
+test("highlights: a quote that is already a bullet's passage is not highlighted twice; the bullet's highlight is the one shown", () => {
   const same = span("application_text", 5, 20);
   const n = notesOf(finding({
     supporting_quotes_restored: [{ quote: "Q", verified: true, span: same }],
     ai_summaries_restored: [{ text: "S", linked: true, passages: [{ quote: "Q", verified: true, span: same }] }],
   }));
-  const kind = (sel: string | null) => segment("x".repeat(40), highlightsFor(n, "application_text", sel)).find((s) => s.highlight)!.highlight!.kind;
-  assert.equal(kind(null), "quote");
-  assert.equal(kind("s0"), "summary");
+  const kinds = highlightsFor(n, "application_text", null).map((h) => h.kind);
+  assert.deepEqual(kinds, ["summary"]);
+});
+
+test("bullets follow the document, not importance: sorted by source order then position", () => {
+  const n = notesOf(finding({ ai_summaries_restored: [
+    { text: "later in the form", linked: true, passages: [{ quote: "a", verified: true, span: span("application_text", 90, 99) }] },
+    { text: "in the letter", linked: true, passages: [{ quote: "b", verified: true, span: span("document:d1", 5, 9) }] },
+    { text: "early in the form", linked: true, passages: [{ quote: "c", verified: true, span: span("application_text", 10, 20) }] },
+  ] }), ["application_text", "document:d1"]);
+  assert.deepEqual(n.bullets.map((b) => b.text), ["early in the form", "later in the form", "in the letter"]);
+});
+
+test("other passages: a quote that is already a bullet's passage is not shown twice; one other passage gets no heading slot", () => {
+  const same = span("application_text", 5, 20);
+  const n = notesOf(finding({
+    supporting_quotes_restored: [{ quote: "Q1", verified: true, span: same }, { quote: "Q2", verified: true, span: span("application_text", 40, 50) }],
+    ai_summaries_restored: [{ text: "S", linked: true, passages: [{ quote: "Q1", verified: true, span: same }] }],
+  }));
+  assert.equal(n.bullets.length, 1);
+  assert.deepEqual(n.others.map((q) => q.text), ["Q2"]);   // exactly one: the screen shows it with no "Other passages" heading and no filler
+});
+
+test("no filler: with nothing to show there are no notes at all (not empty slots)", () => {
+  const n = notesOf(finding({}));
+  assert.deepEqual([n.bullets.length, n.others.length, n.unlinked.length, n.unverified.length], [0, 0, 0, 0]);
+});
+
+test("referee facts are kept apart from the summaries", () => {
+  const f = finding({ supporting_quotes_restored: [
+    { quote: "Referee name: A", label: "referee name", verified: true, span: span("document:d1", 0, 5) },
+    { quote: "She leads", label: "about the applicant", verified: true, span: span("document:d1", 9, 12) }] });
+  assert.deepEqual(notesOf(forMode(f, "referee")).others.map((q) => q.label), ["referee name"]);
+  assert.deepEqual(notesOf(forMode(f, "criterion")).others.map((q) => q.label), ["about the applicant"]);
+});
+
+test("long source text collapses to the paragraphs holding a highlight; short text is shown whole", () => {
+  const long = `field_a: ${"word ".repeat(COLLAPSE_WORDS)}\nfield_b: the passage here\nfield_c: ${"more ".repeat(20)}`;
+  const at = long.indexOf("the passage");
+  const v = collapsedBlocks(long, [{ id: "h", start: at, end: at + 11, kind: "quote" }]);
+  assert.ok(v.collapsible && v.words > COLLAPSE_WORDS);
+  assert.deepEqual(v.blocks.map((b) => long.slice(b.start, b.start + 7)), ["field_b"]);
+  const short = collapsedBlocks("field_a: hello\nfield_b: there", []);
+  assert.equal(short.collapsible, false);
+  assert.equal(short.blocks.length, 2);
+});
+
+test("whereIs gives the page and paragraph of a passage", () => {
+  const text = "[page 1]\nfield_a: one\n[page 2]\nfield_b: two\nfield_c: three";
+  assert.deepEqual(whereIs(text, text.indexOf("three")), { page: 2, paragraph: 3 });
+  assert.equal(whereIs(text, 0), null);
+});
+
+test("marking rules: a whole number 0 to 100 with a reason, or Not assessed; nothing is pre-filled", () => {
+  assert.equal(validMark("0"), 0);
+  assert.equal(validMark("100"), 100);
+  for (const bad of ["", "101", "-1", "50.5", "abc", " ", "1e2"]) assert.equal(validMark(bad), null, bad);
+  assert.equal(canSave("70", "", false), false);          // a mark needs a reason
+  assert.equal(canSave("70", "   ", false), false);
+  assert.equal(canSave("70", "Strong prize record", false), true);
+  assert.equal(canSave("", "reason", false), false);      // no mark chosen
+  assert.equal(canSave("", "", true), true);              // Not assessed needs no mark
 });

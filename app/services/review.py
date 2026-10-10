@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from typing import Any, get_args
 
 from app.domain import DecisionStatus, ReviewAction
@@ -18,6 +20,8 @@ from app.services.access import Actor, application_for_applicant, application_fo
 from app.services.audit import write_audit
 from app.services.errors import Conflict, NotFound, SignOffBlocked, ValidationFailed
 from app.store.base import Store, now_iso, one
+
+log = logging.getLogger(__name__)
 
 SIGN_OFF_STATEMENT = (
     "I have personally reviewed every finding for this application. The AI output was a suggestion only; "
@@ -47,8 +51,16 @@ def latest_reviews(store: Store, finding_ids: list[str]) -> dict[str, dict[str, 
     return out
 
 
+def _in_guided_flow(store: Store, app: dict[str, Any]) -> bool:
+    from app.services import steps
+
+    return bool(steps.rows(store, app["id"]))
+
+
 def undecided_rules(store: Store, application_id: str) -> tuple[dict[str, Any] | None, list[str]]:
-    """(latest run, rule codes still lacking an officer decision)."""
+    """(latest run, rule codes still lacking an officer decision).
+
+    A merit criterion is decided only by the officer's mark (or "Not assessed"); every other rule by a review."""
     run = latest_run(store, application_id)
     if run is None:
         return None, []
@@ -56,9 +68,14 @@ def undecided_rules(store: Store, application_id: str) -> tuple[dict[str, Any] |
     findings = store.select("findings", eq={"run_id": run["id"]})
     by_rule = {f["rule_id"]: f for f in findings}
     reviews = latest_reviews(store, [f["id"] for f in findings])
+    marks = {m["rule_code"] for m in store.select("merit_marks", eq={"application_id": application_id})}
     pending = []
     for rule in sorted(rules, key=lambda r: (r.get("display_order", 0), r["rule_code"])):
         f = by_rule.get(rule["id"])
+        if (rule.get("params") or {}).get("section") == "merit":
+            if rule["rule_code"] not in marks:
+                pending.append(rule["rule_code"])
+            continue
         review = reviews.get(f["id"]) if f else None
         if f is None or review is None or review["action"] == "ask_applicant":
             pending.append(rule["rule_code"])
@@ -142,6 +159,15 @@ def review_finding(
         rule_pack_version=run["rule_pack_version"],
         details={"finding_id": finding_id, "review_id": review["id"], "action": action, "ai_valid": finding["is_valid"]},
     )
+    if final_status == "Not met" and _in_guided_flow(store, app):
+        # Confirming a rule as Not met drafts the decline letter at once. It is only a draft: nothing is released
+        # until the officer approves it, and approval needs sign-off.
+        from app.services import letters
+
+        try:
+            letters.draft_on_confirmation(store, actor, app["id"])
+        except Exception:   # a letter problem must never undo the officer's decision
+            log.warning("could not draft the decline letter for an application after a Not met decision")
     return review
 
 
@@ -157,6 +183,11 @@ def sign_off(store: Store, actor: Actor, application_id: str, *, statement_ackno
     if store.select("assessment_runs", eq={"application_id": application_id, "status": "running"}, limit=1):
         raise Conflict("An assessment run is still in progress")
 
+    from app.services import steps
+
+    recorded = steps.rows(store, application_id)
+    if recorded and not (recorded.get(1, {}).get("status") == "done" and recorded.get(2, {}).get("status") == "done"):
+        raise SignOffBlocked("Finish the Documents and Redaction check steps before signing off")
     run, pending = undecided_rules(store, application_id)
     if run is None and not app.get("manual_assessment_requested"):
         raise SignOffBlocked("There is no complete assessment run to sign off")
@@ -167,7 +198,7 @@ def sign_off(store: Store, actor: Actor, application_id: str, *, statement_ackno
 
     row = store.insert(
         "sign_offs",
-        {"application_id": application_id, "officer_id": actor.user_id, "statement_acknowledged": True},
+        {"application_id": application_id, "officer_id": actor.user_id, "statement_acknowledged": True, "signed_at": now_iso()},
     )[0]
     store.update("applications", {"status": "signed_off"}, eq={"id": application_id})
 
@@ -266,3 +297,23 @@ def request_manual_assessment(store: Store, actor: Actor, application_id: str) -
         "manual_assessment_requested": True,
         "message": "A person will assess your application. AI tools will not be used to check it.",
     }
+
+
+def reopen(store: Store, actor: Actor, application_id: str, reason: str | None) -> dict[str, Any]:
+    """Reopen a signed-off application. It needs a reason. The sign-off is kept in its history and the next one is a new version."""
+    require_role(actor, "officer")
+    app = application_for_staff(store, actor, application_id)
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationFailed("Reopening needs a reason")
+    row = one(store.select("sign_offs", eq={"application_id": application_id}, limit=1))
+    if app["status"] != "signed_off" or not row:
+        raise Conflict("Only a signed-off application can be reopened")
+    version = len(store.select("sign_off_history", eq={"application_id": application_id})) + 1
+    store.insert("sign_off_history", {"application_id": application_id, "version": version, "officer_id": row["officer_id"],
+                                      "signed_at": row["signed_at"], "reopened_by": actor.user_id, "reopened_at": now_iso(), "reason": reason})
+    store.delete("sign_offs", eq={"id": row["id"]})
+    store.update("applications", {"status": "in_review"}, eq={"id": application_id})
+    write_audit(store, actor, "application.reopened", application_id=application_id, reason=reason,
+                details={"version_reopened": version, "sign_off_id": row["id"]})
+    return {"reopened_version": version, "status": "in_review"}

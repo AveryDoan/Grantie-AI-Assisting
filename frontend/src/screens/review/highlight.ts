@@ -84,19 +84,27 @@ export interface SummaryNote {
   state: "linked" | "unlocated" | "unlinked";
 }
 export interface Notes {
-  quotes: QuoteNote[];          // verified quotes, at most MAX_QUOTES slots (shown even when their position is unknown)
-  summaries: SummaryNote[];     // summaries linked to the text, at most MAX_SUMMARIES slots
+  bullets: SummaryNote[];       // AI summary bullets linked to the text, in the order they appear in the document
+  others: QuoteNote[];          // verified quotes not already covered by a bullet ("Other passages" when more than one)
   unverified: QuoteNote[];      // "Could not verify": never shown as a quote, never highlighted
-  unlinked: SummaryNote[];      // "Could not be linked to the text": a summary with no source passage
-  moreQuotes: number;           // verified quotes beyond the slots
+  unlinked: SummaryNote[];      // "Could not be linked to the text": a bullet with no source passage
+  moreBullets: number;          // linked bullets beyond the cap
+  // kept for the highlight helpers below
+  quotes: QuoteNote[];
+  summaries: SummaryNote[];
 }
 export const MAX_QUOTES = 3;
-export const MAX_SUMMARIES = 2;
+export const MAX_SUMMARIES = 6;
 
 const here = (s: TextSpan | null | undefined): Located | null => (s ? { source: s.source, start: s.start, end: s.end } : null);
 
-/** Sort the finding's passages into note slots by what code could establish. Nothing here scores or ranks them. */
-export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summaries_restored">): Notes {
+/** Sort the finding's passages into notes by what code could establish. Bullets follow the document, not importance.
+ *  `order` lists the sources in reading order (form first, then each document). Nothing here scores or ranks anything. */
+export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summaries_restored">, order: string[] = ["application_text"]): Notes {
+  const rank = (src: string | undefined) => { const i = order.indexOf(src ?? ""); return i < 0 ? order.length : i; };
+  const byPosition = <T extends { at: Located | null }>(a: T, b: T) =>
+    rank(a.at?.source) - rank(b.at?.source) || (a.at?.start ?? Infinity) - (b.at?.start ?? Infinity);
+
   const quotes: QuoteNote[] = [];
   const unverified: QuoteNote[] = [];
   (f.supporting_quotes_restored ?? []).forEach((q, i) => {
@@ -104,28 +112,33 @@ export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summ
     if (!q.verified) unverified.push(note);
     else { note.state = note.at ? "verified" : "unlocated"; quotes.push(note); }
   });
-  // "About the applicant" passages come before bare field lines such as a referee's name, so the 3 slots read well.
-  quotes.sort((a, b) => Number((b.label ?? "") === "about the applicant") - Number((a.label ?? "") === "about the applicant"));
-  const summaries: SummaryNote[] = [];
+  const all: SummaryNote[] = [];
   const unlinked: SummaryNote[] = [];
   (f.ai_summaries_restored ?? []).forEach((s, i) => {
     const verified = s.passages.filter((p) => p.verified);
     const at = verified.map((p) => here(p.span)).filter((x): x is Located => x !== null);
     const note: SummaryNote = { id: `s${i}`, kind: "summary", text: s.text ?? "", at, sources: [...new Set(at.map((a) => a.source))], state: "linked" };
     if (!s.linked || verified.length === 0) { note.state = "unlinked"; note.at = []; unlinked.push(note); }
-    else { note.state = at.length ? "linked" : "unlocated"; summaries.push(note); }
+    else { note.state = at.length ? "linked" : "unlocated"; all.push(note); }
   });
-  return {
-    quotes: quotes.slice(0, MAX_QUOTES), summaries: summaries.slice(0, MAX_SUMMARIES), unverified, unlinked,
-    moreQuotes: Math.max(0, quotes.length - MAX_QUOTES),
-  };
+  const first = (n: SummaryNote): { at: Located | null } => ({ at: n.at[0] ?? null });
+  all.sort((a, b) => byPosition(first(a), first(b)));
+  const bullets = all.slice(0, MAX_SUMMARIES);
+
+  // A verified quote that is exactly a bullet's passage is already shown as that bullet's source.
+  const covered = (q: QuoteNote) => !!q.at && bullets.some((b) => b.at.some((a) => a.source === q.at!.source && a.start === q.at!.start && a.end === q.at!.end));
+  const others = quotes.filter((q) => !covered(q)).sort(byPosition);
+  // "About the applicant" passages come before bare field lines such as a referee's name.
+  others.sort((a, b) => Number((b.label ?? "") === "about the applicant") - Number((a.label ?? "") === "about the applicant"));
+  const quoteSlots = quotes.slice(0, MAX_QUOTES);
+  return { bullets, others, unverified, unlinked, moreBullets: Math.max(0, all.length - MAX_SUMMARIES), quotes: quoteSlots, summaries: bullets };
 }
 
-/** The highlights for one source: verified quotes and linked summary passages, never failed or unlinked notes. */
+/** The highlights for one source: the bullets' passages and the other verified passages, never failed or unlinked notes. */
 export function highlightsFor(notes: Notes, source: string, selected?: string | null): Highlight[] {
   const out: Highlight[] = [];
-  for (const q of notes.quotes) if (q.at && q.at.source === source) out.push({ id: `${q.id}`, noteId: q.id, start: q.at.start, end: q.at.end, kind: "quote" });
-  for (const s of notes.summaries) s.at.forEach((a, i) => { if (a.source === source) out.push({ id: `${s.id}.${i}`, noteId: s.id, start: a.start, end: a.end, kind: "summary" }); });
+  for (const q of notes.others) if (q.at && q.at.source === source) out.push({ id: `${q.id}`, noteId: q.id, start: q.at.start, end: q.at.end, kind: "quote" });
+  for (const s of notes.bullets) s.at.forEach((a, i) => { if (a.source === source) out.push({ id: `${s.id}.${i}`, noteId: s.id, start: a.start, end: a.end, kind: "summary" }); });
   // The selected note's passage wins where two notes point at the same words (a quote and a summary of it).
   return selected ? [...out.filter((h) => h.noteId === selected), ...out.filter((h) => h.noteId !== selected)] : out;
 }
@@ -133,8 +146,8 @@ export function highlightsFor(notes: Notes, source: string, selected?: string | 
 /** Sources (tabs) the notes point into, the form first. With no located notes at all, just the form. */
 export function sourcesOf(notes: Notes, form = "application_text"): string[] {
   const all = new Set<string>();
-  for (const q of notes.quotes) if (q.at) all.add(q.at.source);
-  for (const s of notes.summaries) s.sources.forEach((x) => all.add(x));
+  for (const q of notes.others) if (q.at) all.add(q.at.source);
+  for (const s of notes.bullets) s.sources.forEach((x) => all.add(x));
   if (all.size === 0) return [form];
   return [...all].sort((a, b) => Number(b === form) - Number(a === form));
 }
@@ -201,4 +214,36 @@ export function compareValues(typed: string | null | undefined, doc: string | nu
   const b = parseDay(doc);
   if (a && b) return a === b ? "match" : "differs";
   return words(typed) === words(doc) ? "match" : "differs";
+}
+
+// ---------------------------------------------------------------- long text and "where is this"
+
+export const COLLAPSE_WORDS = 150;
+export const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).length : 0);
+
+/** Long source text is collapsed by default to the paragraphs that hold a highlighted passage. Short text is shown whole. */
+export function collapsedBlocks(text: string, highlights: Highlight[]): { blocks: Block[]; collapsible: boolean; words: number } {
+  const blocks = toBlocks(text);
+  const words = wordCount(text);
+  if (words <= COLLAPSE_WORDS) return { blocks, collapsible: false, words };
+  const hit = blocks.filter((b) => b.kind === "para" && highlights.some((h) => h.end > b.start && h.start < b.end));
+  return { blocks: hit, collapsible: true, words };
+}
+
+/** "Page 1, paragraph 3": where a passage sits, from the same paragraph and page markers the viewer shows. */
+export function whereIs(text: string, start: number): { page: number; paragraph: number } | null {
+  const b = toBlocks(text).find((x) => x.kind === "para" && start >= x.start && start < x.end + 1);
+  return b ? { page: b.page ?? 1, paragraph: b.number ?? 1 } : null;
+}
+
+// ---------------------------------------------------------------- criterion vs referee check
+
+/** Labels the referee facts carry (name, position, ...). They belong to the separate "Referee check" row, not to the summaries. */
+export const REFEREE_FIELDS = new Set(["referee name", "position", "organisation", "relationship", "length of association"]);
+
+export function forMode<T extends Pick<Finding, "supporting_quotes_restored" | "ai_summaries_restored">>(f: T, mode: "criterion" | "referee"): T {
+  const quotes = f.supporting_quotes_restored ?? [];
+  return mode === "referee"
+    ? { ...f, supporting_quotes_restored: quotes.filter((q) => REFEREE_FIELDS.has((q.label ?? "").toLowerCase())), ai_summaries_restored: [] }
+    : { ...f, supporting_quotes_restored: quotes.filter((q) => !REFEREE_FIELDS.has((q.label ?? "").toLowerCase())) };
 }

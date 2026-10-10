@@ -15,7 +15,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from app.api.auth import current_actor, get_store_dep
 from app.api.ratelimit import rate_limit
@@ -23,6 +23,17 @@ from app.api.schemas import (
     AssessRequest,
     ClarificationRequestIn,
     DemoLogin,
+    AddMissedIn,
+    DocumentDecisionIn,
+    LocateIn,
+    MeritMarkIn,
+    ReopenIn,
+    ReplyIn,
+    EvidenceDraftIn,
+    RequestDraftIn,
+    RequestEditIn,
+    RevealIn,
+    UnmaskIn,
     ReferenceListSave,
     ReferenceListText,
     DocumentUpload,
@@ -40,8 +51,8 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, consistency, intake, letters, precheck, queue, redaction_service, reference_lists, review
-from app.services.access import Actor, require_role
+from app.services import audit, consistency, doc_step, evidence_request, intake, letters, merit, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps
+from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
 
@@ -123,6 +134,12 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok", "mode": settings.app_mode}
 
+    @app.get("/documents/{document_id}/file", response_model=None)
+    def document_file(document_id: str, token: str, s: Store = Depends(get_store)) -> Any:
+        """The original PDF, for a link that was signed a few minutes ago (officer role is checked when it is issued)."""
+        data, name = pdf_view.file_bytes(s, settings, document_id, token)
+        return Response(content=data, media_type="application/pdf", headers={"Cache-Control": "no-store", "Content-Disposition": "inline"})
+
     if demo_users:
         from app.demo import demo_token
 
@@ -133,6 +150,12 @@ def create_app(
                 return JSONResponse(status_code=404, content={"error": "unknown_demo_role"})  # type: ignore[return-value]
             return {"access_token": demo_token(settings, user["id"]), "role": body.role,
                     "display_name": user["display_name"], "demo": True}
+
+        @app.post("/demo/applicant-reply/{application_id}", dependencies=[general])
+        def demo_applicant_reply(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+            """DEMO ONLY: stand in for the applicant and reply to the officer's open request with fictional files."""
+            require_role(actor, "officer")
+            return doc_step.demo_reply(s, actor, application_id, settings)
 
     @r.get("/me")
     def me(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
@@ -169,6 +192,7 @@ def create_app(
     ) -> dict[str, Any]:
         require_role(actor, "officer", "admin")
         body = body or AssessRequest()
+        steps.assert_ai_allowed(s, actor, application_for_staff(s, actor, application_id), settings)   # step 2 must be approved
         try:
             llm = make_llm(s, settings)
         except LLMError as exc:
@@ -247,6 +271,132 @@ def create_app(
     def linked_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
         """Groups of applications that share an attribute. Names the attribute, never its value."""
         return consistency.linked_groups(s, actor, settings)
+
+    # ---------------------------------------------------- the original PDF: signed link, locate, blur, burned-in export
+    @r.get("/documents/{document_id}/viewer")
+    def document_viewer(document_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Page sizes and a short-lived signed link to the original PDF. Officers only."""
+        return pdf_view.viewer(s, actor, document_id, settings)
+
+    @r.post("/documents/{document_id}/locate")
+    def document_locate(document_id: str, body: LocateIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return pdf_view.locate_items(s, actor, document_id, [i.model_dump() for i in body.items])
+
+    @r.get("/documents/{document_id}/blur")
+    def document_blur(document_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return pdf_view.blur_boxes(s, actor, document_id, settings)
+
+    @r.get("/documents/{document_id}/redacted.pdf", response_model=None)
+    def document_redacted_pdf(document_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> Any:
+        """A copy for sharing: each page an image with opaque black boxes burned in. No overlay, no text layer."""
+        return Response(content=pdf_view.burned_document(s, actor, document_id, settings), media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="redacted-{document_id[:8]}.pdf"', "Cache-Control": "no-store"})
+
+    @r.get("/applications/{application_id}/evidence-pack.pdf", response_model=None)
+    def evidence_pack_pdf(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> Any:
+        return Response(content=pdf_view.evidence_pack(s, actor, application_id, settings), media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="evidence-pack-{application_id[:8]}.pdf"', "Cache-Control": "no-store"})
+
+    # ---------------------------------------------------- the guided steps
+    @r.get("/applications/{application_id}/steps")
+    def get_steps(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return steps.state(s, application_for_staff(s, actor, application_id), settings)
+
+    @r.get("/applications/{application_id}/documents-step")
+    def documents_step(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return doc_step.view(s, actor, application_id)
+
+    @r.post("/applications/{application_id}/documents-step/decision")
+    def document_decision(application_id: str, body: DocumentDecisionIn, actor: Actor = Depends(current_actor),
+                          s: Store = Depends(get_store)) -> dict[str, Any]:
+        return doc_step.decide(s, actor, application_id, body.slot, body.decision, body.reason, settings)
+
+    @r.post("/applications/{application_id}/documents-step/requests")
+    def draft_document_request(application_id: str, body: RequestDraftIn, actor: Actor = Depends(current_actor),
+                               s: Store = Depends(get_store)) -> dict[str, Any]:
+        """A draft only. Nothing is sent until the officer approves and sends it."""
+        return doc_step.draft_request(s, actor, application_id, [i.model_dump() for i in body.items])
+
+    @r.get("/applications/{application_id}/evidence-request/items")
+    def evidence_items(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        require_role(actor, "officer")
+        application_for_staff(s, actor, application_id)
+        return evidence_request.needs_evidence(s, application_id)
+
+    @r.post("/applications/{application_id}/evidence-request")
+    def evidence_draft(application_id: str, body: EvidenceDraftIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """A draft only. This app sends nothing."""
+        return evidence_request.draft(s, actor, application_id, body.finding_ids)
+
+    @r.patch("/document-requests/{request_id}")
+    def edit_document_request(request_id: str, body: RequestEditIn, actor: Actor = Depends(current_actor),
+                              s: Store = Depends(get_store)) -> dict[str, Any]:
+        return doc_step.edit_request(s, actor, request_id, body.message_text)
+
+    @r.post("/document-requests/{request_id}/send")
+    def send_document_request(request_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The officer's approval and the send are one deliberate action. No email is delivered in this prototype."""
+        return doc_step.approve_and_send(s, actor, request_id, settings)
+
+    @r.post("/applications/{application_id}/steps/documents/complete")
+    def complete_documents(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        require_role(actor, "officer")
+        return steps.complete_documents(s, actor, application_for_staff(s, actor, application_id), settings)
+
+    @r.post("/applications/{application_id}/respond")
+    def applicant_reply(application_id: str, body: ReplyIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The applicant replies to an officer's request with new files."""
+        return doc_step.respond(s, actor, application_id, [d.model_dump() for d in body.documents], settings)
+
+    @r.get("/applications/{application_id}/redaction-check")
+    def redaction_check_view(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return redaction_check.overview(s, actor, application_id, settings)
+
+    @r.get("/applications/{application_id}/redaction-check/items")
+    def redaction_check_items(application_id: str, type: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        return redaction_check.group_items(s, actor, application_id, type, settings)
+
+    @r.post("/applications/{application_id}/redaction-check/reveal")
+    def redaction_reveal(application_id: str, body: RevealIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Show one original value on request. Audit-logged."""
+        return redaction_check.reveal(s, actor, application_id, body.item_id, settings)
+
+    @r.post("/applications/{application_id}/redaction-check/add")
+    def redaction_add(application_id: str, body: AddMissedIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return redaction_check.add_missed(s, actor, application_id, body.source, body.text, body.kind, settings)
+
+    @r.post("/applications/{application_id}/redaction-check/unmask")
+    def redaction_unmask(application_id: str, body: UnmaskIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return redaction_check.unmask(s, actor, application_id, body.item_id, body.reason, settings)
+
+    @r.post("/applications/{application_id}/redaction-check/approve",
+            dependencies=[Depends(rate_limit("assess", "rate_limit_assess_per_minute"))])
+    def redaction_approve(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> Any:
+        """Approve the redaction check; then the AI reads the redacted version only."""
+        try:
+            llm = make_llm(s, settings)
+        except LLMError as exc:
+            return JSONResponse(status_code=503, content={"error": "llm_not_configured", "message": str(exc)})
+        return redaction_check.approve(s, actor, application_id, settings, llm)
+
+    @r.get("/applications/{application_id}/outcome")
+    def get_outcome(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return outcome.build(s, actor, application_id, settings)
+
+    @r.post("/applications/{application_id}/letter/next-steps")
+    def next_steps_letter(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return letters.generate_next_steps(s, actor, application_id, settings)
+
+    @r.post("/applications/{application_id}/reopen")
+    def reopen_application(application_id: str, body: ReopenIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return review.reopen(s, actor, application_id, body.reason)
+
+    # ---------------------------------------------------- merit marks
+    @r.put("/applications/{application_id}/merit-marks/{rule_code}")
+    def set_merit_mark(application_id: str, rule_code: str, body: MeritMarkIn, actor: Actor = Depends(current_actor),
+                       s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The officer's own mark (0 to 100) with a reason, or Not assessed. Audited with the old and new value."""
+        return merit.set_mark(s, actor, application_id, rule_code, mark=body.mark, not_assessed=body.not_assessed, reason=body.reason)
 
     # ---------------------------------------------------- reference lists
     @r.get("/reference-lists")

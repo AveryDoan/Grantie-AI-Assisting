@@ -85,13 +85,35 @@ def input_hash(application_text: dict[str, Any], extracted) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def redact_in_memory(app: dict[str, Any], doc_rows: list[dict[str, Any]], store: Store):
+def load_edits(store: Store, application_id: str, cipher: Any) -> tuple[list[Any], list[str]]:
+    """The officer's redaction edits: values to ADD as missed (known values) and values to leave UNMASKED (allowlist).
+
+    Values are stored encrypted and only decrypted here, in memory, to run the redaction again."""
+    from redaction.recognizers import KnownValue
+
+    extra: list[KnownValue] = []
+    allow: list[str] = []
+    for e in store.select("redaction_edits", eq={"application_id": application_id}):
+        value = cipher.decrypt(application_id, f"edit:{e['kind']}", e["encrypted_value"])
+        if e["kind"] == "add":
+            extra.append(KnownValue(value, e["token_type"], "officer"))
+        else:
+            allow.append(value)
+    return extra, allow
+
+
+def redact_in_memory(app: dict[str, Any], doc_rows: list[dict[str, Any]], store: Store, edits: tuple[list[Any], list[str]] | None = None):
     """Run the redaction pipeline without persisting (pure)."""
+    from redaction.config import default_config
     from redaction.pipeline import run_redaction
 
     extracted = extracted_documents(store, doc_rows)
+    extra, allow = edits or ([], [])
+    cfg = default_config()
+    if allow:   # an officer said these are not personal: the detector leaves them alone (known personal values still win)
+        cfg = cfg.model_copy(update={"allowlist": [*cfg.allowlist, *allow]})
     outcome = run_redaction(app["id"], app.get("application_text") or {}, [d for _, d, _ in extracted],
-                            document_kinds=document_kinds(extracted))
+                            document_kinds=document_kinds(extracted), cfg=cfg, extra_known=extra)
     return outcome, extracted
 
 
@@ -103,8 +125,9 @@ def run_and_store(store: Store, actor: Actor, application_id: str, settings: Set
     app = application_for_staff(store, actor, application_id)
     cipher = _cipher(settings)  # fail before doing any work if originals cannot be stored safely
     doc_rows = store.select("documents", eq={"application_id": application_id})
-    outcome, extracted = redact_in_memory(app, doc_rows, store)
-    digest = input_hash(app.get("application_text") or {}, extracted)
+    edits = load_edits(store, application_id, cipher)
+    outcome, extracted = redact_in_memory(app, [d for d in doc_rows if not d.get("superseded")], store, edits)
+    digest = input_hash(app.get("application_text") or {}, extracted) + (":e" + str(len(edits[0]) + len(edits[1])) if edits[0] or edits[1] else "")
 
     if not force:
         previous = one(store.select("redaction_runs", eq={"application_id": application_id, "input_hash": digest},
@@ -146,7 +169,7 @@ def report(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
     app = application_for_staff(store, actor, application_id)
     write_audit(store, actor, "redaction.report_viewed", application_id=application_id)
     run = one(store.select("redaction_runs", eq={"application_id": application_id}, order="started_at", desc=True, limit=1))
-    docs = store.select("documents", eq={"application_id": application_id})
+    docs = [d for d in store.select("documents", eq={"application_id": application_id}) if not d.get("superseded")]
     return {
         "application_id": application_id,
         "ai_status": app.get("ai_status", "not_redacted"),
@@ -187,7 +210,7 @@ def original_view(store: Store, actor: Actor, application_id: str, settings: Set
     restored = restore(app["redacted_text"], tokens, APPLICATION_SOURCE)
     docs = []
     for d in sorted(store.select("documents", eq={"application_id": application_id}), key=lambda d: d["id"]):
-        if d.get("redacted_text"):
+        if d.get("redacted_text") and not d.get("superseded"):
             docs.append({"document_id": d["id"], "text": restore(d["redacted_text"], tokens, f"document:{d['id']}")})
     write_audit(store, actor, "redaction.original_view", application_id=application_id,
                 details={"documents": len(docs)})  # who looked and when - never what they saw
@@ -220,7 +243,7 @@ class QuoteRestorer:
             return
         self._texts = {APPLICATION_SOURCE: (self.app.get("redacted_text") or "",
                                             original_application_text(self.app.get("application_text") or {}))}
-        for row, ext, _ in extracted_documents(self.store, self.store.select("documents", eq={"application_id": self.app["id"]})):
+        for row, ext, _ in extracted_documents(self.store, [d for d in self.store.select("documents", eq={"application_id": self.app["id"]}) if not d.get("superseded")]):
             if row.get("redacted_text"):
                 self._texts[f"document:{row['id']}"] = (row["redacted_text"], ext.text)
 

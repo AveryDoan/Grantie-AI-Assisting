@@ -238,7 +238,7 @@ def run_assessment(
             f"AI assessment stopped: redaction status is '{redaction.ai_status}'. An officer must review the application.",
             details={"ai_status": redaction.ai_status, "leak_scan": redaction.report.get("leak_scan", {})},
         )
-    documents = store.select("documents", eq={"application_id": application_id})
+    documents = [d for d in store.select("documents", eq={"application_id": application_id}) if not d.get("superseded")]
 
     # Idempotency: same inputs -> same run (reviews are kept).
     reference_lists = load_reference_lists(store, pack)

@@ -57,12 +57,48 @@ export interface ConsistencyTrace {
   cross_application?: { identifiers?: number; fingerprints?: number; linked_applications?: number; skipped?: string };
 }
 
+/** One side of a comparison: the value, where it came from, and (when known) where it sits in the original text. */
+export interface CompareSide {
+  label: string;
+  value: string | null;
+  source: string;                 // "application_text" or "document:<id>"
+  source_label: string | null;
+  start: number | null;
+  end: number | null;
+  has_text: boolean;
+}
+
+export type OverviewResult = "Consistent" | "Differs" | "Cannot compare" | "Needs evidence";
+export interface OverviewRow {
+  id: string;
+  check: string;
+  compared: string;               // "Name on the form vs name on the CoE"
+  result: OverviewResult;
+  why: string | null;
+  decision: "Not decided" | "Needs follow-up" | "Dismissed" | "Not needed";
+  left: CompareSide | null;
+  right: CompareSide | null;
+  flag_ids: string[];
+}
+
 export interface ConsistencyView {
   enabled: boolean;
   unavailable?: boolean;
   flags: ConsistencyFlag[];
   trace: ConsistencyTrace;
+  overview?: OverviewRow[];
 }
+
+/** Another application that shares something with this one. Hashed references only; never another applicant's details. */
+export interface LinkedApplication {
+  application_id: string;
+  reference: string;
+  shared: { what: string; ref: string; strength: "Exact match" | "Similar" }[];
+  strength: "Exact match" | "Similar";
+  can_open: boolean;
+}
+
+export interface MeritMark { mark: number | null; not_assessed: boolean; reason: string | null; updated_at: string | null }
 
 export interface LinkedGroup {
   id: string;
@@ -80,6 +116,7 @@ export interface QueueItem {
   submitted_at: string | null;
   attention: Attention;
   open_items: number;
+  waiting_since?: string | null;   // when the request for more documents was sent (only while waiting for the applicant)
   flags_to_check: number;   // a count only: shown when at least one open flag is strong; never used to sort
 }
 
@@ -140,6 +177,17 @@ export interface Finding {
   review_history: Review[];
   section: "eligibility" | "documents" | "merit" | null;
   weight: number | null;
+  merit_mark?: MeritMark | null;   // the officer's own mark for a merit criterion; null until they mark it
+  rule_documents?: RuleDocument[];   // which documents this rule uses, with their status (from config/rule_guidance.yaml)
+  verify_note?: string | null;       // what the officer needs to verify
+}
+
+export interface RuleDocument { type: string; label: string; file_name: string | null; document_id: string | null; status: string }
+
+export interface EvidenceItem { finding_id: string; rule_code: string; label: string; ask: string; why: string }
+export interface EvidenceDraft {
+  id: string; message_text: string; status: string; sent_at: string | null;
+  to: string; subject: string; not_sent_note: string; items: EvidenceItem[];
 }
 
 export interface DocumentRow {
@@ -155,6 +203,8 @@ export interface DocumentRow {
   verification_notes: { field: string; result: string; label: string }[];
   extracted_text: string | null;
   extracted_fields?: Record<string, string>;
+  is_pdf?: boolean;
+  superseded?: boolean;
   attention_level?: "ok" | "check" | "attention" | null;
   attention_reason?: string | null;
 }
@@ -196,6 +246,7 @@ export interface QualityChecks {
 
 export interface Letter {
   id: string;
+  kind?: "decline" | "next_steps";
   version: number;
   body_text: string;
   status: "draft" | "edited" | "approved";
@@ -240,6 +291,7 @@ export interface Detail {
   application: ApplicationRecord;
   documents: DocumentRow[];
   source_texts?: Record<string, { label: string; text: string }>;
+  linked_applications?: LinkedApplication[];
   latest_run: Run | null;
   consistency: ConsistencyView;
   facts: Fact[];
@@ -382,6 +434,55 @@ export type ReferenceListPreview = {
   added: string[]; removed: string[]; added_count: number; removed_count: number;
 };
 
+// ---- Guided steps: Documents, Redaction check, Assessment, Outcome
+export type StepStatus = "not_started" | "in_progress" | "done" | "waiting";
+export interface StepInfo {
+  step: 1 | 2 | 3 | 4; key: string; title: string; status: StepStatus; label: string; unlocked: boolean;
+  missing: string[]; notice: string | null; pending_rules?: string[];
+}
+export interface StepsState { steps: StepInfo[]; current: number; legacy: boolean }
+
+export interface DocSlot {
+  slot: string; label: string; required: boolean; document_id: string | null; file_name: string | null;
+  decision: "confirmed" | "wrong_slot" | "request_again" | "not_needed" | null; reason: string | null;
+  issue: { kind: "missing" | "wrong_slot" | "unreadable" | "differs" | "other"; reason: string } | null;
+  replaces: { old: { file_name: string; text: string | null; fields: Record<string, string> }; new: { file_name: string; text: string | null; fields: Record<string, string> } } | null;
+}
+export interface DocRequest { id: string; status: "draft" | "sent"; message_text: string; items: { slot: string; label: string; kind: string; reason: string; ask: string; why: string }[];
+  created_at: string | null; sent_at: string | null; approved_at: string | null; resubmitted_at: string | null }
+export interface DocumentsStep {
+  slots: DocSlot[]; suggested_items: { slot: string; label: string; kind: string; reason: string }[]; requests: DocRequest[]; missing: string[];
+}
+
+export interface RedactionGroup { type: string; count: number; how: string[]; where: string[] }
+export interface RedactionCheck {
+  run: { id: string; status: string; started_at: string; finished_at: string | null; counts: Record<string, number>; detector_version: string } | null;
+  ai_status: string; leak_scan: { passed: boolean; found: number; checks: Record<string, number> }; groups: RedactionGroup[];
+  blockers: string[]; edits: { added: number; unmasked: number }; texts: Record<string, { label: string; redacted: string }>;
+  documents: { id: string; file_name: string; declared_type: string | null; is_pdf: boolean; redacted_spans: number }[];
+}
+export interface RedactionItem { id: string; type: string; token: string; source: string; where: string; before: string; after: string }
+
+export interface OutcomeUnmet { rule_code: string; rule_text: string; final_status: string; reason: string; quote: string | null; what_would_change: string }
+export interface Outcome {
+  application_id: string; statement: string; signed_off: boolean;
+  result: "not_assessed" | "undecided" | "decline" | "needs_information" | "eligible";
+  unmet: OutcomeUnmet[]; needs_information: OutcomeUnmet[]; letter: Letter | null; letter_kind?: "decline" | "next_steps" | null;
+  summary: { marks: { rule_code: string; criterion: string; mark: number | null; not_assessed: boolean; reason: string | null }[]; signals_kept: { label: string; note: string | null }[]; note: string } | null;
+  record: { outcome: string; officer: string; signed_at: string; version: number; letter_version: number | null; letter_status: string | null;
+    decisions: { rule_code: string; rule_text: string; decision: string; ai_status: string; reason: string | null; overridden?: boolean }[];
+    reopened: { version: number; reopened_at: string; reason: string }[] } | null;
+  pending_rules?: string[];
+}
+
+// ---- The original PDF: signed link, evidence highlights, redaction blur
+export interface PdfRect { page: number; x0: number; y0: number; x1: number; y1: number }
+export interface PdfViewerInfo { document_id: string; file_name: string; declared_type: string | null; pages: { page: number; width: number; height: number }[]; url: string; expires_in: number }
+export interface PdfLocateItem { id: string; start?: number | null; end?: number | null; text?: string | null }
+export interface PdfLocation { status: "exact" | "approximate" | "not_found"; rects: PdfRect[]; method: string }
+export interface PdfBlurBox { id: string; token: string; type: string; rects: PdfRect[]; found: boolean }
+export interface PdfBlur { boxes: PdfBlurBox[]; counts: Record<string, number>; redacted: boolean }
+
 async function request<T>(path: string, init: { method?: string; body?: unknown; raw?: boolean } = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: init.method ?? "GET",
@@ -417,6 +518,9 @@ export const api = {
     request<Review>(`/findings/${findingId}/review`, { method: "POST", body }),
   clarify: (id: string, body: { finding_id?: string; message_text?: string; send: boolean }) =>
     request<{ id: string; status: string }>(`/applications/${id}/clarification`, { method: "POST", body }),
+  evidenceItems: (id: string) => request<EvidenceItem[]>(`/applications/${id}/evidence-request/items`),
+  draftEvidenceRequest: (id: string, finding_ids?: string[]) =>
+    request<EvidenceDraft>(`/applications/${id}/evidence-request`, { method: "POST", body: { finding_ids: finding_ids ?? null } }),
   signoffStatement: () => request<{ statement: string }>("/signoff-statement"),
   signoff: (id: string) =>
     request<{ id: string }>(`/applications/${id}/signoff`, { method: "POST", body: { statement_acknowledged: true } }),
@@ -427,6 +531,38 @@ export const api = {
     request<AuditRow[]>(`/audit-log?${new URLSearchParams(params)}`),
   auditCsv: (params: Record<string, string> = {}) =>
     request<string>(`/audit-log?${new URLSearchParams({ ...params, format: "csv" })}`, { raw: true }),
+  setMeritMark: (applicationId: string, ruleCode: string, body: { mark: number | null; not_assessed: boolean; reason?: string }) =>
+    request<MeritMark>(`/applications/${applicationId}/merit-marks/${ruleCode}`, { method: "PUT", body }),
+  documentViewer: (docId: string) => request<PdfViewerInfo>(`/documents/${docId}/viewer`),
+  locateItems: (docId: string, items: PdfLocateItem[]) => request<Record<string, PdfLocation>>(`/documents/${docId}/locate`, { method: "POST", body: { items } }),
+  documentBlur: (docId: string) => request<PdfBlur>(`/documents/${docId}/blur`),
+  downloadPdf: async (path: string, fileName: string) => {
+    const res = await fetch(`/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, "error", "The file could not be exported");
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  },
+  steps: (id: string) => request<StepsState>(`/applications/${id}/steps`),
+  documentsStep: (id: string) => request<DocumentsStep>(`/applications/${id}/documents-step`),
+  documentDecision: (id: string, body: { slot: string; decision: string; reason?: string }) =>
+    request<unknown>(`/applications/${id}/documents-step/decision`, { method: "POST", body }),
+  draftRequest: (id: string, items: { slot: string; kind: string; reason?: string; note?: string }[]) =>
+    request<DocRequest>(`/applications/${id}/documents-step/requests`, { method: "POST", body: { items } }),
+  editRequest: (requestId: string, message_text: string) => request<DocRequest>(`/document-requests/${requestId}`, { method: "PATCH", body: { message_text } }),
+  sendRequest: (requestId: string) => request<DocRequest>(`/document-requests/${requestId}/send`, { method: "POST" }),
+  completeDocuments: (id: string) => request<StepsState>(`/applications/${id}/steps/documents/complete`, { method: "POST" }),
+  demoApplicantReply: (id: string) => request<unknown>(`/demo/applicant-reply/${id}`, { method: "POST" }),
+  redactionCheck: (id: string) => request<RedactionCheck>(`/applications/${id}/redaction-check`),
+  redactionItems: (id: string, type: string) => request<RedactionItem[]>(`/applications/${id}/redaction-check/items?${new URLSearchParams({ type })}`),
+  revealItem: (id: string, itemId: string) => request<{ item_id: string; original: string }>(`/applications/${id}/redaction-check/reveal`, { method: "POST", body: { item_id: itemId } }),
+  addMissed: (id: string, body: { source: string; text: string; kind: string }) => request<RedactionCheck>(`/applications/${id}/redaction-check/add`, { method: "POST", body }),
+  unmaskItem: (id: string, itemId: string, reason: string) => request<RedactionCheck>(`/applications/${id}/redaction-check/unmask`, { method: "POST", body: { item_id: itemId, reason } }),
+  approveRedaction: (id: string) => request<{ steps: StepsState }>(`/applications/${id}/redaction-check/approve`, { method: "POST" }),
+  outcome: (id: string) => request<Outcome>(`/applications/${id}/outcome`),
+  nextStepsLetter: (id: string) => request<Letter>(`/applications/${id}/letter/next-steps`, { method: "POST" }),
+  reopen: (id: string, reason: string) => request<{ status: string }>(`/applications/${id}/reopen`, { method: "POST", body: { reason } }),
   reviewFlag: (flagId: string, body: { action: "confirm" | "dismiss"; note?: string }) =>
     request<ConsistencyFlag>(`/consistency-flags/${flagId}/review`, { method: "POST", body }),
   referenceLists: () => request<ReferenceListSummary[]>("/reference-lists"),
