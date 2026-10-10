@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from datetime import date
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -145,7 +146,20 @@ COMPARISONS: list[tuple[str, str, str]] = [
     ("date_of_birth", "date_of_birth", "date"),
     ("passport_number", "passport_number", "id"),
     ("course_name", "course_name", "text"),
+    ("course_start_date", "course_start_date", "date"),
 ]
+
+# What the officer reads in a one-line reason: "Name on the CoE differs from the form".
+DOC_PLAIN: dict[str, str] = {
+    "coe": "CoE", "visa": "visa", "travel_document": "passport", "offer_letter": "letter of offer",
+    "travel_booking": "travel booking", "flight_screenshot": "flight screenshot", "referee_letter": "referee letter",
+    "headshot": "headshot", "certified_translation": "certified translation", "other": "document",
+}
+FIELD_PLAIN: dict[str, str] = {
+    "applicant_name": "Name", "date_of_birth": "Date of birth", "passport_number": "Passport number",
+    "course_name": "Course", "course_start_date": "Start date",
+}
+PASSPORT_MIN_MONTHS = 6
 
 
 def normalise_declared(declared: str) -> DocType:
@@ -283,6 +297,9 @@ class DocumentCheck:
     type_matches: bool
     extracted_fields: dict[str, Any]
     comparisons: list[dict[str, Any]] = field(default_factory=list)
+    # "ok" | "check" | "attention", with a plain one-line reason. Worked out by code, stored with the document.
+    attention_level: str = "ok"
+    attention_reason: str | None = None
 
     @property
     def needs_verification(self) -> bool:
@@ -329,4 +346,44 @@ def check_documents(
                 {"field": typed_key, "result": result, "similarity": score, "label": "needs verification" if result in ("mismatch", "unparseable") else result}
             )
         checks.append(chk)
+    course_start = parse_date(str(typed_fields.get("course_start_date") or "")) or next(
+        (parse_date(c.extracted_fields.get("course_start_date") or "") for c in checks if c.detected_type == "coe"), None)
+    for chk in checks:
+        chk.attention_level, chk.attention_reason = attention_for(chk, course_start, documents_text=next(
+            (d.get("extracted_text") or "" for d in documents if d["id"] == chk.document_id), ""))
     return DocumentChecks(checks)
+
+
+def _months_after(d: date, months: int) -> date:
+    y, m = divmod(d.month - 1 + months, 12)
+    return date(d.year + y, m + 1, min(d.day, 28))
+
+
+def attention_for(chk: DocumentCheck, course_start: date | None, documents_text: str = "") -> tuple[str, str | None]:
+    """One plain reason per document, from the checks above. Neutral wording: a reason to look, never a verdict."""
+    name = DOC_PLAIN.get(chk.detected_type if not chk.type_matches else chk.declared_type, "document")
+    attention: list[str] = []
+    check: list[str] = []
+    if not chk.type_matches:
+        attention.append(f"This file looks like a {DOC_PLAIN.get(chk.detected_type, 'document')}, not a {DOC_PLAIN.get(chk.declared_type, 'document')}")
+    elif not documents_text.strip() and chk.declared_type != "headshot":
+        check.append("No readable text in this file. A person needs to read it")
+    for c in chk.comparisons:
+        label = FIELD_PLAIN.get(c["field"], c["field"].replace("_", " ").capitalize())
+        if c["result"] == "mismatch":
+            attention.append(f"{label} on the {name} differs from the form")
+        elif c["result"] == "unparseable":
+            check.append(f"{label} on the {name} could not be read")
+        elif c["result"] == "variant":
+            check.append(f"{label} on the {name} is written differently from the form")
+    expiry = parse_date(chk.extracted_fields.get("document_expiry_date") or "") if chk.declared_type == "travel_document" else None
+    if expiry and course_start:
+        if expiry < course_start:
+            attention.append("Passport expires before the course starts")
+        elif expiry < _months_after(course_start, PASSPORT_MIN_MONTHS):
+            attention.append(f"Passport expires within {PASSPORT_MIN_MONTHS} months of the course start")
+    if attention:
+        return "attention", "; ".join(attention[:2])
+    if check:
+        return "check", "; ".join(check[:2])
+    return "ok", None

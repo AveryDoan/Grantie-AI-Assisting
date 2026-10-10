@@ -94,11 +94,23 @@ export interface Review {
 }
 
 export interface SupportingQuote {
+  span?: TextSpan | null;
   quote: string;
   verified?: boolean;
   method?: string;
   source?: string; // "document:<id>" when the quote comes from an uploaded letter
   label?: string;
+}
+
+/** Where a passage sits in the ORIGINAL text of one source (offsets into Detail.source_texts[source].text). */
+export interface TextSpan { source: string; start: number; end: number; text: string; method?: string }
+
+export interface RuleSource { typed: string | null; document_type: string | null; document_field: string | null }
+
+export interface AiSummary {
+  text: string | null;
+  linked: boolean;   // at least one of its passages was found in the text by code
+  passages: { quote: string | null; verified: boolean; span: TextSpan | null }[];
 }
 
 export interface Finding {
@@ -112,6 +124,9 @@ export interface Finding {
   rationale: string | null;
   evidence_quote: string | null;
   evidence_quote_restored: string | null;
+  evidence_span?: TextSpan | null;
+  rule_sources?: RuleSource[];
+  ai_summaries_restored?: AiSummary[];
   quote_verified: boolean;
   supporting_quotes_restored: SupportingQuote[];
   confidence: "high" | "medium" | "low" | null;
@@ -139,6 +154,9 @@ export interface DocumentRow {
   needs_verification: boolean;
   verification_notes: { field: string; result: string; label: string }[];
   extracted_text: string | null;
+  extracted_fields?: Record<string, string>;
+  attention_level?: "ok" | "check" | "attention" | null;
+  attention_reason?: string | null;
 }
 
 export interface InjectionFlag {
@@ -221,6 +239,7 @@ export interface RawQuote {
 export interface Detail {
   application: ApplicationRecord;
   documents: DocumentRow[];
+  source_texts?: Record<string, { label: string; text: string }>;
   latest_run: Run | null;
   consistency: ConsistencyView;
   facts: Fact[];

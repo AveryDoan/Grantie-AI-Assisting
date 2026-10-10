@@ -103,6 +103,8 @@ class Finding(BaseModel):
     evidence_quote: str | None = None
     quote_verified: bool = False
     supporting_quotes: list[dict[str, Any]] = Field(default_factory=list)
+    # Judgement criteria only: [{text, passages: [{quote, verified, method}], linked}]. No score or rating.
+    ai_summaries: list[dict[str, Any]] = Field(default_factory=list)
     confidence: Confidence | None = None
     language_flag: bool = False
     needs_applicant_clarification: bool = False

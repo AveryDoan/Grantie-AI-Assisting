@@ -1,0 +1,70 @@
+{
+  "code": "DA",
+  "title": "Control: every document is right and in its slot",
+  "display_name": "Soraya Pemberton",
+  "email": "soraya.pemberton@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Soraya Pemberton",
+      "date_of_birth": "2003-05-09",
+      "email": "soraya.pemberton@example.com",
+      "phone": "0491 571 600",
+      "nationality": "Vietnam",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "12 Jacaranda Lane, Hue, Vietnam",
+      "residential_country": "Vietnam",
+      "postal_address": "12 Jacaranda Lane, Hue, Vietnam",
+      "postal_country": "Vietnam",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Nursing",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Soraya Pemberton",
+      "declaration_date": "2026-10-12",
+      "passport_number": "P1200451"
+    },
+    "answers": {
+      "current_study": "I am in my final year at a secondary college in Hue and sit my last exams in November.",
+      "academic_achievements": "I received the school prize for biology and a distinction in chemistry this year.",
+      "leadership": "I lead a first-aid club of nine students and run a practice evening every month.",
+      "community_engagement": "Each Saturday I greet patients at a community health centre and help older visitors find their way.",
+      "nt_contribution": "I want to nurse in remote Northern Territory clinics, using my first-aid training and clinic volunteering to help families who live far from a hospital.",
+      "biography": "Soraya grew up in Hue beside the Perfume River, where her mother runs a small tea stall and her father repairs boats. A long stay in hospital at age eight made her decide to become a nurse, and she has studied biology and chemistry with that goal ever since. Her teachers describe a patient listener who explains hard ideas to classmates and finishes every practical she starts. On Saturdays she volunteers at a community health centre, greeting patients, translating for older visitors and keeping the waiting room calm. She plays badminton, cooks for her family on Sundays and walks by the river at sunset to clear her head before exams. In Darwin she plans to complete a nursing degree, join the student health society and later work in a remote clinic, bringing the same patience and care she learned at home."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "passport_1.pdf",
+      "declared_type": "passport"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "Every document matches the form. The Documents table should show nothing that needs attention."
+}

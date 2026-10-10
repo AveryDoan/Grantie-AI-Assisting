@@ -23,9 +23,9 @@ def test_demo_mode_end_to_end():
     me = client.get("/me", headers=h).json()
     assert me["role"] == "officer" and "fictional" in me["display_name"]
     queue = client.get("/applications", headers=h).json()
-    # 15 evaluation cases + the 10 synthetic consistency cases (F01 to F10)
-    assert len(queue) == 25 and all(q["reference"].startswith("APP-") for q in queue)
-    assert sum("flags_to_check" in q for q in queue) == 25
+    # 15 evaluation cases + 10 consistency cases (F01 to F10) + 4 document cases (DA to DD)
+    assert len(queue) == 29 and all(q["reference"].startswith("APP-") for q in queue)
+    assert sum("flags_to_check" in q for q in queue) == 29
     first = queue[0]["id"]
     assert client.post(f"/applications/{first}/assess", headers=h, json={}).status_code == 200
     detail = client.get(f"/applications/{first}", headers=h).json()

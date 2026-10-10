@@ -485,3 +485,142 @@ def build() -> list[Scenario]:
         notes="Innocent: a scanned letter (scanner software, made months after its date), a re-saved PDF and an arrival six days after the "
               "course starts, explained in the form. May raise weak signals; must raise no strong flag."))
     return out
+
+
+# ---------------------------------------------------------------------------- document cases (DA to DD)
+# Four applications for the officer's Documents table: one clean control and three with a document that needs a look.
+# They reuse the builders above. Every document ends with a visible "SAMPLE: FICTIONAL TEST DOCUMENT" footer.
+# These are not consistency-check scenarios, so `build()` and the consistency evaluation do not include them.
+
+TEST_FOOTER = "SAMPLE: FICTIONAL TEST DOCUMENT"
+
+
+def footed(doc: Doc) -> Doc:
+    """The same document with the visible test footer at the bottom (and no header line)."""
+    return Doc(doc.kind, [l for l in doc.lines if l != FOOTER] + ["", TEST_FOOTER], doc.info)
+
+
+def passport(family: str, given: str, number: str, dob: str, expiry: str, nationality: str) -> Doc:
+    return Doc("passport", [FOOTER, "Passport", f"Surname: {family}", f"Given names: {given}", f"Nationality: {nationality}",
+                            f"Date of birth: {dob}", f"Passport number: {number}", "Date of issue: 12 March 2022", f"Date of expiry: {expiry}"])
+
+
+def _doc_case(code: str, title: str, name: str, family: str, given: str, email: str, phone: str, dob_iso: str, dob_text: str, country: str,
+              town: str, passport_number: str, passport_expiry: str, notes: str, *, coe_doc: Doc | None, booking_doc: Doc | None,
+              letters: tuple[list[str], list[str]], ref_phones: tuple[str, str], story: dict, extra: dict[str, str] | None = None) -> Scenario:
+    """Each case has its own referee contacts and letter wording, so the cases do not look linked to each other."""
+    domain = town.lower().replace(" ", "")
+    docs = [coe_doc, passport(family.upper(), given, passport_number, dob_text, passport_expiry, country), booking_doc,
+            visa(family, given, "28 September 2026"),
+            letter(f"{town} Secondary College", f"Ms {family[:3]}ana Reyes", "Class Teacher", "Class teacher", "3 years", "9 June 2026",
+                   f"teacher@{domain}-college.example.org", ref_phones[0], letters[0]),
+            letter(f"{town} Community Health Centre", f"Mr {family[:3]}on Patel", "Volunteer Coordinator", "Volunteer supervisor", "2 years", "20 June 2026",
+                   f"volunteers@{domain}-health.example.org", ref_phones[1], letters[1]),
+            headshot()]
+    fields = form(name, dob_iso, email, phone, country, f"12 Jacaranda Lane, {town}, {country}", country, "Bachelor of Nursing", STD_START,
+                  ARRIVE_ISO, passport_number=passport_number, **(extra or {}))
+    answers = {k: v for k, v in story.items() if k != "bio"} | {"biography": " ".join(story["bio"])}
+    return Scenario(code, title, name, email, fields, answers, [footed(d) for d in docs if d is not None], should=[], notes=notes)
+
+
+def build_documents() -> list[Scenario]:
+    """DA control, DB CoE missing, DC passport expires soon, DD CoE differs from the form and a document is in the wrong slot."""
+    out: list[Scenario] = []
+    good_booking = lambda n, ref: booking(n, "Hanoi", "HAN", STD_ARRIVE_DEPART, STD_ARRIVE, ref)  # noqa: E731
+
+    n = "Soraya Pemberton"
+    out.append(_doc_case(
+        "DA", "Control: every document is right and in its slot", n, "Pemberton", "Soraya", "soraya.pemberton@example.com", "0491 571 600",
+        "2003-05-09", "9 May 2003", "Vietnam", "Hue", "P1200451", "14 June 2031",
+        "Every document matches the form. The Documents table should show nothing that needs attention.",
+        coe_doc=coe(n, "Bachelor of Nursing", "16 November 2026", "15 November 2029", "3 years (6 semesters)", "14 September 2026", "E7101001"),
+        booking_doc=good_booking(n, "SP1A2B"),
+        letters=(["Soraya joined my biology class three years ago and quickly became the student others ask for help before an exam.",
+                  "She keeps tidy lab notes, shares them freely and never leaves a practical unfinished. I recommend her."],
+                 ["Soraya has greeted patients at our Saturday clinic for two years. Older visitors ask for her by name.",
+                  "She is punctual, kind and very good in a crowded waiting room. I recommend her warmly."]),
+        ref_phones=("+61 8 5550 3301", "+61 3 5550 4412"),
+        story={"current_study": "I am in my final year at a secondary college in Hue and sit my last exams in November.",
+               "academic_achievements": "I received the school prize for biology and a distinction in chemistry this year.",
+               "leadership": "I lead a first-aid club of nine students and run a practice evening every month.",
+               "community_engagement": "Each Saturday I greet patients at a community health centre and help older visitors find their way.",
+               "nt_contribution": "I want to nurse in remote Northern Territory clinics, using my first-aid training and clinic volunteering to help families who live far from a hospital.",
+               "bio": ["Soraya grew up in Hue beside the Perfume River, where her mother runs a small tea stall and her father repairs boats.",
+                       "A long stay in hospital at age eight made her decide to become a nurse, and she has studied biology and chemistry with that goal ever since.",
+                       "Her teachers describe a patient listener who explains hard ideas to classmates and finishes every practical she starts.",
+                       "On Saturdays she volunteers at a community health centre, greeting patients, translating for older visitors and keeping the waiting room calm.",
+                       "She plays badminton, cooks for her family on Sundays and walks by the river at sunset to clear her head before exams.",
+                       "In Darwin she plans to complete a nursing degree, join the student health society and later work in a remote clinic, bringing the same patience and care she learned at home."]}))
+
+    n = "Ilari Whitcombe"
+    out.append(_doc_case(
+        "DB", "The Confirmation of Enrolment was not uploaded", n, "Whitcombe", "Ilari", "ilari.whitcombe@example.com", "0491 571 601",
+        "2002-11-21", "21 November 2002", "India", "Kochi", "P2230917", "2 February 2032",
+        "No CoE. The Documents table should show the CoE slot as missing, with a plain reason.",
+        coe_doc=None, booking_doc=good_booking(n, "IW3C4D"),
+        letters=(["I have been Ilari's chemistry teacher since 2023. His practical reports are clear and he explains results to the whole group.",
+                  "He volunteers to set up the lab before class. I am pleased to support this application."],
+                 ["Ilari helps run our weekend first-aid refreshers, preparing the kits and demonstrating bandaging to new volunteers.",
+                  "He is calm, reliable and easy to work with. I support his application."]),
+        ref_phones=("+61 7 5550 6128", "+61 2 5550 7340"),
+        story={"current_study": "I am completing the last term of senior school in Kochi and take my board exams in March.",
+               "academic_achievements": "I finished the year with the top results in chemistry and won the district science fair.",
+               "leadership": "I coordinate the weekend first-aid refresher for new volunteers at my local club.",
+               "community_engagement": "I help a neighbourhood clinic restock supplies and read to children waiting for their check-ups.",
+               "nt_contribution": "A nursing degree in Darwin will let me work in the Territory's smaller towns, where I can use my clinic experience to support patients who travel long distances for care.",
+               "bio": ["Ilari lives in Kochi with his grandmother and two younger sisters, near the harbour where his uncle works as a port clerk.",
+                       "He became interested in nursing when the family clinic saved his sister during a fever, and he has volunteered there ever since.",
+                       "In class he is known for tidy chemistry notes that he copies for anyone who missed a lesson.",
+                       "Weekends are spent running first-aid refreshers, packing supply kits and reading picture books to children in the waiting area.",
+                       "He enjoys cricket, sketching boats from the jetty and cooking fish curry for the family on holidays.",
+                       "His plan is to study nursing in Darwin, join a student volunteer group and one day work in a country clinic, bringing the steady care he saw at home."]}))
+
+    n = "Anh Thu Marlowe"
+    out.append(_doc_case(
+        "DC", "The passport expires within six months of the course start", n, "Marlowe", "Anh Thu", "anhthu.marlowe@example.com", "0491 571 602",
+        "2004-03-17", "17 March 2004", "Vietnam", "Da Nang", "P3345128", "10 March 2027",
+        "Course starts 16 November 2026; the passport expires 10 March 2027 (under four months later).",
+        coe_doc=coe(n, "Bachelor of Nursing", "16 November 2026", "15 November 2029", "3 years (6 semesters)", "14 September 2026", "E7101003"),
+        booking_doc=good_booking(n, "AM5E6F"),
+        letters=(["Anh Thu has been in my English and science classes for three years. She asks careful questions and writes thoughtful lab summaries.",
+                  "She mentors the younger students at lunchtime. I am glad to recommend her."],
+                 ["For two years Anh Thu has helped at our health centre on Saturdays, welcoming families and keeping the children's corner tidy.",
+                  "Visitors comment on her gentle manner. I recommend her to any nursing programme."]),
+        ref_phones=("+61 8 5550 8216", "+61 3 5550 9124"),
+        story={"current_study": "I am in my final semester at a high school in Da Nang and will graduate in December.",
+               "academic_achievements": "I achieved the top results in my year for English and received the regional award for science writing.",
+               "leadership": "I mentor ten younger students at lunchtime and run the school's science reading corner.",
+               "community_engagement": "I help at a health centre on Saturdays, welcoming families and keeping the children's corner tidy.",
+               "nt_contribution": "Studying nursing in the Northern Territory will prepare me to work with communities far from city hospitals, where I can use my volunteering and language skills to help patients feel at ease.",
+               "bio": ["Anh Thu was born in Da Nang, where her parents run a bakery that opens before sunrise.",
+                       "She has loved science since a teacher let her look at onion cells under a microscope, and she now wants a career caring for people.",
+                       "Classmates say she asks careful questions and writes clear summaries that others borrow before tests.",
+                       "On Saturdays she welcomes families at a health centre and arranges the toys in the children's corner so the wait feels shorter.",
+                       "She likes table tennis, folding paper cranes and trying new bread recipes with her father.",
+                       "In Darwin she hopes to finish a nursing degree, make friends through a student society and return to clinic work in a regional town."]}))
+
+    n = "Imelda Fairweather"
+    wrong_slot = Doc("travel booking", offer(n, "Bachelor of Nursing", "10 August 2026").lines)  # a letter of offer uploaded as the arrival evidence
+    out.append(_doc_case(
+        "DD", "The CoE differs from the form, and a letter of offer is in the arrival slot", n, "Fairweather", "Imelda", "imelda.fairweather@example.com", "0491 571 603",
+        "2003-08-30", "30 August 2003", "Philippines", "Cebu", "P4456239", "5 July 2031",
+        "The CoE names a different student and a different start date (30 November 2026). The arrival slot holds a letter of offer, not a booking.",
+        coe_doc=coe("Imelda Fairchild", "Bachelor of Nursing", "30 November 2026", "29 November 2029", "3 years (6 semesters)", "14 September 2026", "E7101004"),
+        booking_doc=wrong_slot,
+        letters=(["I taught Imelda mathematics and biology for three years. She finishes extra problems before they are set and shares her methods.",
+                  "She leads our first-aid club with patience. She has my full support."],
+                 ["Imelda assists at our community clinic every Saturday, setting out information leaflets and walking elderly patients to their appointments.",
+                  "She is cheerful under pressure. I am happy to endorse her application."]),
+        ref_phones=("+61 2 5550 1187", "+61 7 5550 2263"),
+        story={"current_study": "I am studying in the final year of senior high school in Cebu and graduate in October.",
+               "academic_achievements": "I earned the top mathematics results in my school and a school prize in biology.",
+               "leadership": "I head a first-aid club of twelve students and organise a yearly bandaging workshop for younger classes.",
+               "community_engagement": "On Saturdays I help at a community clinic, setting out leaflets and walking elderly patients to their appointments.",
+               "nt_contribution": "I would like to train as a nurse in Darwin and then work in a remote Territory clinic, where my first-aid leadership and clinic experience can support families with limited access to care.",
+               "bio": ["Imelda was born in Cebu, where her father drives a jeepney and her mother sews school uniforms for the neighbourhood.",
+                       "She chose nursing after watching a nurse calm her grandfather during a night in hospital, and she studies biology and mathematics with that in mind.",
+                       "Her teachers say she finishes extra problems before they are set and happily explains her method to anyone who asks.",
+                       "On Saturdays she volunteers at a community clinic, handing out leaflets and walking older patients to their appointments.",
+                       "She enjoys volleyball, singing in the church choir and baking pandesal with her cousins.",
+                       "Her plan is to complete a nursing degree in Darwin, join a student health group and work in a remote clinic where patient care matters most."]}))
+    return out

@@ -158,8 +158,9 @@ Set `LLM_FALLBACK_PROVIDER=groq` with `GROQ_API_KEY` and `GROQ_MODEL`. When Gemi
 ## Tests
 
 ```bash
-pytest                                                        # 370 tests incl. redaction and consistency (needs the [redaction] extra + en_core_web_lg)
+pytest                                                        # ~390 tests incl. redaction and consistency (needs the [redaction] extra + en_core_web_lg)
 TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres pytest   # + real-Postgres trigger/RLS tests
+(cd frontend && npm test)                                     # highlight, notes and span logic of the review screen (Node's built-in runner)
 ```
 
 `TEST_DATABASE_URL` must point at a **scratch** Postgres server where you are a superuser, never at Supabase. The tests create and drop their own database, apply `supabase/tests/local_supabase_stub.sql` (a minimal stand-in for Supabase's `auth` and `storage` schemas), run all migrations, and execute `supabase/tests/behaviour_checks.sql` (71 RLS and trigger checks).
@@ -194,6 +195,17 @@ The run reports:
 - every failure.
 
 [eval/reports/sample_report.md](eval/reports/sample_report.md) is a **sample produced with the offline stub**. It shows the report format and that the deterministic code checks match the answer key. Its LLM-rule figures are not meaningful, because the stub was written alongside the cases. Run with a real key for real figures. `GET /evaluation/latest` returns the latest run.
+
+## Application review screen
+
+One calm overview, four collapsible sections (Documents, Eligibility, Merit criteria, Does the story add up?), one row per item. Details open in a side panel; how an item was redacted and read by the AI is one more click (the trace, scoped to that item). No score, ranking or recommendation appears anywhere.
+
+- **Documents that need attention.** Each uploaded document gets a level (`ok`, `check`, `attention`) and one plain reason, worked out by code at assessment and stored on the document (`documents.attention_level`, `attention_reason`; migration 0013): name or start date that differs from the form, a file that looks like another kind of document, a passport that expires before the course starts or within 6 months of it. A missing slot gets its reason on screen. Rows sort Needs attention, Check, OK.
+- **"Why this result"** callout, a **"Where this came from"** table (real form labels; typed value beside the document value; a clear difference is marked "These do not match") and **"Show the application text"**, a drawer that opens the exact field or passage, highlighted, or says "No matching text found" and lists what was searched.
+- **Merit criteria viewer.** A full-height panel: the text on the left (paragraph and page markers, a tab per document), the AI's notes on the right in a fixed number of slots (3 quotes, 2 summaries). Clicking a note scrolls to and highlights its passage; clicking a highlighted passage selects the note. A quote code could not verify is listed as "Could not verify", never highlighted. A summary with no source passage is listed as "Could not be linked to the text". A passage with no exact position says "Could not locate in the document". The officer records an assessment (Meets / Does not meet / Not assessed) and a note; nothing is pre-filled by AI, and the weights are not shown.
+- **Where highlights come from.** The AI reads redacted text. `redaction.spans.quote_to_original` maps each quote back to the applicant's own words with exact offsets; `GET /applications/{id}` returns those offsets with the original texts (`source_texts`, officers only). If the mapping fails there is no position, and the screen never guesses one. Summaries come from the evidence prompt (`p1-ev2`): one neutral sentence plus the exact passages it rests on. The offline stub cannot paraphrase, so its summary only says which passage it points at.
+
+Demo applications `DA` to `DD` (in `seed/fraud/scenarios.py`, loaded with the other synthetic cases; every document ends with "SAMPLE: FICTIONAL TEST DOCUMENT"): A all documents right, B no CoE, C passport expires within six months of the course start, D CoE name and start date differ from the form and a letter of offer sits in the arrival slot. They are not consistency-check scenarios, so the consistency evaluation does not include them.
 
 ## Redaction
 

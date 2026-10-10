@@ -1,0 +1,66 @@
+{
+  "code": "DB",
+  "title": "The Confirmation of Enrolment was not uploaded",
+  "display_name": "Ilari Whitcombe",
+  "email": "ilari.whitcombe@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Ilari Whitcombe",
+      "date_of_birth": "2002-11-21",
+      "email": "ilari.whitcombe@example.com",
+      "phone": "0491 571 601",
+      "nationality": "India",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "12 Jacaranda Lane, Kochi, India",
+      "residential_country": "India",
+      "postal_address": "12 Jacaranda Lane, Kochi, India",
+      "postal_country": "India",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Nursing",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Ilari Whitcombe",
+      "declaration_date": "2026-10-12",
+      "passport_number": "P2230917"
+    },
+    "answers": {
+      "current_study": "I am completing the last term of senior school in Kochi and take my board exams in March.",
+      "academic_achievements": "I finished the year with the top results in chemistry and won the district science fair.",
+      "leadership": "I coordinate the weekend first-aid refresher for new volunteers at my local club.",
+      "community_engagement": "I help a neighbourhood clinic restock supplies and read to children waiting for their check-ups.",
+      "nt_contribution": "A nursing degree in Darwin will let me work in the Territory's smaller towns, where I can use my clinic experience to support patients who travel long distances for care.",
+      "biography": "Ilari lives in Kochi with his grandmother and two younger sisters, near the harbour where his uncle works as a port clerk. He became interested in nursing when the family clinic saved his sister during a fever, and he has volunteered there ever since. In class he is known for tidy chemistry notes that he copies for anyone who missed a lesson. Weekends are spent running first-aid refreshers, packing supply kits and reading picture books to children in the waiting area. He enjoys cricket, sketching boats from the jetty and cooking fish curry for the family on holidays. His plan is to study nursing in Darwin, join a student volunteer group and one day work in a country clinic, bringing the steady care he saw at home."
+    }
+  },
+  "documents": [
+    {
+      "file": "passport_1.pdf",
+      "declared_type": "passport"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "No CoE. The Documents table should show the CoE slot as missing, with a plain reason."
+}

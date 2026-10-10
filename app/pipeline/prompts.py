@@ -15,6 +15,7 @@ from app.llm.base import Prompt
 from app.pipeline.injection import neutralise_delimiters
 
 PROMPT_VERSION = "p1"
+EVIDENCE_PROMPT_VERSION = "p1-ev2"  # the evidence prompt also asks for linked summaries
 ALT_PROMPT_VERSION = "p1-alt"  # different wording, used by the consistency check
 
 # --------------------------------------------------------------------------
@@ -41,10 +42,21 @@ class RuleAssessmentOut(BaseModel):
     needs_applicant_clarification: bool
 
 
+class SummaryOut(BaseModel):
+    summary: str = Field(description="One neutral sentence saying what the applicant describes. No evaluation.")
+    passages: list[str] = Field(description="1 or 2 exact verbatim passages the sentence is based on")
+
+
 class EvidenceOut(BaseModel):
-    """Judgement rules: quotes only. There is deliberately no status field."""
+    """Judgement rules: quotes and neutral summaries only. There is deliberately no status, score or rating field."""
 
     supporting_quotes: list[str] = Field(description="Exact verbatim passages relevant to the rule; may be empty")
+    summaries: list[SummaryOut] = Field(default_factory=list, description="At most 2 neutral summaries, each tied to its passages")
+
+
+# The review screen shows a fixed number of note slots for every applicant.
+MAX_QUOTES = 3
+MAX_SUMMARIES = 2
 
 
 # --------------------------------------------------------------------------
@@ -96,8 +108,14 @@ You help a grants officer by finding passages relevant to a JUDGEMENT criterion.
 {_DATA_RULES}
 
 Return only exact, verbatim passages from the application data that the officer should read for this
-criterion. Do NOT give a status, score, opinion or conclusion. If nothing is relevant, return an empty
-list. Return only the JSON object."""
+criterion (at most 3). Do NOT give a status, score, opinion or conclusion. If nothing is relevant, return
+an empty list.
+
+Also return at most 2 "summaries". A summary is ONE neutral sentence that says what the applicant
+describes, in plain words. It must list the 1 or 2 exact verbatim passages it is based on. A summary
+never judges quality, strength, fit or writing style, never compares the applicant with anyone, and never
+says what the officer should decide. If you cannot point to the passage, do not write the summary.
+Return only the JSON object."""
 
 SYSTEM_FACTS = f"""\
 You extract plain facts from a grant application for a human officer.
@@ -140,7 +158,7 @@ def evidence_prompt(rule: Rule, redacted_text: str, rule_pack_version: str) -> P
         task=f"evidence:{rule.rule_code}",
         system=SYSTEM_EVIDENCE,
         user=user,
-        prompt_version=PROMPT_VERSION,
+        prompt_version=EVIDENCE_PROMPT_VERSION,
         cache_text=redacted_text,
         rule_pack_version=rule_pack_version,
         meta={"kind": "evidence", "rule_code": rule.rule_code, "source": redacted_text},

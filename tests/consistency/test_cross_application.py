@@ -89,7 +89,9 @@ def test_the_stored_hashes_are_hashes_and_no_identifier_is_stored_anywhere(pool)
     store = pool["store"]
     rows = store.select("identifier_hashes")
     assert rows and all(re.fullmatch(r"[0-9a-f]{64}", r["hash"]) for r in rows)
-    dump = json.dumps([store.select(t) for t in ("identifier_hashes", "document_fingerprints", "consistency_flags")], default=str).lower()
+    # Timestamps are dropped: a microsecond count such as ".155502" can contain "5550" by chance.
+    tables = [[{k: v for k, v in r.items() if not k.endswith("_at")} for r in store.select(t)] for t in ("identifier_hashes", "document_fingerprints", "consistency_flags")]
+    dump = json.dumps(tables, default=str).lower()
     for raw in ("5550 3344", "5550", "riverbend-institute", "d.crossley", "m.lindqvist", "s.osei", "crossley", "lindqvist", "0491 570 313", "491570313",
                 "dhruv.ashcombe", "prayag marg", "pokhara 33700"):
         assert raw not in dump, raw

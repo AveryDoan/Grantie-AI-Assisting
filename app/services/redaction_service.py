@@ -224,13 +224,15 @@ class QuoteRestorer:
             if row.get("redacted_text"):
                 self._texts[f"document:{row['id']}"] = (row["redacted_text"], ext.text)
 
-    def original(self, quote: str | None, source: str | None = None) -> str | None:
+    def locate(self, quote: str | None, source: str | None = None) -> dict[str, Any] | None:
+        """Where an AI quote sits in the ORIGINAL text, from the exact span mapping: {source, start, end, text, method}.
+
+        None when there is no token map or the passage cannot be found. A position is never guessed."""
         if not quote:
-            return quote
+            return None
         self._load()
         if not self._tokens:
-            return quote
-        from redaction.restore import restore
+            return None
         from redaction.spans import quote_to_original
 
         sources = [source] if source and source in (self._texts or {}) else list(self._texts or {})
@@ -238,5 +240,42 @@ class QuoteRestorer:
             red, orig = self._texts[s]
             m = quote_to_original(quote, red, orig, self._tokens, s)
             if m is not None:
-                return m.original
+                return {"source": s, "start": m.orig_start, "end": m.orig_end, "text": m.original, "method": m.method}
+        return None
+
+    def original(self, quote: str | None, source: str | None = None) -> str | None:
+        if not quote:
+            return quote
+        hit = self.locate(quote, source)
+        if hit:
+            return hit["text"]
+        self._load()
+        if not self._tokens:
+            return quote
+        from redaction.restore import restore
+
         return restore(quote, self._tokens)  # canonical display; ambiguous placeholders stay as tokens
+
+    def text(self, value: str | None) -> str | None:
+        """Restore tokens in free text such as an AI summary (ambiguous placeholders stay as tokens)."""
+        if not value:
+            return value
+        self._load()
+        if not self._tokens:
+            return value
+        from redaction.restore import restore
+
+        return restore(value, self._tokens)
+
+    def source_texts(self) -> dict[str, dict[str, str]]:
+        """The original texts the offsets from locate() point into. Officer view only."""
+        self._load()
+        if not self._tokens:
+            return {}
+        out: dict[str, dict[str, str]] = {APPLICATION_SOURCE: {"label": "Application form", "text": self._texts[APPLICATION_SOURCE][1]}}
+        for row in self.store.select("documents", eq={"application_id": self.app["id"]}):
+            key = f"document:{row['id']}"
+            if key in (self._texts or {}):
+                out[key] = {"label": f"{(row.get('declared_type') or 'document').replace('_', ' ').capitalize()} · {row.get('file_name')}",
+                            "text": self._texts[key][1]}
+        return out

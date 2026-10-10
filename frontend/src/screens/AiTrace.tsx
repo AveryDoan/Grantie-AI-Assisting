@@ -115,13 +115,14 @@ function ConsistencyTrace({ detail }: { detail: Detail }) {
   );
 }
 
-export default function AiTrace({ id, navigate }: { id: string; navigate: Navigate }) {
+export default function AiTrace({ id, item, navigate }: { id: string; item?: string; navigate: Navigate }) {
   const detailLoad = useLoad(() => api.detail(id), [id]);
   const reportLoad = useLoad(() => api.redactionReport(id), [id]);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const [original, setOriginal] = useState<OriginalView | null>(null);
   const [textKey, setTextKey] = useState("application_text");
+  const [scopeApplied, setScopeApplied] = useState(false);
 
   const detail = detailLoad.data;
   const report = reportLoad.data;
@@ -154,6 +155,24 @@ export default function AiTrace({ id, navigate }: { id: string; navigate: Naviga
     ...(f.evidence_quote ? [{ f, quote: f.evidence_quote, restored: f.evidence_quote_restored, verified: f.quote_verified, method: undefined as string | undefined, source: "application_text" }] : []),
     ...(f.supporting_quotes ?? []).map((q, i) => ({ f, quote: q.quote, restored: f.supporting_quotes_restored[i]?.quote ?? null, verified: q.verified, method: q.method, source: q.source ?? "application_text" })),
   ]);
+  // Scoped to one item (opened from the review screen): the text it came from, its quotes, and its facts only.
+  const [scopeKind, scopeId] = (item ?? "").split(/:(.*)/s);
+  const scopeFinding = scopeKind === "rule" ? detail.findings.find((f) => f.rule_code === scopeId) : undefined;
+  const scopeFlag = scopeKind === "flag" ? detail.consistency?.flags.find((f) => f.id === scopeId) : undefined;
+  const scopeSources = new Set<string>(
+    scopeKind === "doc" ? [`document:${scopeId}`]
+      : scopeFinding ? [...(scopeFinding.supporting_quotes ?? []).map((q) => q.source ?? "application_text"), ...(scopeFinding.evidence_quote ? ["application_text"] : [])]
+      : scopeFlag ? scopeFlag.evidence.map((e) => e.source).filter((x) => x === "application_text" || x.startsWith("document:")) : []);
+  const scoped = Boolean(item && (scopeFinding || scopeFlag || scopeKind === "doc"));
+  const scopeTitle = scopeFinding ? `Rule ${scopeFinding.rule_code}: ${scopeFinding.rule_text.replace(/\s*Weight on the form: \d+%\.?/i, "")}`
+    : scopeFlag ? scopeFlag.description : scopeKind === "doc" ? `Document: ${detail.documents.find((d) => d.id === scopeId)?.file_name ?? ""}` : "";
+  if (scoped && !scopeApplied) {
+    const first = [...scopeSources][0];
+    if (first && texts.some((t) => t.key === first)) setTextKey(first);
+    setScopeApplied(true);
+  }
+  const shownQuotes = scopeFinding ? quotes.filter((q) => q.f.id === scopeFinding.id) : scopeKind === "doc" ? quotes.filter((q) => q.source === `document:${scopeId}`) : scopeFlag ? [] : quotes;
+  const factsInScope = scoped && scopeSources.size ? detail.facts.filter((x) => scopeSources.has(x.source ?? "application_text")) : detail.facts;
   const run = report.run;
   const leaks = run ? Object.values(run.leak_scan ?? {}).reduce((a, b) => a + b, 0) : 0;
 
@@ -170,6 +189,13 @@ export default function AiTrace({ id, navigate }: { id: string; navigate: Naviga
       </div>
     </div>
     <ErrorNotice error={actionError} />
+    {scoped && (
+      <div className="notice blue trace-scope" role="status"><Icon name="search" />
+        <span><strong>Showing this item only:</strong> {scopeTitle}</span>
+        <button className="link-button" onClick={() => navigate({ name: "trace", id })}>Show everything</button>
+        <button className="link-button" onClick={() => navigate({ name: "review", id })}>Back to review</button>
+      </div>
+    )}
     {app.manual_assessment_requested && <div className="notice"><Icon name="user" />The applicant asked for a person-only assessment. The AI will not be run on this application.</div>}
 
     <section className="evaluation-metrics trace-metrics">
@@ -206,17 +232,17 @@ export default function AiTrace({ id, navigate }: { id: string; navigate: Naviga
 
     <Section eyebrow="Step 2 · AI extraction" title="Facts the AI extracted"
       intro="Each fact comes with the passage the AI quoted. Code then checks the quote is really in the redacted text before anything relies on it.">
-      {!detail.latest_run ? <p className="empty-state">The AI check has not run yet.</p> : detail.facts.length === 0 ? <p className="empty-state">No facts were extracted in this run.</p> :
+      {!detail.latest_run ? <p className="empty-state">The AI check has not run yet.</p> : factsInScope.length === 0 ? <p className="empty-state">No facts were extracted in this run.</p> :
         <table className="data-table trace-table"><thead><tr><th>Fact</th><th>Value</th><th>Quote as the AI saw it</th><th>Check</th></tr></thead>
-          <tbody>{detail.facts.map((f) => <tr key={f.id}><td>{humanise(f.fact_key)}</td><td><strong>{f.fact_value}</strong></td>
+          <tbody>{factsInScope.map((f) => <tr key={f.id}><td>{humanise(f.fact_key)}</td><td><strong>{f.fact_value}</strong></td>
             <td>{f.source_quote ? <q><Tokens text={f.source_quote} /></q> : <em>No quote</em>}<small>{sourceLabel(f.source, detail)}</small></td>
             <td>{f.source_quote ? <Verified ok={f.quote_verified} /> : "–"}</td></tr>)}</tbody></table>}
     </Section>
 
     <Section eyebrow="Step 3 · Quotes behind each finding" title="What the AI quoted, and the applicant’s own words"
       intro="Left: the quote exactly as the AI returned it (placeholders included). Right: the same passage restored for you from the encrypted map. Findings with an unverified quote are not valid until an officer decides.">
-      {!detail.latest_run ? <p className="empty-state">The AI check has not run yet.</p> : quotes.length === 0 ? <p className="empty-state">No quotes in this run.</p> :
-        <div className="trace-quotes">{quotes.map((q, i) => <article key={`${q.f.id}-${i}`} className={q.verified ? "trace-quote" : "trace-quote unverified"}>
+      {!detail.latest_run ? <p className="empty-state">The AI check has not run yet.</p> : shownQuotes.length === 0 ? <p className="empty-state">{scopeFlag ? "Quotes for this signal are in the consistency checks below." : "No quotes in this run for this item."}</p> :
+        <div className="trace-quotes">{shownQuotes.map((q, i) => <article key={`${q.f.id}-${i}`} className={q.verified ? "trace-quote" : "trace-quote unverified"}>
           <header><span className="rule-number">{q.f.rule_code}</span><span className="trace-rule">{q.f.rule_text}</span><StatusChip status={q.f.ai_status} /></header>
           <div className="trace-compare">
             <div><small>AI quote ({sourceLabel(q.source, detail)})</small><blockquote><Tokens text={q.quote} /></blockquote></div>
@@ -227,6 +253,6 @@ export default function AiTrace({ id, navigate }: { id: string; navigate: Naviga
         </article>)}</div>}
     </Section>
 
-    <ConsistencyTrace detail={detail} />
+    {(!scoped || scopeFlag) && <ConsistencyTrace detail={detail} />}
   </main>;
 }

@@ -29,6 +29,7 @@ export const Icon = ({ name, size = 18 }: { name: string; size?: number }) => {
     list: <><path d="M9 6h11M9 12h11M9 18h11" /><path d="M4 6h.01M4 12h.01M4 18h.01" /></>,
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     record: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></>,
+    eye: <><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
     collapse: <><path d="m14 7-5 5 5 5" /><path d="M20 4v16" /></>,
   };
   return (
@@ -63,7 +64,7 @@ const STATUS_ICON: Record<AIStatus, string> = {
 };
 
 export function StatusChip({ status }: { status: AIStatus }) {
-  if (status === "Evidence only") return <span className="judgement-chip">Officer judgement</span>;
+  if (status === "Evidence only") return <span className="judgement-chip"><Icon name="eye" size={15} />Officer judgement</span>;
   return (
     <span className={`status status-${status.toLowerCase().replace(" ", "-")}`}>
       <Icon name={STATUS_ICON[status]} size={15} />

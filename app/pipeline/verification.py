@@ -101,6 +101,14 @@ def verify_findings(
             if not all(sq["verified"] for sq in f.supporting_quotes):
                 f.is_valid = False
                 f.error_detail = (f.error_detail + "; " if f.error_detail else "") + "One or more supporting quotes were not found in the application text"
+        for sm in f.ai_summaries:
+            # A summary is only as good as its passages: code must find at least one in the text.
+            # An unlinked summary never invalidates the finding; it is listed apart for the officer.
+            for ps in sm.get("passages", []):
+                text = (extra_sources or {}).get(ps.get("source") or "", source)
+                qc = verify_quote(ps.get("quote"), text, threshold=threshold, min_fuzzy_length=min_fuzzy_length)
+                ps["verified"], ps["method"] = qc.verified, qc.method
+            sm["linked"] = any(ps.get("verified") for ps in sm.get("passages", []))
         if rule.id in duplicates:
             f.is_valid = False
             f.error_detail = (f.error_detail + "; " if f.error_detail else "") + "More than one finding was produced for this rule"

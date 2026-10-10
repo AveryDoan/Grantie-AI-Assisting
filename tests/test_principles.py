@@ -56,7 +56,14 @@ def test_judgement_rules_never_return_a_status(scripted, rule):
 
 
 def test_evidence_schema_has_no_status_field():
-    assert set(EvidenceOut.model_fields) == {"supporting_quotes"}
+    assert set(EvidenceOut.model_fields) == {"supporting_quotes", "summaries"}
+    # Nothing that could carry a verdict: no status, score, rating or strength anywhere in the schema.
+    def names(node):
+        if isinstance(node, dict):
+            return set(node.get("properties", {})) | set().union(*(names(v) for v in node.values()))
+        return set().union(*(names(v) for v in node)) if isinstance(node, list) else set()
+
+    assert not any(w in n.lower() for n in names(EvidenceOut.model_json_schema()) for w in ("status", "score", "rating", "strength", "rank", "confidence"))
 
 
 def test_pipeline_judgement_rules_are_evidence_only(store, stub_llm, settings):

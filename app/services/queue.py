@@ -145,6 +145,30 @@ def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> 
 
 
 
+# Typed form field that matches a field read from a document (the form and documents name them differently).
+FORM_KEY_FOR_DOC_FIELD = {"provider_name": "education_provider", "full_name": "applicant_name"}
+
+
+def rule_sources(rule: dict[str, Any]) -> list[dict[str, Any]]:
+    """Which form fields (and which document field) a rule reads, so the screen can show where a result came from.
+
+    Real field keys only; the screen turns them into the form's own labels. No rule codes."""
+    p = rule.get("params") or {}
+    doc_type = p.get("document_type") or ((p.get("required_documents") or [None])[0])
+    doc_field = p.get("field") or p.get("date_field")
+    typed = [k for k in dict.fromkeys([
+        *(p.get("required_fields") or []), p.get("typed_field"), p.get("fact"), p.get("secondary_fact"),
+        FORM_KEY_FOR_DOC_FIELD.get(doc_field or ""), doc_field if doc_field in ("course_name", "course_start_date", "study_load") else None,
+    ]) if k]
+    rows = [{"typed": k, "document_type": None, "document_field": None} for k in typed]
+    if doc_type and doc_field and rows:
+        match = next((r for r in rows if r["typed"] == FORM_KEY_FOR_DOC_FIELD.get(doc_field, doc_field)), rows[0])
+        match["document_type"], match["document_field"] = doc_type, doc_field
+    elif doc_type and doc_field:
+        rows.append({"typed": None, "document_type": doc_type, "document_field": doc_field})
+    return rows
+
+
 def application_detail(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any]:
     if actor.role == "applicant":
         return applicant_view(store, actor, application_id)
@@ -172,10 +196,21 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
                     "source_clause": rule.get("source_clause"),
                     # Officer sees the applicant's real words; the AI only saw tokens.
                     "evidence_quote_restored": restorer.original(f.get("evidence_quote"), "application_text"),
+                    "evidence_span": restorer.locate(f.get("evidence_quote"), "application_text"),
+                    "rule_sources": rule_sources(rule),
                     # Officer view: real words restored (the AI only saw tokens).
                     "supporting_quotes_restored": [
-                        q | {"quote": restorer.original(q.get("quote"), q.get("source") or "application_text")}
+                        q | {"quote": restorer.original(q.get("quote"), q.get("source") or "application_text"),
+                             "span": restorer.locate(q.get("quote"), q.get("source") or "application_text")}
                         for q in (f.get("supporting_quotes") or [])
+                    ],
+                    "ai_summaries_restored": [
+                        {"text": restorer.text(sm.get("text")), "linked": bool(sm.get("linked")),
+                         "passages": [{"quote": restorer.original(ps.get("quote"), ps.get("source") or "application_text"),
+                                       "verified": bool(ps.get("verified")),
+                                       "span": restorer.locate(ps.get("quote"), ps.get("source") or "application_text")}
+                                      for ps in sm.get("passages", [])]}
+                        for sm in (f.get("ai_summaries") or [])
                     ],
                     "section": (rule.get("params") or {}).get("section"),
                     "weight": (rule.get("params") or {}).get("weight"),
@@ -189,6 +224,7 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
         "application": app | _names(store, app),
         "applicant": one(store.select("applicants", eq={"id": app["applicant_id"]}, limit=1)),
         "documents": store.select("documents", eq={"application_id": application_id}),
+        "source_texts": restorer.source_texts() if run else {},
         "latest_run": run,
         "runs": store.select("assessment_runs", eq={"application_id": application_id}, order="started_at", desc=True),
         "facts": facts,

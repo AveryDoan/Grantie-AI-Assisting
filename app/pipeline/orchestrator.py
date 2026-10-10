@@ -333,6 +333,8 @@ def _persist(
                 "extracted_fields": chk.extracted_fields,
                 "needs_verification": chk.needs_verification,
                 "verification_notes": chk.comparisons,
+                "attention_level": chk.attention_level,
+                "attention_reason": chk.attention_reason,
             },
             eq={"id": chk.document_id},
         )

@@ -1,0 +1,70 @@
+{
+  "code": "DD",
+  "title": "The CoE differs from the form, and a letter of offer is in the arrival slot",
+  "display_name": "Imelda Fairweather",
+  "email": "imelda.fairweather@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Imelda Fairweather",
+      "date_of_birth": "2003-08-30",
+      "email": "imelda.fairweather@example.com",
+      "phone": "0491 571 603",
+      "nationality": "Philippines",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "12 Jacaranda Lane, Cebu, Philippines",
+      "residential_country": "Philippines",
+      "postal_address": "12 Jacaranda Lane, Cebu, Philippines",
+      "postal_country": "Philippines",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Nursing",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Imelda Fairweather",
+      "declaration_date": "2026-10-12",
+      "passport_number": "P4456239"
+    },
+    "answers": {
+      "current_study": "I am studying in the final year of senior high school in Cebu and graduate in October.",
+      "academic_achievements": "I earned the top mathematics results in my school and a school prize in biology.",
+      "leadership": "I head a first-aid club of twelve students and organise a yearly bandaging workshop for younger classes.",
+      "community_engagement": "On Saturdays I help at a community clinic, setting out leaflets and walking elderly patients to their appointments.",
+      "nt_contribution": "I would like to train as a nurse in Darwin and then work in a remote Territory clinic, where my first-aid leadership and clinic experience can support families with limited access to care.",
+      "biography": "Imelda was born in Cebu, where her father drives a jeepney and her mother sews school uniforms for the neighbourhood. She chose nursing after watching a nurse calm her grandfather during a night in hospital, and she studies biology and mathematics with that in mind. Her teachers say she finishes extra problems before they are set and happily explains her method to anyone who asks. On Saturdays she volunteers at a community clinic, handing out leaflets and walking older patients to their appointments. She enjoys volleyball, singing in the church choir and baking pandesal with her cousins. Her plan is to complete a nursing degree in Darwin, join a student health group and work in a remote clinic where patient care matters most."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "passport_1.pdf",
+      "declared_type": "passport"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "The CoE names a different student and a different start date (30 November 2026). The arrival slot holds a letter of offer, not a booking."
+}

@@ -15,7 +15,7 @@ from app.llm import LLMClient, LLMError
 from app.pipeline.code_checks import CodeContext, run_code_check
 from app.pipeline.documents import DocumentChecks
 from app.pipeline.facts import FactSet
-from app.pipeline.prompts import EvidenceOut, RuleAssessmentOut, evidence_prompt, rule_prompt
+from app.pipeline.prompts import MAX_QUOTES, MAX_SUMMARIES, EvidenceOut, RuleAssessmentOut, evidence_prompt, rule_prompt
 
 
 def _llm_failure(rule: Rule, exc: Exception | str) -> Finding:
@@ -54,12 +54,15 @@ def evaluate_evidence_only(llm: LLMClient | None, rule: Rule, redacted_text: str
         out = llm.call_llm(evidence_prompt(rule, redacted_text, pack_version), EvidenceOut)
     except LLMError as exc:
         return _llm_failure(rule, exc)
-    quotes = [{"quote": q} for q in dict.fromkeys(q.strip() for q in out.supporting_quotes) if q]
+    quotes = [{"quote": q} for q in dict.fromkeys(q.strip() for q in out.supporting_quotes) if q][:MAX_QUOTES]
+    summaries = [{"text": sm.summary.strip(), "passages": [{"quote": p.strip()} for p in dict.fromkeys(sm.passages) if p.strip()][:2]}
+                 for sm in out.summaries if sm.summary.strip()][:MAX_SUMMARIES]
     return Finding(
         rule_id=rule.id,
         rule_code=rule.rule_code,
         ai_status="Evidence only",
         supporting_quotes=quotes,
+        ai_summaries=summaries,
         check_source=rule.check_method,
         is_valid=True,
         # No rationale, no confidence: no conclusion (principle 6).

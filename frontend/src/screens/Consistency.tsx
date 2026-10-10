@@ -1,18 +1,11 @@
 // Consistency flags: places where an application's story may not add up.
 // Signals for the officer to check, never findings or verdicts. A flag never changes a rule result and never
 // blocks sign-off. Each flag is confirmed or dismissed by the officer; a dismissal needs a note.
+// The table lives on the review screen; this file holds one flag's evidence and its Confirm / Dismiss actions.
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { api, type ConsistencyFlag, type ConsistencyView, type FlagEvidence } from "../api";
+import { api, type ConsistencyFlag, type FlagEvidence } from "../api";
 import { Button, ErrorNotice, Icon } from "../ui";
-
-const GROUPS: { type: ConsistencyFlag["check_type"]; title: string; hint: string }[] = [
-  { type: "cross_document", title: "Across documents", hint: "The form, the CoE, the arrival evidence and the referee letters, side by side." },
-  { type: "timeline", title: "Timeline", hint: "Dates and roles, in order. The AI listed the events; code checked them." },
-  { type: "narrative", title: "Statements that conflict", hint: "Two passages that appear to disagree. The AI pointed at them; code found both." },
-  { type: "cross_application", title: "Across applications", hint: "Shared contacts, referees or wording with other applications. Only the shared attribute is named." },
-  { type: "document_integrity", title: "Document signals", hint: "Weak signals from file details. Scans, re-saves and edits all change them." },
-];
 
 function Quote({ e }: { e: FlagEvidence }) {
   return (
@@ -24,7 +17,7 @@ function Quote({ e }: { e: FlagEvidence }) {
   );
 }
 
-function Evidence({ items }: { items: FlagEvidence[] }) {
+export function Evidence({ items }: { items: FlagEvidence[] }) {
   const quotes = items.filter((e) => e.kind === "quote");
   const fields = items.filter((e) => e.kind === "field");
   const signals = items.filter((e) => e.kind === "signal");
@@ -47,7 +40,7 @@ function Evidence({ items }: { items: FlagEvidence[] }) {
   );
 }
 
-function DismissDialog({ flag, close, done }: { flag: ConsistencyFlag; close: () => void; done: () => void }) {
+export function DismissDialog({ flag, close, done }: { flag: ConsistencyFlag; close: () => void; done: () => void }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -80,7 +73,8 @@ function DismissDialog({ flag, close, done }: { flag: ConsistencyFlag; close: ()
   );
 }
 
-function FlagCard({ flag, onChanged }: { flag: ConsistencyFlag; onChanged: () => void }) {
+/** One flag inside the side panel: what doesn't fit, the evidence, and the officer's decision. */
+export function FlagDetail({ flag, onChanged, locked }: { flag: ConsistencyFlag; onChanged: () => void; locked?: boolean }) {
   const [dialog, setDialog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -91,19 +85,15 @@ function FlagCard({ flag, onChanged }: { flag: ConsistencyFlag; onChanged: () =>
   };
   return (
     <article className={`cx-card ${flag.strength} ${decided ? "decided" : ""} ${flag.verification}`}>
-      <header>
-        <span className={`cx-strength ${flag.strength}`}>{flag.verification === "unclear" ? "Unclear" : flag.strength === "weak" ? "Weak signal" : "To check"}</span>
-        <code className="cx-check">{flag.check_id}</code>
-        {decided && <span className="cx-decision">{flag.status === "confirmed" ? "Confirmed by you" : "Dismissed by you"}</span>}
-      </header>
       <p className="cx-description">{flag.description}</p>
       <Evidence items={flag.evidence} />
+      {flag.verification === "unclear" && <p className="muted">The AI reported a possible conflict but code could not find its quotes, so nothing is shown as a finding. Please review manually.</p>}
       {flag.note && <p className="cx-note"><strong>Your note:</strong> {flag.note}</p>}
       <ErrorNotice error={error} />
-      {flag.verification === "verified" && (
+      {flag.verification === "verified" && !locked && (
         <div className="rule-actions">
           <Button icon="check" variant={decided ? "secondary" : "primary"} disabled={busy || flag.status === "confirmed"} onClick={() => void confirm()}>
-            {flag.status === "confirmed" ? "Confirmed" : "Confirm: this needs follow-up"}
+            {flag.status === "confirmed" ? "Confirmed: needs follow-up" : "Confirm: needs follow-up"}
           </Button>
           <Button variant="secondary" icon="close" disabled={busy || flag.status === "dismissed"} onClick={() => setDialog(true)}>
             {flag.status === "dismissed" ? "Dismissed" : "Dismiss"}
@@ -112,47 +102,5 @@ function FlagCard({ flag, onChanged }: { flag: ConsistencyFlag; onChanged: () =>
       )}
       {dialog && <DismissDialog flag={flag} close={() => setDialog(false)} done={() => { setDialog(false); onChanged(); }} />}
     </article>
-  );
-}
-
-export function ConsistencyPanel({ view, onChanged, onTrace }: { view: ConsistencyView; onChanged: () => void; onTrace?: () => void }) {
-  if (!view.enabled) return null;
-  const verified = view.flags.filter((f) => f.verification === "verified");
-  const unclear = view.flags.filter((f) => f.verification === "unclear");
-  const open = verified.filter((f) => f.status === "open").length;
-  return (
-    <section className="panel consistency-panel" aria-labelledby="consistency-title">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Consistency flags · signals, not findings</p>
-          <h2 id="consistency-title">Does the story add up?</h2>
-          <p>Places where two pieces of the application do not fit together. Each is for you to check and confirm or dismiss.
-            A flag does not change any rule result and does not stop sign-off.</p>
-        </div>
-        <div className="cx-summary">
-          <strong>{open}</strong><span>{open === 1 ? "flag" : "flags"} to check</span>
-          {onTrace && <button className="link-button" onClick={onTrace}>See what the AI read <Icon name="arrow" size={14} /></button>}
-        </div>
-      </div>
-      {view.flags.length === 0 && <p className="empty-state">No consistency flags for this application.</p>}
-      {GROUPS.map((g) => {
-        const items = verified.filter((f) => f.check_type === g.type).sort((a, b) => (a.strength === b.strength ? 0 : a.strength === "strong" ? -1 : 1));
-        if (!items.length) return null;
-        return (
-          <div className="cx-group" key={g.type}>
-            <h3>{g.title} <small>{items.length}</small></h3>
-            <p className="muted">{g.hint}</p>
-            {items.map((f) => <FlagCard key={f.id} flag={f} onChanged={onChanged} />)}
-          </div>
-        );
-      })}
-      {unclear.length > 0 && (
-        <div className="cx-group">
-          <h3>Unclear <small>{unclear.length}</small></h3>
-          <p className="muted">The AI reported a possible conflict but code could not find its quotes, so nothing is shown as a finding.</p>
-          {unclear.map((f) => <FlagCard key={f.id} flag={f} onChanged={onChanged} />)}
-        </div>
-      )}
-    </section>
   );
 }

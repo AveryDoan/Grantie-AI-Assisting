@@ -13,7 +13,7 @@ from typing import Any
 from seed import data
 from seed.data import sid
 from seed.fraud.generate import ROOT, write_case
-from seed.fraud.scenarios import SUBMITTED_AT, build
+from seed.fraud.scenarios import SUBMITTED_AT, build, build_documents
 
 BUCKET = "application-documents"
 
@@ -25,11 +25,11 @@ def expected() -> dict[str, dict[str, Any]]:
 
 
 def seed_fraud(store: Any, *, consistency: bool = True) -> dict[str, str]:
-    """Insert F01 to F10. Returns code -> application id."""
+    """Insert F01 to F10 and the document cases DA to DD. Returns code -> application id."""
     from app.services.intake import prepare_upload
 
     ids: dict[str, str] = {}
-    for sc in build():
+    for sc in [*build(), *build_documents()]:
         folder = ROOT / sc.code
         if not (folder / "form.json").exists():
             write_case(sc)

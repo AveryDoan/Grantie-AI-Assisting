@@ -93,7 +93,9 @@ class OfflineStubProvider:
             sentences = _sentences(source, hints["field"])
         if kind == "evidence":
             quotes = [s for s in sentences if any(re.search(rf"(?<!\w){re.escape(k)}(?!\w)", s, re.I) for k in hints.get("evidence", []))]
-            return json.dumps({"supporting_quotes": quotes[:3]})
+            # The offline stub cannot paraphrase: its summary only says which passage it points at.
+            summaries = [{"summary": f"The applicant describes something relevant to this criterion in this passage.", "passages": [q]} for q in quotes[:1]]
+            return json.dumps({"supporting_quotes": quotes[:3], "summaries": summaries})
         if kind == "rule":
             return json.dumps(self._rule(hints, sentences))
         raise LLMInvalidOutput("stub: unknown prompt kind")

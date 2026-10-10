@@ -28,7 +28,7 @@ export type Route =
   | { name: "pool" }
   | { name: "lists" }
   | { name: "review"; id: string }
-  | { name: "trace"; id: string }
+  | { name: "trace"; id: string; item?: string }
   | { name: "signoff"; id: string }
   | { name: "letter"; id: string }
   | { name: "audit" }
@@ -40,7 +40,7 @@ function parse(hash: string): Route {
   if (parts[0] === "applications" && parts[1]) {
     if (parts[2] === "signoff") return { name: "signoff", id: parts[1] };
     if (parts[2] === "letter") return { name: "letter", id: parts[1] };
-    if (parts[2] === "trace") return { name: "trace", id: parts[1] };
+    if (parts[2] === "trace") return { name: "trace", id: parts[1], item: new URLSearchParams(query).get("item") ?? undefined };
     return { name: "review", id: parts[1] };
   }
   if (parts[0] === "queue") return { name: "queue", q: new URLSearchParams(query).get("q") ?? undefined };
@@ -60,7 +60,7 @@ export function href(route: Route): string {
     case "lists": return "#/lists";
     case "queue": return route.q ? `#/queue?q=${encodeURIComponent(route.q)}` : "#/queue";
     case "review": return `#/applications/${route.id}`;
-    case "trace": return `#/applications/${route.id}/trace`;
+    case "trace": return `#/applications/${route.id}/trace${route.item ? `?item=${encodeURIComponent(route.item)}` : ""}`;
     case "signoff": return `#/applications/${route.id}/signoff`;
     case "letter": return `#/applications/${route.id}/letter`;
     case "audit": return "#/audit";
@@ -212,7 +212,7 @@ export default function App() {
       {route.name === "queue" && <Queue key={route.q ?? ""} navigate={navigate} initialSearch={route.q} />}
       {/* A new key per application: the screen never shows one application's content (or buttons) under another's address. */}
       {route.name === "review" && <Review key={route.id} id={route.id} navigate={navigate} />}
-      {route.name === "trace" && <AiTrace key={route.id} id={route.id} navigate={navigate} />}
+      {route.name === "trace" && <AiTrace key={`${route.id}-${route.item ?? ""}`} id={route.id} item={route.item} navigate={navigate} />}
       {route.name === "pool" && <Pool navigate={navigate} />}
       {route.name === "lists" && <Lists />}
       {route.name === "signoff" && <Signoff key={route.id} id={route.id} navigate={navigate} />}

@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 
 from seed.fraud.pdfkit import make_pdf
-from seed.fraud.scenarios import SUBMITTED_AT, Scenario, build
+from seed.fraud.scenarios import SUBMITTED_AT, Scenario, build, build_documents
 
 ROOT = Path(__file__).resolve().parent / "generated"
 
@@ -44,7 +44,7 @@ def write_case(sc: Scenario, root: Path = ROOT) -> Path:
 
 
 def main() -> None:
-    cases = build()
+    cases = [*build(), *build_documents()]
     ROOT.mkdir(parents=True, exist_ok=True)
     for sc in cases:
         folder = write_case(sc)
