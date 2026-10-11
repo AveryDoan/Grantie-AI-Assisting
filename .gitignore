@@ -62,3 +62,6 @@ sandbox/output/
 **/*.db
 **/*.sqlite
 **/*.sqlite3
+# Local folder aliases retained outside the canonical package layout
+Avery - Archived/
+Grantie - Final/
