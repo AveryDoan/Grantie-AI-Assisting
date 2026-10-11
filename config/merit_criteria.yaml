@@ -1,0 +1,94 @@
+# Merit criteria: how code finds candidate passages and how the summary is grouped. This is DATA, not code.
+# For each criterion (rule code): the themes, in the order they are shown for EVERY applicant, and the keywords that point
+# at a passage worth reading. A keyword only decides which passages are looked at. It never decides what is true or how good it is.
+# Add words freely: more keywords means more candidate passages, and every unused passage is still shown to the officer.
+#
+# documents: which document types feed the criterion ("application form" is the typed form). A document type not listed
+#            is never read for it (a CoE or a flight booking says nothing about references). Leave it out to read everything.
+# only_with: for a listed document type, only passages that also contain one of these words count.
+# group_by: source  ->  one theme per document (each referee is a theme of their own); the themes below order the facts
+#            inside it. Facts are never compared across referees.
+criteria:
+  M1:
+    label: Academic merit
+    documents: [application form, resume, certificate, transcript, referee letter, biography]
+    themes:
+      - id: grades
+        label: Grades and ranking
+        keywords: [GPA, grade, grades, average, rank, ranked, ranking, cohort, percent, "%", distinction, "first class", marks, results, result, transcript, top]
+      - id: awards
+        label: Awards and prizes
+        keywords: [award, awards, prize, prizes, scholarship, medal, honour, honours, recognition, placing, "first place", winner, won, awarded]
+      - id: projects
+        label: Projects and competitions
+        keywords: [project, competition, showcase, hackathon, thesis, dissertation, capstone]
+      - id: research
+        label: Publications and research
+        keywords: [paper, published, publication, publications, conference, journal, research, "short paper"]
+      - id: study
+        label: Study history
+        keywords: [bachelor, master, degree, diploma, semester, university, institute, college, ielts, graduate, graduates, graduating, "higher secondary", "high school"]
+  M2:
+    label: Supporting evidence (references)
+    documents: [referee letter, resume]
+    only_with:
+      resume: [referee, referees]
+    group_by: source
+    themes:
+      - id: relationship
+        label: How the referee knows the applicant
+        keywords: [known, supervised, taught, supervisor, lecturer, employer, adviser, advisor, relationship, mentor, worked, referee, referees]
+      - id: association
+        label: Length of association
+        keywords: [years, months, since, association, period]
+      - id: observed
+        label: What the referee saw
+        keywords: [academic, student, GPA, project, built, dashboard, skill, skills, technical, delivered, founded, led, president, trained, membership, club, reliable, honest, calm, trust, generous]
+      - id: recommendation
+        label: Recommendation
+        keywords: [recommend, support, strongest, "without reservation", credit, welcome]
+  M3:
+    label: Leadership
+    documents: [application form, resume, biography, referee letter]
+    themes:
+      - id: founding
+        label: Starting initiatives
+        keywords: [founded, founder, started, established, launched, created, initiative, initiated]
+      - id: roles
+        label: Roles and positions
+        keywords: [president, led, lead, leader, leadership, chair, coordinator, director, served, captain, "team lead", managing]
+      - id: delivery
+        label: Organising and delivering
+        keywords: [organised, organized, delivered, training, negotiated, ran, runs, trained, programme, program, workshop, workshops, event, events, secured]
+      - id: growth
+        label: Growth and results
+        keywords: [grew, grown, tripled, increased, members, membership, participants, mentors, schools, internships, villagers, businesses, volunteers, students]
+  M4:
+    label: Community engagement
+    documents: [application form, resume, biography, referee letter]
+    themes:
+      - id: volunteering
+        label: Volunteering
+        keywords: [volunteer, volunteers, volunteering, voluntary, free, unpaid, relief]
+      - id: mentoring
+        label: Mentoring and teaching
+        keywords: [mentor, mentors, mentoring, tutor, teaching, taught, coach, club, trained]
+      - id: community
+        label: Community projects
+        keywords: [community, villagers, flood, floods, recovery, local, farmers, rural, schools, charity, neighbourhood, residents]
+  M5:
+    label: Contribution to the Northern Territory
+    documents: [application form, biography, referee letter]
+    themes:
+      - id: territory
+        label: Connection to the Territory
+        keywords: ["Northern Territory", Territory, Darwin, Casuarina, NT, remote, communities, connectivity, agencies, health services]
+      - id: plans
+        label: Plans while studying
+        keywords: [plan, plans, volunteer, mentor, hackathon, hackathons, join, chapter, "during my studies", community]
+      - id: after
+        label: After graduation
+        keywords: ["after graduation", return, career, future, employer, "long term", "work on", "work in", stay]
+      - id: study
+        label: Study choice
+        keywords: [Master, "Data Science", units, accredited, campus, chose, course]

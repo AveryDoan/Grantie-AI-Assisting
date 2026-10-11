@@ -11,6 +11,7 @@ import { Button, ErrorNotice, Icon, StatusChip, effectiveStatus, isDecided } fro
 import { ConsistencyPanel, ResultChip } from "./review/ConsistencyTab";
 import { AskDialog, DecisionDialog, type DialogState } from "./review/Dialogs";
 import { CRITERIA, MeritViewer } from "./review/MeritViewer";
+import { MeritWorkspace } from "./review/MeritWorkspace";
 import { Badge, DecisionCell, Row } from "./review/parts";
 import { ReviewPanel } from "./review/Panel";
 import { CHECKED_BY_LABEL, byAttention, checkedBy, decisionText, plainRule } from "./review/model";
@@ -340,7 +341,9 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
         )}
       </div>
 
-      {viewer && <MeritViewer f={viewer} detail={detail} mode={item?.kind === "referee" ? "referee" : "criterion"} locked={locked} onClose={closePanel} onChanged={reload} onTrace={scopedTrace} />}
+      {viewer && item?.kind !== "referee" && detail.merit_summaries?.[viewer.rule_code]
+        ? <MeritWorkspace f={viewer} title={criterionName(viewer)} detail={detail} summary={detail.merit_summaries[viewer.rule_code]} locked={locked} onClose={closePanel} onChanged={reload} onTrace={scopedTrace} />
+        : viewer && <MeritViewer f={viewer} detail={detail} mode={item?.kind === "referee" ? "referee" : "criterion"} locked={locked} onClose={closePanel} onChanged={reload} onTrace={scopedTrace} />}
 
       {dialog && dialog.kind === "ask" && (
         <AskDialog detail={detail} findings={dialog.more ?? [dialog.finding]} close={() => setDialog(null)} onDone={() => { setDialog(null); setPicked(new Set()); reload(); }} />

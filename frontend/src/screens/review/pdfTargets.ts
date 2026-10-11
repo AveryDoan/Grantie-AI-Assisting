@@ -10,6 +10,8 @@ export interface EvidenceSpan {
 export interface PdfTarget { docId: string; title: string; items: PdfItem[] }
 
 export const FORM = "application_text";
+/** The form text is stored as "field_name: answer"; the field name is not printed in the PDF. */
+export const FIELD_PREFIX = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*:\s*/;
 
 /** The PDF document a text source maps to: its own id, or for the form the file holding the applicant's answers. */
 export function docForSource(detail: Pick<Detail, "documents">, source: string): { id: string; name: string; direct: boolean } | null {
@@ -32,7 +34,7 @@ export function pdfTargets(detail: Pick<Detail, "documents">, spans: EvidenceSpa
     // Offsets mean the document's own text only. For the form they refer to a different layout, so use the words.
     t.items.push(doc.direct && sp.start != null && sp.end != null
       ? { id: sp.id, kind: sp.kind, start: sp.start, end: sp.end, label: sp.label }
-      : { id: sp.id, kind: sp.kind, text: sp.text, label: sp.label });
+      : { id: sp.id, kind: sp.kind, text: sp.text?.replace(FIELD_PREFIX, ""), label: sp.label });
     out.set(doc.id, t);
   }
   return [...out.values()];

@@ -302,3 +302,86 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .toolbar-title span { margin-left: 6px; padding: 1px 9px; border-radius: var(--r-chip); background: var(--page); border: 1px solid var(--rail-line); font-size: 12px; font-weight: 600; }
 .officer-shell .workspace-content > main { padding: 0 !important; }
 .track-seg { padding: 10px 10px; }
+
+/* ---- merit grading workspace: documents | summary lane with the mark pinned at the bottom */
+.mw { width: 100%; top: 0; }
+.mw-title { display: flex; align-items: center; gap: var(--sp-3); }
+.mw-title h2 { margin: 0; }
+.mw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: var(--r-chip); background: var(--st-judgement-tint); color: var(--st-judgement); font-size: 12px; font-weight: 600; cursor: help; }
+.mw-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr); }
+.mw-doc { min-width: 0; overflow-y: auto; padding: var(--sp-4) var(--sp-5); border-right: 1px solid var(--rail-line); display: grid; align-content: start; gap: var(--sp-3); }
+.mw-tabs { display: flex; flex-wrap: wrap; gap: var(--sp-1); padding: 3px; background: var(--seg-track); border-radius: 10px; }
+.mw-tabs button { padding: 6px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; transition: background var(--t), color var(--t); }
+.mw-tabs button:hover { color: var(--brand-navy); }
+.mw-tabs button.on { background: var(--card); color: var(--brand-navy); font-weight: 600; box-shadow: var(--sh-card); }
+.mw-text { padding: var(--sp-3); background: var(--card); border: 1px solid var(--rail-line); border-radius: var(--r-card); }
+.mw-lane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--page); }
+.mw-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-4) var(--sp-5); display: grid; align-content: start; gap: var(--sp-3); }
+.mw-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); }
+.mw-head h3 { margin: 0; }
+.mw-muted, .mw-head p { margin: 2px 0 0; color: var(--muted-ink); font-size: 13px; }
+.mw-ai { font-size: 12px !important; letter-spacing: .02em; }
+.mw-menu { position: relative; }
+.mw-menu > .icon-button { font-size: 20px; line-height: 1; width: 36px; height: 36px; }
+.mw-menu-list { position: absolute; right: 0; top: 40px; z-index: 5; min-width: 220px; display: grid; padding: 4px; background: var(--card); border: 1px solid var(--rail-line); border-radius: 10px; box-shadow: var(--sh-float); }
+.mw-menu-list button { padding: 8px 10px; border: 0; border-radius: 6px; background: none; text-align: left; font: inherit; cursor: pointer; }
+.mw-menu-list button:hover:not(:disabled), .mw-menu-list button:focus-visible { background: var(--page); }
+.mw-overview { padding: var(--sp-3) var(--sp-4); background: var(--card); border: 1px solid var(--rail-line); border-radius: var(--r-card); box-shadow: var(--sh-card); color: var(--brand-navy); line-height: 1.55; }
+.mw-theme { background: var(--card); border: 1px solid var(--rail-line); border-left: 4px solid var(--sec-merit); border-radius: var(--r-card); box-shadow: var(--sh-card); padding: var(--sp-3) var(--sp-4); }
+.mw-theme header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+.mw-theme h4 { margin: 0; font-size: 15px; color: var(--brand-navy); }
+.mw-theme header .link-button { font-size: 13px; white-space: nowrap; }
+.mw-from { margin: 2px 0 var(--sp-2); color: var(--muted-ink); font-size: 12px; }
+.mw-from span[title] { cursor: help; }
+.mw-theme ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mw-theme li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); padding: 6px 0; border-top: 1px solid var(--rail-line); }
+.mw-theme li:first-child { border-top: 0; }
+.mw-show { flex: none; font-size: 13px; opacity: .85; }
+.mw-theme li:hover .mw-show, .mw-show:focus-visible { opacity: 1; }
+.mw-differs { display: block; font-style: normal; font-size: 12px; color: var(--sec-consistency); }
+.mw-note { margin: 0; padding: var(--sp-3); border-radius: var(--r-control); background: var(--sec-consistency-tint); color: var(--ink-soft); }
+.mw-focus { display: grid; gap: var(--sp-3); align-content: start; }
+.mw-focus h3 { margin: 0; }
+.mw-focus ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.mw-back { justify-self: start; display: inline-flex; align-items: center; gap: 4px; }
+.mw-line { margin: 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--rail-line); color: var(--ink-soft); font-style: italic; }
+.mw-stepper { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); }
+.mw-stepper-btns { display: inline-flex; gap: var(--sp-2); }
+.mw-quote { margin: 0; padding: var(--sp-3); background: var(--card); border: 1px solid var(--rail-line); border-left: 3px solid var(--quote-underline); border-radius: var(--r-control); display: grid; gap: 4px; }
+.mw-quote figcaption { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-ink); }
+.mw-quote blockquote { margin: 0; overflow-wrap: anywhere; }
+.mw-quote-foot { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.mw-quote small { color: var(--muted-ink); }
+.mw-missing { margin: 0; font-size: 13px; color: var(--muted-ink); }
+.mw-docgroup h4 { margin: var(--sp-2) 0; font-size: 14px; }
+.mw-failed { margin: 0; padding-left: 18px; }
+.mw-trace { margin: var(--sp-2) 0 0; font-size: 13px; }
+.mw-mark { border-top: 1px solid var(--rail-line); background: var(--card); padding: var(--sp-3) var(--sp-5) var(--sp-4); box-shadow: 0 -6px 16px rgba(23, 31, 85, .05); }
+.mw-mark h3 { margin: 0 0 var(--sp-2); font-size: 15px; }
+.mw-mark .rv-mark.stacked { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: var(--sp-3); align-items: start; }
+.mw-mark .rv-mark-reason textarea { min-height: 64px; }
+.mw-mark .rv-mark-save { grid-column: 1 / -1; justify-self: end; }
+.mw .pv-hl.quote:not(.sel) { opacity: .45; }
+.pv-bar .pv-legend { display: inline-flex; gap: var(--sp-3); align-items: center; margin: 0 0 0 var(--sp-2); padding: 0; border: 0; background: none; font-size: 12px; color: var(--muted-ink); }
+.pv-bar .pv-toggle { margin-left: auto; }
+.pv-missing { margin: 0; padding: 6px var(--sp-3); font-size: 13px; color: var(--muted-ink); display: flex; gap: 6px; align-items: center; background: var(--page); border-bottom: 1px solid var(--rail-line); }
+@media (max-width: 1100px) { .mw-body { grid-template-columns: 1fr; overflow-y: auto; } .mw-doc { border-right: 0; } .mw-mark .rv-mark.stacked { grid-template-columns: 1fr; } }
+.mw-doc .rv-viewtoggle { justify-self: start; display: inline-flex; overflow: visible; height: auto; }
+.mw-mark { padding-top: var(--sp-2); padding-bottom: var(--sp-3); }
+.mw-mark h3 { display: none; }
+.mw-mark .rv-mark-reason textarea { min-height: 48px; height: 48px; }
+.mw-focus > .mw-back { justify-self: start !important; }
+
+/* the document pane fills the height; bullets are rows you click to see them in the document */
+.mw-doc { display: flex; flex-direction: column; gap: var(--sp-3); overflow: hidden; }
+.mw-viewer { flex: 1; min-height: 0; }
+.mw-viewer .pv { height: 100%; }
+.mw-text { flex: 1; min-height: 0; overflow-y: auto; }
+.mw-theme ul { list-style: disc; padding-left: 0; }
+.mw-theme li { display: block; padding: 0; border-top: 0; }
+.mw-bullet { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); padding: 7px 8px 7px 22px; position: relative;
+  border: 0; border-radius: var(--r-control); background: transparent; text-align: left; font: inherit; color: var(--brand-navy); cursor: pointer; transition: background var(--t); }
+.mw-bullet::before { content: ""; position: absolute; left: 8px; top: 15px; width: 6px; height: 6px; border-radius: 50%; background: var(--sec-merit); }
+.mw-bullet .icon { flex: none; margin-top: 3px; color: var(--muted-ink); opacity: 0; transition: opacity var(--t); }
+.mw-bullet:hover, .mw-bullet:focus-visible { background: var(--sec-merit-tint); }
+.mw-bullet:hover .icon, .mw-bullet:focus-visible .icon { opacity: 1; color: var(--sec-merit-ink); }

@@ -291,6 +291,10 @@ def run_assessment(
             from app.services import consistency as consistency_service
 
             consistency_service.run_for_assessment(store, actor, app, run, outcome, documents, pack, llm, settings)
+        # Merit summaries: the AI reads every redacted document and the code verifies every quote. Never raises.
+        from app.services import merit_summary
+
+        merit_summary.generate(store, actor, app, outcome.redaction, documents, pack, llm, settings)
     except Exception as exc:
         from redaction.pipeline import RedactionBlocked
 

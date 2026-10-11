@@ -15,7 +15,7 @@ export type HighlightKind = "quote" | "summary" | "left" | "right";
 export interface PdfItem extends PdfLocateItem { kind: HighlightKind; label?: string; group?: string }   // group: the card this highlight belongs to
 
 const KIND_LABEL: Record<HighlightKind, string> = { quote: "Verified quote", summary: "AI summary source", left: "First value", right: "Second value" };
-const STATUS_WORDS: Record<string, string> = { approximate: "Approximate position", not_found: "Could not locate on the page" };
+const STATUS_WORDS: Record<string, string> = { approximate: "Approximate position", not_found: "Highlight not available" };
 
 /** A rectangle in page points (origin top left) as pixels on the displayed, scaled and rotated page. */
 export function toView(r: PdfRect, W: number, H: number, scale: number, rotation: number) {
@@ -26,8 +26,10 @@ export function toView(r: PdfRect, W: number, H: number, scale: number, rotation
   return { left: Math.min(a[0], b[0]) * scale, top: Math.min(a[1], b[1]) * scale, width: Math.abs(b[0] - a[0]) * scale, height: Math.abs(b[1] - a[1]) * scale };
 }
 
-export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, blur = true, height = 640 }: {
-  docId: string; appId: string; items?: PdfItem[]; selectedId?: string | null; onSelect?: (id: string) => void; blur?: boolean; height?: number;
+export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, onLocated, blur = true, height = 640 }: {
+  docId: string; appId: string; items?: PdfItem[]; selectedId?: string | null; onSelect?: (id: string) => void;
+  onLocated?: (located: Record<string, PdfLocation>) => void;   // where each item was found, so the panel can say when one was not
+  blur?: boolean; height?: number | string;
 }) {
   const [info, setInfo] = useState<PdfViewerInfo | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -65,7 +67,7 @@ export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, blur
   }, [docId]);
   useEffect(() => {
     let live = true;
-    if (items.length) api.locateItems(docId, items.map(({ id, start, end, text }) => ({ id, start, end, text }))).then((r) => live && setLocated(r)).catch(() => undefined);
+    if (items.length) api.locateItems(docId, items.map(({ id, start, end, text }) => ({ id, start, end, text }))).then((r) => { if (live) { setLocated(r); onLocated?.(r); } }).catch(() => undefined);
     else setLocated({});
     return () => { live = false; };
   }, [docId, itemsKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -92,9 +94,10 @@ export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, blur
   if (error) return <ErrorNotice error={error} />;
   if (!info || !pdf) return <Loading label="Opening the PDF…" />;
 
-  const total = blurs ? Object.values(blurs.counts).reduce((a, b) => a + b, 0) : 0;
-  const flagged = items.filter((i) => located[i.id] && located[i.id].status !== "exact");
   const kinds = [...new Set(items.map((i) => i.kind))];
+  // One quiet line, only when the highlight the officer asked for could not be placed on the page.
+  const wanted = selectedId ? items.filter((i) => (i.group ?? i.id) === selectedId) : [];
+  const missing = wanted.length > 0 && wanted.every((i) => located[i.id] && (located[i.id].status === "not_found" || !located[i.id].rects.length));
 
   return (
     <div className="pv" style={{ height }}>
@@ -103,16 +106,15 @@ export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, blur
         <span aria-live="polite">{Math.round(zoom * 100)}%</span>
         <Button variant="secondary" onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))} title="Zoom in">+</Button>
         <Button variant="secondary" onClick={() => setRotation((r) => (r + 90) % 360)} title="Rotate">Rotate</Button>
+        <span className="pv-legend" aria-label="Legend">
+          {kinds.filter((k) => k !== "summary").map((k) => <span key={k}><i className={`pv-key ${k}`} />{k === "quote" ? "Quoted text" : KIND_LABEL[k]}</span>)}
+          {blur && blurs?.redacted && <span><i className="pv-key blur" />Redacted</span>}
+        </span>
         {blur && blurs?.redacted && (
           <label className="pv-toggle"><input type="checkbox" checked={aiView} onChange={(e) => setAiView(e.target.checked)} />Show what the AI saw</label>
         )}
-        {blur && blurs?.redacted && <span className="pv-count">{total} redacted {total === 1 ? "span" : "spans"} on this document</span>}
       </div>
-      <div className="pv-legend" aria-label="Legend">
-        {kinds.map((k) => <span key={k}><i className={`pv-key ${k}`} />{KIND_LABEL[k]}</span>)}
-        {blur && blurs?.redacted && <span><i className="pv-key blur" />Redacted (blurred)</span>}
-        {flagged.length > 0 && <span className="pv-warn"><Icon name="question" size={13} />{flagged.map((i) => `${i.label ?? KIND_LABEL[i.kind]}: ${STATUS_WORDS[located[i.id].status]}`).join(" · ")}</span>}
-      </div>
+      {missing && <p className="pv-missing" role="status"><Icon name="info" size={14} />Highlight not available for this quote. The exact text is shown in the panel.</p>}
       <div className="pv-scroll" ref={scroller}>
         {info.pages.map((pg) => (
           <PdfPage key={`${pg.page}-${zoom}-${rotation}`} pdf={pdf} meta={pg} zoom={zoom} rotation={rotation}>

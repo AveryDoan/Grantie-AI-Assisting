@@ -51,7 +51,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, consistency, doc_step, evidence_request, intake, letters, merit, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps
+from app.services import audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
@@ -390,6 +390,18 @@ def create_app(
     @r.post("/applications/{application_id}/reopen")
     def reopen_application(application_id: str, body: ReopenIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
         return review.reopen(s, actor, application_id, body.reason)
+
+    # ------------------------------------------ merit summaries (AI, from verified quotes)
+    @r.post("/applications/{application_id}/merit/{rule_code}/summary",
+            dependencies=[Depends(rate_limit("assess", "rate_limit_assess_per_minute"))])
+    def regenerate_merit_summary(application_id: str, rule_code: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Run the summary for one criterion again. A new version; the old one is kept."""
+        require_role(actor, "officer", "admin")
+        try:
+            llm = make_llm(s, settings)
+        except LLMError:
+            llm = None
+        return merit_summary.regenerate(s, actor, application_id, rule_code, llm, settings)
 
     # ---------------------------------------------------- merit marks
     @r.put("/applications/{application_id}/merit-marks/{rule_code}")

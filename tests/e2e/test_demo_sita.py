@@ -218,3 +218,60 @@ def test_work_list_says_where_each_application_is_and_never_scores(run):
     assert not [k for r in rows for k in r if any(w in k for w in ("score", "rank", "total"))]
     open_dates = [r["submitted_at"] or "" for r in rows if r["status"] != "signed_off"]
     assert open_dates == sorted(open_dates)   # oldest received first
+
+
+# ---------------------------------------------------------------- merit summaries (extract first, then summarise from verified quotes)
+
+def test_merit_summaries_cite_verified_quotes_in_the_theme_template_order(run):
+    from app.pipeline import merit_claims as mc
+    from eval.merit_summary_eval import evaluate
+
+    d = _get(run, f"/applications/{run['id']}")
+    sums = d["merit_summaries"]
+    assert set(sums) >= {"M1", "M2", "M3", "M4", "M5"}
+    for code, s in sums.items():
+        assert s["status"] == "ok" and s["version"] >= 1, code
+        cfg = mc.criterion_config(code)
+        if cfg.get("group_by") != "source":
+            order = mc.theme_order(cfg)
+            assert [t["id"] for t in s["themes"]] == sorted((t["id"] for t in s["themes"]), key=order.index), "the template order"
+        for t in s["themes"]:
+            assert t["from"] and all(f["name"] and "." not in f["name"] for f in t["from"]), "plain document names, file names on hover"
+            for it in t["items"]:
+                assert it["quotes"], "a bullet with no verified quote never appears"
+                assert not mc.too_close(it["text"], [q["text"] for q in it["quotes"]]), "a bullet is never a copied quote"
+                for q in it["quotes"]:
+                    assert q["span"] and q["text"], "every quote is located in the original document"
+        assert s["all_quotes"], "the passages are listed even without the summary"
+        assert all("text" not in x for x in s["could_not_verify"]), "failed text is never shown"
+    m = evaluate(d)
+    assert m["unsupported"] == 0, "no bullet may use a number that is not in its quotes"
+    assert m["quote_validity"] == 1.0
+
+
+def test_supporting_evidence_is_grouped_by_referee_and_leaves_out_the_coe_and_the_flight(run):
+    d = _get(run, f"/applications/{run['id']}")
+    s = d["merit_summaries"]["M2"]
+    names = {f["name"] for t in s["themes"] for f in t["from"]} | {q["name"] for q in s["all_quotes"]}
+    assert names <= {"Referee letter 1", "Referee letter 2", "Resume"}, names
+    labels = [t["label"] for t in s["themes"]]
+    assert labels[0].startswith("Referee letter 1") and any(l.startswith("Referee letter 2") for l in labels)
+    assert not any(it["differs"] for t in s["themes"] for it in t["items"]), "two referees' own association lengths never conflict"
+
+
+def test_the_deans_award_shows_both_documents_and_is_never_silently_resolved(run):
+    s = _get(run, f"/applications/{run['id']}")["merit_summaries"]["M1"]
+    quotes = [q for t in s["themes"] for it in t["items"] for q in it["quotes"]] + s["other_passages"]
+    assert any("2023" in (q["text"] or "") and "Dean" in (q["text"] or "") for q in quotes), "the form's 2023 to 2025"
+    assert any(q["name"] == "Certificate" and "2025" in (q["text"] or "") for q in quotes + s["all_quotes"]), "the certificate's 2025"
+
+
+def test_merit_summary_trace_audit_and_a_new_version_keeps_the_old(run):
+    aid = run["id"]
+    log = _get(run, "/audit-log")
+    made = [a for a in log if a["action"] == "merit.summary_generated"]
+    assert made and all("quote" not in str(a.get("details")) for a in made), "ids and counts only, never the applicant's words"
+    r = _post(run, f"/applications/{aid}/merit/M3/summary")
+    assert r.status_code == 200, r.text
+    s = _get(run, f"/applications/{aid}")["merit_summaries"]["M3"]
+    assert s["version"] == 2 and s["versions"] == [1, 2]

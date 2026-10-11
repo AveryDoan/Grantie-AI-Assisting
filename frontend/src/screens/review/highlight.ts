@@ -100,7 +100,8 @@ const here = (s: TextSpan | null | undefined): Located | null => (s ? { source: 
 
 /** Sort the finding's passages into notes by what code could establish. Bullets follow the document, not importance.
  *  `order` lists the sources in reading order (form first, then each document). Nothing here scores or ranks anything. */
-export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summaries_restored">, order: string[] = ["application_text"]): Notes {
+export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summaries_restored">, order: string[] = ["application_text"],
+  opts: { keepOrder?: boolean; cap?: number } = {}): Notes {
   const rank = (src: string | undefined) => { const i = order.indexOf(src ?? ""); return i < 0 ? order.length : i; };
   const byPosition = <T extends { at: Located | null }>(a: T, b: T) =>
     rank(a.at?.source) - rank(b.at?.source) || (a.at?.start ?? Infinity) - (b.at?.start ?? Infinity);
@@ -122,8 +123,10 @@ export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summ
     else { note.state = at.length ? "linked" : "unlocated"; all.push(note); }
   });
   const first = (n: SummaryNote): { at: Located | null } => ({ at: n.at[0] ?? null });
-  all.sort((a, b) => byPosition(first(a), first(b)));
-  const bullets = all.slice(0, MAX_SUMMARIES);
+  // The merit summary arrives already in its theme template order; that order is kept and nothing is cut off.
+  if (!opts.keepOrder) all.sort((a, b) => byPosition(first(a), first(b)));
+  const cap = opts.cap ?? MAX_SUMMARIES;
+  const bullets = all.slice(0, cap);
 
   // A verified quote that is exactly a bullet's passage is already shown as that bullet's source.
   const covered = (q: QuoteNote) => !!q.at && bullets.some((b) => b.at.some((a) => a.source === q.at!.source && a.start === q.at!.start && a.end === q.at!.end));
@@ -131,7 +134,7 @@ export function notesOf(f: Pick<Finding, "supporting_quotes_restored" | "ai_summ
   // "About the applicant" passages come before bare field lines such as a referee's name.
   others.sort((a, b) => Number((b.label ?? "") === "about the applicant") - Number((a.label ?? "") === "about the applicant"));
   const quoteSlots = quotes.slice(0, MAX_QUOTES);
-  return { bullets, others, unverified, unlinked, moreBullets: Math.max(0, all.length - MAX_SUMMARIES), quotes: quoteSlots, summaries: bullets };
+  return { bullets, others, unverified, unlinked, moreBullets: Math.max(0, all.length - cap), quotes: quoteSlots, summaries: bullets };
 }
 
 /** The highlights for one source: the bullets' passages and the other verified passages, never failed or unlinked notes. */

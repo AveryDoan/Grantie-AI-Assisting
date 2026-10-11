@@ -11,7 +11,7 @@ from typing import Any
 
 from app.config import Settings, get_settings
 from app.pipeline import injection
-from app.services import rule_guidance
+from app.services import merit_summary, rule_guidance
 from app.services.redaction_service import QuoteRestorer
 from app.services.access import Actor, application_for_applicant, application_for_staff
 from app.services.errors import Forbidden
@@ -296,6 +296,7 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
         "sign_off": one(store.select("sign_offs", eq={"application_id": application_id}, limit=1)),
         "attention": _attention(store, app),
         "header_notices": _header_notices(app, doc_rows),
+        "merit_summaries": merit_summary.views(store, app, restorer, restorer.source_texts() if run else {}) if run else {},
         "consistency": consistency_service.application_flags(store, app, settings or get_settings(), restorer),
         "linked_applications": linked_service.for_application(store, actor, app, reference) if (settings or get_settings()).consistency_layer else [],
         "disclaimer": "AI output is a suggestion only. An officer decides every finding and signs off the decision.",

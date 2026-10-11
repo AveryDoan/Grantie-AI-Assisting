@@ -96,6 +96,10 @@ class OfflineStubProvider:
             return json.dumps({"facts": [self._fact(k, sentences) for k in meta.get("keys", [])]})
         if kind == "referee":
             return json.dumps(self._referee(source))
+        if kind == "merit_claims":
+            return json.dumps(_stub_merit_claims(meta))
+        if kind == "merit_summary":
+            return json.dumps(_stub_merit_summary(meta))
         if kind == "timeline":
             return json.dumps({"events": _stub_timeline(source)})
         if kind == "narrative":
@@ -173,6 +177,149 @@ class OfflineStubProvider:
             }
         return {"status": "Needs evidence", "rationale": "The application does not address this rule.", "evidence_quote": None,
                 "confidence": "medium", "language_flag": False, "needs_applicant_clarification": True}
+
+
+# ---------------------------------------------------------------------------
+# Merit summaries (extract claims, then summarise from verified claims). Pattern matching, NOT an LLM: it copies clauses that
+# mention a theme keyword or a number, and groups claims that share three words in a row or two numbers. Written next to the
+# synthetic test cases; it says nothing about how a real model performs.
+# ---------------------------------------------------------------------------
+
+_NAMED = re.compile(r"(?:[A-Z][\w'’&-]+\s+){0,4}(?:Award|Society|Showcase|Conference|Prize|Scholarship|Pahadi|Club|Project|University|Institute)\b")
+
+
+def _stub_merit_claims(meta: dict[str, Any]) -> dict[str, Any]:
+    kw = meta.get("theme_keywords", {})
+    claims = []
+    for p in meta.get("passages", []):
+        named = _NAMED.search(p["text"])
+        for sentence in re.split(r"(?<=[.!?])\s+", p["text"]):
+            for clause in re.split(r";\s+", sentence):
+                clause = clause.strip()
+                if len(clause.split()) < 3:
+                    continue
+                theme = next((t for t, words in kw.items() if any(re.search(rf"(?<!\w){re.escape(w)}(?!\w)", clause, re.I) for w in words)), None)
+                if theme is None and not re.search(r"\d", clause):
+                    continue
+                own = _NAMED.search(clause)
+                subject = (own or named).group().strip() if (own or named) else ""
+                # The stub only knows one attribute it can name safely: the year(s) of a named thing.
+                attribute = "year" if subject and re.search(r"\b(19|20)\d\d\b", clause) else ""
+                claims.append({"restatement": " ".join(clause.split()[:25]), "theme": theme or "other", "source_quote": " ".join(clause.split()),
+                               "passage_id": p["id"], "subject": subject, "attribute": attribute})
+    return {"claims": claims}
+
+
+def _runs(a: str, b: str, n: int = 3) -> bool:
+    ta, tb = re.findall(r"\w+", a.lower()), re.findall(r"\w+", b.lower())
+    grams = {tuple(ta[i:i + n]) for i in range(len(ta) - n + 1)}
+    return any(tuple(tb[i:i + n]) in grams for i in range(len(tb) - n + 1))
+
+
+def _plain_name(label: str) -> str:
+    name = re.sub(r"\s*·.*$", "", label or "the document").strip()
+    return name if name in ("CoE",) else name[:1].lower() + name[1:]
+
+
+_NUM_PHRASE = re.compile(r"(?:\b[\w'’.-]+\s+){0,2}\d[\d,./%+]*(?:\s+(?:of|out of|to|in)?\s*[\w'’.%+-]+){0,2}")
+
+
+def _paraphrase(quote: str, doc: str, theme_label: str) -> str:
+    """The stub cannot really paraphrase. It names the document and lists the numbers and names it found, in a template
+    sentence, so a line is never a cut-off copy of the quote."""
+    q = re.sub(r"^[a-z_]+:\s*", "", quote)
+    bits: list[str] = []
+    for m in _NAMED.finditer(q):
+        bits.append(m.group().strip())
+    for m in _NUM_PHRASE.finditer(q):
+        bit = m.group().strip(" ,.;")
+        if bit and not any(bit in b or b in bit for b in bits):
+            bits.append(bit)
+    lead = re.compile(r"^(?:(?:I|my|me|she|her|he|his|they|their|and|where|also|the|a|an|with|in|of|for|to)\s+)+", re.I)
+    bits = [lead.sub("", b).strip(" ,.") for b in bits]
+    bits = [b for b in bits if b and len(b) > 2][:3]
+    if not bits:
+        return f"The {doc} talks about {theme_label.lower()}."
+    return f"The {doc} mentions " + (", ".join(bits[:-1]) + " and " + bits[-1] if len(bits) > 1 else bits[0]) + "."
+
+
+def _line(c: dict[str, Any], names: dict[str, str], labels: dict[str, str]) -> str:
+    doc = _plain_name(names.get(c["source"], "document"))
+    third = _third_person(c["quote"], doc)
+    if third and not _close(third, c["quote"]) and len(third.split()) >= 4:
+        return third
+    return _paraphrase(c["quote"], doc, labels.get(c.get("attribute_theme", c["theme"]), "this criterion"))
+
+
+def _third_person(quote: str, doc: str) -> str | None:
+    """A plain third-person version of a first-person sentence, shortened at a clause break. None if nothing changed."""
+    who = "The referee" if doc.lower().startswith("referee") else "The applicant"
+    q = re.sub(r"^[a-z_]+:\s*", "", " ".join(quote.split()))
+    q = re.sub(r"\[PERSON_\d+\]", "the applicant", q)
+    before = q
+    for pat, rep in ((r"\bI have\b", f"{who} has"), (r"\bI've\b", f"{who} has"), (r"\bI am\b", f"{who} is"), (r"\bI'm\b", f"{who} is"),
+                     (r"\bI was\b", f"{who} was"), (r"\bI\b", who), (r"\bmy\b", "their"), (r"\bMy\b", "Their"), (r"\bme\b", "them"),
+                     (r"^(She|He)\b", "The applicant")):
+        q = re.sub(pat, rep, q)
+    if q == before:
+        # Not in the first person: a referee writing about the applicant ("She built ...", "[PERSON_1] joined us ...").
+        m = re.match(r"^(?:She|He|The applicant|the applicant)\s+(.*)$", q)
+        if not (m and doc.lower().startswith("referee")):
+            return None
+        rest = m.group(1).split()
+        rest = " ".join(rest[:14])
+        rest = rest[:rest.rfind(",")] if "," in rest and len(m.group(1).split()) > 14 else rest
+        q = f"The referee says the applicant {rest.strip(' ,;:.')}"
+    first = q.find(who)
+    if first >= 0:   # name the person once, then "they"
+        q = q[:first + len(who)] + q[first + len(who):].replace(f" {who} has", " they have").replace(f" {who} is", " they are").replace(f" {who}", " they")
+    words = q.split()
+    if len(words) > 22:
+        cut = " ".join(words[:22])
+        q = cut[:cut.rfind(",")] if "," in cut else cut
+    q = q.strip(" ,;:-")
+    q = q[:1].upper() + q[1:]
+    return q if q.endswith((".", "!", "?")) else q + "."
+
+
+def _close(a: str, b: str) -> bool:
+    from rapidfuzz import fuzz
+
+    na, nb = " ".join(a.lower().split()), " ".join(b.lower().split())
+    return fuzz.ratio(na, nb) > 84 or (len(na) > 12 and na.strip(".") in nb)
+
+
+def _stub_merit_summary(meta: dict[str, Any]) -> dict[str, Any]:
+    labels = meta.get("theme_labels", {})
+    names = meta.get("names", {})
+    groups: list[dict[str, Any]] = []
+    wanted = [set(d.get("claim_ids", [])) for d in meta.get("rewrite", [])]
+    for c in meta.get("claims", []):
+        nums = set(re.findall(r"\d[\d,]*(?:\.\d+)?", c["quote"]))
+        for g in groups:
+            if g["theme"] == c["theme"] and c["source"] != g["first_source"] and (_runs(c["quote"], g["quote"]) or len(nums & g["nums"]) >= 2):
+                g["claim_ids"].append(c["claim_id"])
+                break
+        else:
+            groups.append({"theme": c["theme"], "claim_ids": [c["claim_id"]], "quote": c["quote"], "nums": nums, "first_source": c["source"],
+                           "text": _line(c, names, labels)})
+    items: list[dict[str, Any]] = []
+    for g in groups:   # the same template line twice in one theme becomes one line that cites both
+        same = next((i for i in items if i["theme"] == g["theme"] and i["text"] == g["text"]), None)
+        if same:
+            same["claim_ids"] += g["claim_ids"]
+        else:
+            items.append({"theme": g["theme"], "text": g["text"], "claim_ids": list(g["claim_ids"])})
+    if wanted:   # a rewrite: only the groups asked for, in the same template sentence
+        items = [i for i in items if set(i["claim_ids"]) in wanted]
+    docs = list(dict.fromkeys(re.sub(r"\d", "", _plain_name(names.get(c["source"], "document"))).strip() for c in meta.get("claims", [])))
+    themes = list(dict.fromkeys(labels.get(c.get("attribute_theme", c["theme"]), "") for c in meta.get("claims", []) if labels.get(c.get("attribute_theme", c["theme"]))))
+    overview = []
+    if docs:
+        overview.append(f"This was found in the {', the '.join(docs[:-1]) + ' and the ' + docs[-1] if len(docs) > 1 else docs[0]}.")
+    if themes:
+        overview.append(f"It covers {', '.join(t.lower() for t in themes[:-1]) + ' and ' + themes[-1].lower() if len(themes) > 1 else themes[0].lower()}.")
+    return {"overview": overview, "items": items}
 
 
 # ---------------------------------------------------------------------------

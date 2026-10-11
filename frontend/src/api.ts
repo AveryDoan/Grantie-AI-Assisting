@@ -148,6 +148,19 @@ export interface TextSpan { source: string; start: number; end: number; text: st
 
 export interface RuleSource { typed: string | null; document_type: string | null; document_field: string | null }
 
+export interface MeritDoc { source: string; name: string; file_name: string | null }
+export interface MeritQuote extends MeritDoc { text: string | null; span: TextSpan | null; claim_id?: string; passage_id?: string }
+export interface MeritItem { item_id: string; text: string | null; differs: boolean; quotes: MeritQuote[] }
+export interface MeritTheme { id: string; label: string; from: MeritDoc[]; items: MeritItem[] }
+export interface MeritSummary {
+  version: number; status: "ok" | "no_ai" | "failed"; error: string | null; generated_at: string | null; label: string | null;
+  overview: string[]; themes: MeritTheme[];
+  other_passages: MeritQuote[]; all_quotes: MeritQuote[];
+  could_not_verify: { kind: "claim" | "bullet"; reason: string }[];
+  coverage: { with_matches: number; document_count: number; documents: (MeritDoc & { passages: number; readable: boolean })[] };
+  versions: number[];
+}
+
 export interface AiSummary {
   text: string | null;
   linked: boolean;   // at least one of its passages was found in the text by code
@@ -296,6 +309,7 @@ export interface Detail {
   documents: DocumentRow[];
   source_texts?: Record<string, { label: string; text: string }>;
   linked_applications?: LinkedApplication[];
+  merit_summaries?: Record<string, MeritSummary>;
   latest_run: Run | null;
   consistency: ConsistencyView;
   facts: Fact[];
@@ -525,6 +539,7 @@ export const api = {
   evidenceItems: (id: string) => request<EvidenceItem[]>(`/applications/${id}/evidence-request/items`),
   draftEvidenceRequest: (id: string, finding_ids?: string[]) =>
     request<EvidenceDraft>(`/applications/${id}/evidence-request`, { method: "POST", body: { finding_ids: finding_ids ?? null } }),
+  regenerateMeritSummary: (id: string, code: string) => request<{ status: string; version: number }>(`/applications/${id}/merit/${code}/summary`, { method: "POST" }),
   signoffStatement: () => request<{ statement: string }>("/signoff-statement"),
   signoff: (id: string) =>
     request<{ id: string }>(`/applications/${id}/signoff`, { method: "POST", body: { statement_acknowledged: true } }),
