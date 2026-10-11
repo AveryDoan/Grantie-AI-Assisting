@@ -412,14 +412,15 @@ $('outcomepage').addEventListener('click',e=>{const em=e.target.closest('[data-e
 function changeTab(tab){document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',String(t===tab)));const n=tab.dataset.tab;const pages={1:'page1',2:'evaluation',3:'reviewpage',4:'outcomepage',5:'auditpage'};Object.values(pages).forEach(id=>$(id)?.classList.toggle('hidden',pages[n]!==id));$('detailpage').classList.add('hidden');$('other')?.remove();if(n==='2')evaluationRows();if(n==='3')renderReview();if(n==='4')renderOutcome();if(n==='5')loadAudit();window.scrollTo(0,0)}
 function openDetail(id){current=applications.find(x=>x.id===id);if(!current)return;$('page1').classList.add('hidden');$('evaluation').classList.add('hidden');$('outcomepage').classList.add('hidden');$('reviewpage').classList.add('hidden');$('other').classList.add('hidden');$('detailpage').classList.remove('hidden');$('detailtitle').textContent=shortApplicationId(current)+' — '+current.name;renderConsistency();$('appsubtitle').textContent=current.provider+' · '+current.course+' · Received '+current.date;$('appsummary').innerHTML='<div><b>Applicant:</b> '+esc(current.name)+'</div><div><b>Provider:</b> '+esc(current.provider)+'</div><div><b>Status:</b> '+esc(current.status)+'</div>';
 let docs=docTypes.filter((d,i)=>!(current.id.endsWith('03')&&i===5));$('doccount').textContent=docs.length;$('documents').innerHTML=docs.map((d,i)=>{
- const checks=demoAllPass?[true,true,true]:demoDocumentChecks(current.id,i),passes=checks.every(Boolean);
+ const documentIndex=docTypes.indexOf(d);
+ const checks=demoAllPass?[true,true,true]:demoDocumentChecks(current.id,documentIndex),passes=checks.every(Boolean);
  const labels=['Correct document type','Sufficient document / evidence','Document readable'];
  return `<div class="docrow ${passes?'doc-pass':'doc-attention'}">
  <span class="doc-verdict ${passes?'':'pending'}">${passes?'✓ PASS':'! NEEDS REVIEW'}</span>
  <div class="doc-card-preview-wrap"><img class="doc-card-preview" src="${esc(d[4]||d[3]||'')}" alt="First page preview of ${esc(d[0])}" loading="lazy"><div class="doc-preview-caption">First-page preview · Open full document for the source PDF</div></div>
  <div class="doc-card-info"><div class="doc-top"><span class="docicon">▤</span><div><div class="filename">${esc(d[0])}</div><div class="muted">${esc(d[1])} · PDF · ${esc(d[2])}</div></div></div>
  <div class="doc-checklist">${labels.map((label,j)=>`<div class="doc-check"><span class="markcheck ${checks[j]?'':'notyet'}">${checks[j]?'✓':'!'}</span><span>${label}${checks[j]?'':' — check required'}</span><button type="button" class="info-trigger" data-explain-kind="Document check" data-explain-title="${esc(label)}" data-explain-text="This check is based on the supplied document type, the available evidence signal, and whether the source PDF can be read. It is an assistive suggestion only and must be verified by an officer.">i</button></div>`).join('')}</div>
- <div class="doc-footer"><span class="muted">Illustrative AI checks · demo only</span><button class="docbtn" data-file="${i}" aria-label="View ${esc(d[0])}">View full document</button></div></div>
+ <div class="doc-footer"><span class="muted">Illustrative AI checks · demo only</span><button class="docbtn" data-file="${documentIndex}" aria-label="View ${esc(d[0])}">View full document</button></div></div>
  </div>`}).join('');
 updatePIIStage(docs);
 $('metcount').textContent=aiOutput.filter(a=>a[0].startsWith('Supported')).length;$('reviewcount').textContent=aiOutput.filter(a=>a[0]==='Needs review').length;$('missingcount').textContent=aiOutput.filter(a=>a[0]==='Evidence missing').length;
@@ -769,6 +770,7 @@ document.addEventListener('DOMContentLoaded',function(){
       if (!button) return;
       const documentInfo = docTypes[Number(button.dataset.file)];
       if (!documentInfo) return;
+      document.getElementById('filemodal').dataset.documentIndex=button.dataset.file;
       const preview = document.getElementById('filepreview');
       const open = document.getElementById('fileopen');
       const download = document.getElementById('filedownload');
@@ -784,9 +786,9 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('filecontent').addEventListener('click', event => {
       const decision=event.target.closest('[data-file-decision]');
       if(!decision || !current) return;
-      const documentIndex=Number(document.querySelector('#documents [data-file]')?.dataset.file || 0);
-      const filename=document.getElementById('fileopen')?.download || '';
-      const key=current.id+':'+(docTypes.findIndex(item=>item[1]===filename)>=0?docTypes.findIndex(item=>item[1]===filename):documentIndex);
+      const documentIndex=Number(document.getElementById('filemodal')?.dataset.documentIndex);
+      if(!Number.isInteger(documentIndex)||!docTypes[documentIndex])return;
+      const key=current.id+':'+documentIndex;
       window.__fileDecisions=window.__fileDecisions||{};
       window.__fileDecisions[key]=decision.dataset.fileDecision;
       document.querySelectorAll('[data-file-decision]').forEach(button=>button.classList.toggle('selected',button===decision));
@@ -995,7 +997,7 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   function persistDecisionBeforeClose(){
     if(!current)return;
-    const filename=$('filedownload')?.download||'';const index=docTypes.findIndex(item=>item[1]===filename);if(index<0)return;
+    const index=Number($('filemodal')?.dataset.documentIndex);if(!Number.isInteger(index)||!docTypes[index])return;
     const decision=decisionFor(current.id,index);if(decision==='missing'){current.status='Waiting for Response';draw();}
     openDetail(current.id);renderPersistedDocumentState();
   }
