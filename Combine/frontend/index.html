@@ -980,8 +980,28 @@ document.addEventListener('DOMContentLoaded',function(){
   $('documents').addEventListener('click',event=>{if(event.target.closest('[data-request-missing]'))prepareMissingEvidenceRequest();});
   $('closefile').addEventListener('click',persistDecisionBeforeClose,true);
   $('filemodal').addEventListener('click',event=>{if(event.target===$('filemodal'))persistDecisionBeforeClose();},true);
+  window.__prepareMissingEvidenceRequest=prepareMissingEvidenceRequest;
+})();
+</script><script>
+(() => {
+  const filecontent=document.getElementById('filecontent');
+  if(!filecontent)return;
+  filecontent.addEventListener('click',event=>{
+    const decision=event.target.closest('[data-file-decision]');
+    if(!decision)return;
+    let holder=filecontent.querySelector('#fileDecisionRequest');
+    if(!holder){holder=document.createElement('div');holder.id='fileDecisionRequest';filecontent.querySelector('#fileDecisionStatus')?.after(holder)}
+    if(decision.dataset.fileDecision==='missing'){
+      holder.innerHTML='<button type="button" class="file-request-evidence" data-request-current-missing>✉ Prepare AI-assisted request to applicant</button>';
+    }else holder.innerHTML='';
+  });
+  filecontent.addEventListener('click',event=>{
+    if(!event.target.closest('[data-request-current-missing]'))return;
+    window.__prepareMissingEvidenceRequest?.();
+  });
 })();
 </script><style>
+.file-request-evidence{width:100%;margin-top:10px;border:1px solid #c88320;border-radius:8px;padding:10px 12px;background:#fff8e9;color:#8b5406;font:inherit;font-size:12px;font-weight:800;text-align:left;cursor:pointer}.file-request-evidence:hover{background:#fff0d5;border-color:#a96b0a}
 /* Contextual AI explanations: compact info triggers open the review assistant. */
 .info-trigger{width:16px;height:16px;display:inline-grid;place-items:center;flex:0 0 16px;margin-left:auto;padding:0;border:1px solid #b9c6d9;border-radius:50%;background:#fff;color:#2f4778;font:800 9px/1 Arial,sans-serif;cursor:pointer;transition:.16s ease}.info-trigger:hover,.info-trigger:focus-visible{border-color:#7899cf;background:#edf4ff;color:#1e3b76;outline:0;box-shadow:0 0 0 3px #dbe8ff;border-radius:50%}.doc-check .info-trigger{margin-left:auto}.ai-output-line{display:flex;align-items:center;gap:8px;min-height:28px}.ai-output-line .info-trigger{margin-left:0}.file-ai-result{position:relative}.file-ai-result>.info-trigger{position:absolute;top:10px;right:10px;margin:0}.file-check-list .info-trigger{margin-left:auto}.explanation-shade{position:fixed;inset:0;z-index:259;background:#101a32a6;opacity:0;pointer-events:none;transition:opacity .2s}.explanation-shade.active{opacity:1;pointer-events:auto}.explanation-drawer{position:fixed;z-index:260;top:0;right:0;width:min(430px,100vw);height:100vh;display:flex;flex-direction:column;background:#fff;box-shadow:-18px 0 45px #15203d33;transform:translateX(100%);transition:transform .22s ease}.explanation-drawer.active{transform:translateX(0)}.explanation-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding:24px 22px 19px;border-bottom:1px solid #e6eaf1;background:#fbfcfe}.explanation-kicker{margin:0 0 7px;color:#9b4c36;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.explanation-head h2{margin:0;color:#1b2758;font-size:21px;line-height:1.2}.explanation-close{width:34px;height:34px;display:grid;place-items:center;border:1px solid #d6deeb;border-radius:9px;background:#fff;color:#263967;font-size:24px;line-height:1;cursor:pointer}.explanation-body{overflow:auto;padding:22px}.explanation-chat{display:grid;gap:14px}.explanation-message{padding:15px 16px;border-radius:14px 14px 14px 4px;background:#f3f6fb;color:#33415b;font-size:14px;line-height:1.62}.explanation-message strong{color:#1e3468}.explanation-source{padding:13px 14px;border:1px solid #dbe4f1;border-radius:11px;background:#fff;color:#53627b;font-size:12px;line-height:1.55}.explanation-source b{color:#263967}.explanation-disclaimer{margin:0;padding:13px 14px;border-radius:10px;background:#fff8e9;color:#80520b;font-size:12px;line-height:1.5}.explanation-prompt{margin-top:20px;color:#68758b;font-size:12px}.explanation-prompt input{width:100%;box-sizing:border-box;margin-top:7px;padding:11px 12px;border:1px solid #d4ddea;border-radius:8px;color:#33415b;font:inherit}.explanation-prompt input:disabled{background:#f7f8fb;color:#8b95a5}
 @media(max-width:650px){.explanation-drawer{width:100%}}.explanation-head:before{content:'G';width:34px;height:34px;display:grid;place-items:center;position:absolute;margin-left:0;border-radius:11px;background:#f47a24;color:#fff;font-size:18px;font-weight:900;box-shadow:0 4px 12px #0c173c55}.explanation-head{position:relative;padding-left:66px}.explanation-kicker{font-size:0}.explanation-kicker:after{content:'GRANTIE AI EXPLANATION';font-size:10px}.explanation-body:after{content:'🐶';position:absolute;right:18px;bottom:16px;width:66px;height:66px;display:grid;place-items:center;border:2px solid #f47a24;border-radius:22px 22px 8px 22px;background:linear-gradient(145deg,#edf4ff,#fff);box-shadow:0 8px 18px #17245420;font-size:36px;line-height:1}.explanation-body:before{content:'Grantie bot';position:absolute;right:18px;bottom:0;color:#7b879b;font-size:9px;font-weight:750;white-space:nowrap}
