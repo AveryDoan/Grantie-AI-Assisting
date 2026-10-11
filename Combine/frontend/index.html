@@ -845,12 +845,12 @@ document.addEventListener('DOMContentLoaded',function(){
 @media(max-width:850px){#auditpage{padding:24px 17px 60px}.audit-actions{width:100%}.audit-actions button{flex:1}.audit-controls input{min-width:180px}.audit-table{min-width:950px}}
 </style><style>
 /* Document review cards: prioritize readable evidence and balanced metadata. */
-#documents{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-#documents .docrow{grid-template-columns:minmax(0,38%) minmax(0,62%)!important;min-height:0;height:100%;padding:16px;gap:18px;align-items:stretch!important}
+#documents{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+#documents .docrow{grid-template-columns:minmax(0,34%) minmax(0,66%)!important;min-height:0;height:100%;padding:12px;gap:12px;align-items:stretch!important}
 #documents .doc-card-preview-wrap{min-width:0;min-height:0;padding:0;gap:8px}
-#documents .doc-card-preview{height:250px;min-height:250px;border-radius:10px}
+#documents .doc-card-preview{height:220px;min-height:220px;border-radius:9px}
 #documents img.doc-card-preview{object-fit:contain;object-position:center;background:#f7f8fb;padding:8px}
-#documents .doc-card-info{min-width:0;min-height:250px;gap:10px;padding:2px 2px 0}
+#documents .doc-card-info{min-width:0;min-height:220px;gap:8px;padding:1px 1px 0}
 #documents .doc-top{padding-right:112px;min-height:0}
 #documents .filename{font-size:15px;line-height:1.35}
 #documents .doc-top .muted{font-size:12px;line-height:1.45;overflow-wrap:anywhere}
@@ -860,7 +860,7 @@ document.addEventListener('DOMContentLoaded',function(){
 #documents .doc-footer{margin-top:auto;align-items:flex-end}
 #documents .doc-footer .muted{max-width:170px;line-height:1.35}
 #documents .docbtn{white-space:nowrap;padding:9px 12px}
-@media(max-width:1100px){#documents{grid-template-columns:1fr}#documents .docrow{grid-template-columns:minmax(240px,38%) minmax(0,62%)!important}}
+@media(max-width:1200px){#documents{grid-template-columns:repeat(2,minmax(0,1fr))}#documents .docrow{grid-template-columns:minmax(180px,38%) minmax(0,62%)!important}}
 @media(max-width:650px){#documents .docrow{grid-template-columns:1fr!important;gap:14px}#documents .doc-card-preview{height:300px;min-height:300px}#documents .doc-card-info{min-height:0;padding:0}.doc-verdict{right:10px;top:10px}}
 </style>
 <section class="hidden" id="auditpage">
