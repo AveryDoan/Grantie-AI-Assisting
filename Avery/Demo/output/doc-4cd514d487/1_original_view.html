@@ -1,0 +1,88 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Original view (officer only)</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+</style></head><body><main>
+<div class="banner officer">OFFICER-ONLY · contains personal information · local file: never commit, upload or share</div>
+<h1>Original view (officer only)</h1><p class="muted">doc-4cd514d487 · detected spans are highlighted by type (hover for the token)</p>
+<div class="legend"><mark class="ADDRESS">Address</mark><mark class="DOB">Date of birth</mark><mark class="ID">ID number</mark><mark class="PERSON">Name</mark><mark class="PLACE">Place</mark></div>
+<div class="card"><pre class="doc">[page 1]
+Charles Darwin University
+CRICOS Provider Code: 00300K | ABN <mark class="ID" title="[ID_1] · ID number">54 093 513 649</mark>
+Casuarina Campus, <mark class="PLACE" title="[PLACE_1] · Place">Ellengowan Drive</mark>, Casuarina <mark class="ADDRESS" title="[LOCATION: unknown] · Address">NT 0810</mark> | cdu.edu.au
+CONFIRMATION OF ENROLMENT
+This document confirms that the student named below has accepted an offer and is enrolled in the course specified,
+subject to the conditions of the offer.
+Confirmation of Enrolment (CoE) number E0912345678
+Student ID S2026-04417
+Family name <mark class="PERSON" title="[PERSON_1] · Name">KARKI</mark>
+Given names <mark class="PERSON" title="[PERSON_1] · Name">Sita</mark>
+Date of birth <mark class="DOB" title="[DOB_1] · Date of birth">14/03/2003</mark>
+Sex Female
+Country of citizenship Nepal
+Passport number <mark class="ID" title="[ID_2] · ID number">PA 4821907</mark>
+Passport expiry 08/11/2031
+Residential address (home country) House 22, Ward 5, <mark class="PLACE" title="[PLACE_2] · Place">Baneshwor</mark>, <mark class="PLACE" title="[PLACE_3] · Place">Kathmandu</mark> 44600, Nepal
+Course Master of Data Science (SDASC3)
+CRICOS course code 116326C
+Course level Masters Degree (Coursework)
+Campus Casuarina Campus, Darwin NT
+Mode of study Full time, on campus
+Course start date 22/02/2027
+Course end date 20/11/2028
+Orientation 15/02/2027
+Course duration 2 years (4 semesters)
+Tuition fee per year (AUD) $31,688.00
+Total tuition fee (AUD) $63,376.00
+Initial prepaid tuition $15,844.00 (paid 30/09/2026)
+Overseas Health Cover (OSHC) provider Allianz Care Australia
+OSHC policy number OSH-<mark class="ID" title="[ID_3] · ID number">7730182</mark>
+OSHC period 15/02/2027 to 31/03/2029
+English test IELTS Academic 7.5 (21/08/2026)
+Date CoE issued 02/10/2026
+Issued by: CDU Global Admissions (sample record). This CoE is issued under the ESOS Act 2000. The student must hold
+a valid student visa to study in Australia.
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.</pre></div></main></body></html>

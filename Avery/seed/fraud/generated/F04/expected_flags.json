@@ -1,0 +1,16 @@
+{
+  "code": "F04",
+  "control": false,
+  "should_raise": [
+    "timeline.role_before_age",
+    "timeline.overlapping_full_time",
+    "timeline.visa_before_coe"
+  ],
+  "may_raise": [],
+  "should_not_raise": [
+    "cross_document.*",
+    "narrative.*",
+    "cross_application.*",
+    "document_integrity.*"
+  ]
+}

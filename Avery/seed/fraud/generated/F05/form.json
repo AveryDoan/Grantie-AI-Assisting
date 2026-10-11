@@ -1,0 +1,73 @@
+{
+  "code": "F05",
+  "title": "'Studied engineering for three years' against a transcript showing one",
+  "display_name": "Chidi Marlowe",
+  "email": "chidi.marlowe@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Chidi Marlowe",
+      "date_of_birth": "2001-05-09",
+      "email": "chidi.marlowe@example.com",
+      "phone": "0491 570 159",
+      "nationality": "Nigeria",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "18 Palm Close, Enugu 400001, Nigeria",
+      "residential_country": "Nigeria",
+      "postal_address": "18 Palm Close, Enugu 400001, Nigeria",
+      "postal_country": "Nigeria",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Nursing",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Chidi Marlowe",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I studied engineering for three years at Enugu Institute of Technology before I moved into healthcare.",
+      "academic_achievements": "I finished a certificate in community health with a credit average and received the training centre's attendance award.",
+      "leadership": "I coordinate eight volunteers at a weekend clinic run by our church.",
+      "community_engagement": "I help with blood-pressure checks and keep the waiting-room records at the clinic every Saturday.",
+      "nt_contribution": "I want to become a nurse and work in remote Northern Territory communities, because I have seen how much a calm, practical health worker can help when the nearest hospital is hours away.",
+      "biography": "Chidi lives in Enugu and changed direction after a family illness showed him how much a good nurse matters. He left engineering to study community health, completed a certificate and now coordinates volunteers at a weekend clinic, where he checks blood pressure, keeps patient records and calms anxious families in the waiting room. Co-workers describe him as steady, humorous and quick to learn new procedures. He plays football with the clinic staff on Sundays, sings in the church choir and cooks jollof rice for the volunteers after long shifts. In Darwin he wants to complete a nursing degree, join a student health group and later work in a remote clinic. He believes health care starts with listening to people and treating each patient as part of a family."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "other_1.pdf",
+      "declared_type": "other"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "The form says three years of engineering; the transcript shows one year completed and a withdrawal. A referee's letter agrees with one year."
+}

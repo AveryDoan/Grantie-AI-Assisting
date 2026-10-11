@@ -1,0 +1,73 @@
+{
+  "code": "F01",
+  "title": "Arrival date is four weeks after the course starts",
+  "display_name": "Lakshmi Aldridge",
+  "email": "lakshmi.aldridge@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Lakshmi Aldridge",
+      "date_of_birth": "2003-02-17",
+      "email": "lakshmi.aldridge@example.com",
+      "phone": "0491 570 006",
+      "nationality": "India",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "9 Marigold Court, Pune 411001, India",
+      "residential_country": "India",
+      "postal_address": "9 Marigold Court, Pune 411001, India",
+      "postal_country": "India",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Nursing",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-12-14",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Lakshmi Aldridge",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I am finishing the last term of my higher secondary certificate in Pune.",
+      "academic_achievements": "I finished Year 12 with 91 percent and first place in biology in my district.",
+      "leadership": "I captain my school's first-aid team of eleven students and run the monthly training evening.",
+      "community_engagement": "On Sundays I help at a free eye-screening camp organised by a local trust.",
+      "nt_contribution": "I want to work as a nurse in remote Northern Territory clinics, where I can use my training in first aid and my experience with screening camps to help communities that live far from a hospital.",
+      "biography": "Lakshmi is a quiet, determined student from Pune who has wanted to become a nurse since she helped care for her grandmother after a long illness. At school she studies biology, chemistry and mathematics, and she has led the first-aid team for two years. Her teachers describe her as careful, calm in a crisis and always willing to stay late to help a classmate revise. On weekends she helps at a free eye-screening camp where she registers patients, explains the process in three languages and keeps the queue moving. She plays the flute, cooks for her family on Fridays and walks to school every day. In Darwin she hopes to complete her nursing degree, join a student health society and eventually work in a remote clinic, bringing the same patience and care she has learned at home."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    },
+    {
+      "file": "other_1.pdf",
+      "declared_type": "other"
+    }
+  ],
+  "notes": "Everything agrees except the arrival date: 28 days after the course starts. Only visible by comparing the CoE with the booking."
+}

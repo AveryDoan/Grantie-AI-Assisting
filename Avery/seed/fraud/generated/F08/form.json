@@ -1,0 +1,69 @@
+{
+  "code": "F08",
+  "title": "One of three applicants sharing a referee phone, an email domain and a letter template (F08)",
+  "display_name": "Yuki Pemberley",
+  "email": "yuki.pemberley@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Yuki Pemberley",
+      "date_of_birth": "2002-12-05",
+      "email": "yuki.pemberley@example.com",
+      "phone": "0491 570 737",
+      "nationality": "Japan",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "3-11 Sakura Dori, Sapporo 060-0001, Japan",
+      "residential_country": "Japan",
+      "postal_address": "3-11 Sakura Dori, Sapporo 060-0001, Japan",
+      "postal_country": "Japan",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Science",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Yuki Pemberley",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I am a third-year science student in Sapporo.",
+      "academic_achievements": "My snow-crystal project received the university's poster prize.",
+      "leadership": "I coordinate the Saturday workshops at the science museum.",
+      "community_engagement": "I run weather workshops for children at the museum.",
+      "nt_contribution": "I want to learn how climate shapes life in the north of Australia and bring science to remote schools.",
+      "biography": "Yuki lives in Sapporo, where winter lasts half the year and she has spent many of those months in a university laboratory studying snow crystals. She is a careful experimenter who keeps tidy notebooks and explains results with simple drawings. Beyond her studies she volunteers at a children's science museum, running Saturday workshops about weather, and she plays the cello in a community orchestra. Her professors say she is calm in front of a class and generous with her time. In Darwin she hopes to complete her science degree, learn how heat and water shape a very different climate and bring her love of explaining science to schools in remote places. She also hopes to taste a real tropical mango, which she has never seen outside a photograph."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "Each application looks unrelated. Together: the same referee phone number (written two ways), one email domain, one reused letter template with a few words changed."
+}

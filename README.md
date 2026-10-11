@@ -500,3 +500,60 @@ frontend/              officer web app (React + Vite, from the Figma design)
 - Officers see the original PDF (short-lived signed link) with evidence highlights. Redacted spans are blurred on screen only; exports (`/documents/{id}/redacted.pdf`, `/applications/{id}/evidence-pack.pdf`) are rendered to images with opaque black boxes, never overlay-only.
 - `config/document_signals.yaml` lists expected shared PDF software (no integrity signal). `config/redaction.yaml` has detectors for booking references, card digits, certificate numbers.
 - Migrations 0011 to 0016 are not applied to the live Supabase yet. After 0016, run `python -m seed.backfill_pdf_layout` for existing PDFs.
+# Grantie Grant Application
+
+This repository contains the current Grantie grant decision-support application and the earlier Avery implementation.
+
+## Repository layout
+
+- `Combine/` — main application and current Grantie interface.
+- `Avery/` — preserved legacy implementation and reference workflow.
+- `Docs/` — supplied source documents used by the demos.
+
+The main UI’s document previews are also bundled at `Combine/frontend/public/docs/` so the Combine app works without depending on a separate local folder.
+
+## Run the main application
+
+From `Combine/`:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+
+In a second terminal:
+
+```bash
+cd Combine/frontend
+npm install
+npm run dev
+```
+
+Open the Vite URL shown in the terminal, normally `http://localhost:5173`.
+
+## Validate the main frontend
+
+```bash
+cd Combine/frontend
+npm run build
+```
+
+The frontend build was verified successfully before packaging this folder.
+
+## Git setup
+
+This package is intentionally prepared without a nested Git repository. From this folder:
+
+```bash
+git init
+git add .
+git commit -m "Prepare Grantie app with Avery legacy code and supplied documents"
+git branch -M main
+git remote add origin <your-repository-url>
+git push -u origin main
+```
+
+Do not commit `.env` files or secrets. Use the included `.env.example` files as templates.

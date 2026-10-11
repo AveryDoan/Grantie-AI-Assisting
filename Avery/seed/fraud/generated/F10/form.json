@@ -1,0 +1,74 @@
+{
+  "code": "F10",
+  "title": "Control: a scanned and re-saved letter and a late arrival with a good reason",
+  "display_name": "Ngoc Anh Fenwick",
+  "email": "ngocanh.fenwick@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Ngoc Anh Fenwick",
+      "date_of_birth": "2004-01-30",
+      "email": "ngocanh.fenwick@example.com",
+      "phone": "0491 571 266",
+      "nationality": "Vietnam",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "6 Orchid Street, Can Tho 94000, Vietnam",
+      "residential_country": "Vietnam",
+      "postal_address": "6 Orchid Street, Can Tho 94000, Vietnam",
+      "postal_country": "Vietnam",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Bachelor of Nursing",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-22",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Ngoc Anh Fenwick",
+      "declaration_date": "2026-10-12",
+      "arrival_note": "My student visa was granted later than planned. My provider agreed that I may arrive in the first week."
+    },
+    "answers": {
+      "current_study": "I am in my final semester of upper secondary school in Can Tho.",
+      "academic_achievements": "I received the school prize for the best results in biology and English this year.",
+      "leadership": "I organise a monthly blood-donation morning at my school with the help of twelve classmates.",
+      "community_engagement": "I read to patients at the children's ward of the provincial hospital on Sunday mornings.",
+      "nt_contribution": "I want to be a nurse in the Northern Territory, where I can care for people in small communities and learn from Aboriginal health workers about caring well for people on their own land.",
+      "biography": "Ngoc Anh lives in Can Tho on the Mekong delta, where her family sells fruit at a floating market. She decided to be a nurse after spending a month with her cousin in hospital and seeing how much the night nurses mattered. At school she is first in biology, helps younger students with English and organises a monthly blood-donation morning. On Sundays she reads picture books to children in the paediatric ward, and some of them now wait for her at the door. Teachers say she is gentle, reliable and difficult to rattle. She enjoys swimming, painting lanterns for the autumn festival and making banh xeo for friends. After the scholarship she hopes to finish a nursing degree in Darwin, learn from remote-area nurses and one day work where people most need a patient, friendly nurse."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    },
+    {
+      "file": "other_1.pdf",
+      "declared_type": "other"
+    }
+  ],
+  "notes": "Innocent: a scanned letter (scanner software, made months after its date), a re-saved PDF and an arrival six days after the course starts, explained in the form. May raise weak signals; must raise no strong flag."
+}

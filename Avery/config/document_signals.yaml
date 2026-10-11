@@ -1,0 +1,17 @@
+# Weak file-detail signals (consistency layer, check 3: document_integrity).
+#
+# A signal here is only ever a reason to look. This file lists fixtures that are EXPECTED to look alike, so the look-alike is
+# not raised as a signal. It matches on the PDF producer class only (the raw producer text is never stored) and is meant for
+# synthetic test data, never for real applications.
+expected_shared_producer:
+  - fixture: demo_sita
+    # Producer string to match (read once at upload, never stored).
+    producer_contains: "ReportLab"
+    note: >-
+      The eight Sita Karki sample PDFs (seed/demo_sita/) were generated together as test data. They share one PDF
+      producer and one creation time on purpose, so neither is a signal for these files.
+    # Which weak file-detail signals not to raise for a matching file.
+    suppress:
+      - created_after_dated
+      - created_before_dated
+      - modified_after_created

@@ -1,0 +1,286 @@
+2026 Northern Territory skilled
+occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 1 of 10
+High priority occupations
+These occupations have been identified by industry and economic modelling as high priority.
+OSCA code Occupation OSCA Skill level
+111431 Policy and Planning Manager 1
+113232 ICT Project Manager 1
+131131 Construction Project Manager 1
+131231 Engineering Manager 1
+131931 Surveying Manager 1
+141131 Assistant School Principal 1
+141231 Children's Education and Care Service Director 1
+141331 Aged Care Manager 1
+161231 Cafe or Restaurant Manager 2
+161431 Hotel or Motel Manager 2
+161631 Senior Chef 2
+162131 Retail Manager (General) 2
+171231 Office Manager 2
+172132 Customer Service Manager 2
+172231 Event Manager 2
+172331 Facilities Manager 2
+211131 Accountant (General) 1
+211134 Management Accountant 1
+211231 External Auditor 1
+222131 Human Resources Adviser 1
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 2 of 10
+222331 Rehabilitation Consultant 1
+222332 Work Health and Safety Adviser 1
+222431 Training and Development Professional 1
+223431 Enterprise Architect 1
+223932 Cost Controller 1
+232335 Heritage Consultant 1
+242332 Graphic Designer 1
+243231 Civil Engineer 1
+243331 Electrical Engineer 1
+243532 Mechanical Engineer 1
+243533 Production or Plant Engineer 1
+243631 Mining Engineer (excluding Petroleum) 1
+243932 Aerospace Engineer 1
+243933 Biomedical Engineer 1
+244331 Aboriginal and Torres Strait Islander Land and Sea Ranger 1
+244333 Ecologist 1
+244334 Park Ranger 1
+244531 Geologist 1
+244731 Medical Laboratory Scientist 1
+251131 Early Childhood (Pre-primary School) Teacher 1
+251231 Primary School Teacher 1
+251331 Secondary School Teacher 1
+252231 Vocational Education Teacher 1
+261131 Counsellor (General) 1
+261231 Psychologist 1
+261331 Social Worker 1
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 3 of 10
+262231 Exercise Physiologist 1
+262331 Occupational Therapist 1
+262431 Physiotherapist 1
+262631 Speech Pathologist 1
+263131 Nuclear Medicine Technologist 1
+263133 Radiographer 1
+263231 Dietitian 1
+263331 Optometrist 1
+263431 Community Pharmacist 1
+263432 Hospital Pharmacist 1
+263931 Audiologist 1
+264231 General Practitioner 1
+264333 Endocrinologist 1
+264431 Psychiatrist 1
+264531 Resident Medical Officer 1
+264932 Emergency Medicine Specialist 1
+264937 Radiologist 1
+265131 Midwife 1
+265432 Registered Nurse (Acute Care) 1
+265434 Registered Nurse (Mental Health) 1
+265435 Registered Nurse (Primary Health Care) 1
+265499 Registered Nurses nec 1
+269232 Dentist 1
+269332 Health Promotion Officer 1
+269531 Veterinarian 1
+273333 Software Engineer 1
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 4 of 10
+299131 Aeroplane Pilot 1
+299231 Specialist Police Officer 1
+312132 Building Designer 2
+312331 Construction Estimator 2
+312432 Construction Site Supervisor 2
+313435 Ship's Master 2
+313934 Mechanical Engineering Technician 2
+321131 Chef 2
+322231 Butcher or Smallgoods Maker 3
+322331 Cook 3
+322431 Pastrycook 3
+331131 Metal Fabricator 3
+331936 Sheetmetal Worker 3
+332231 Fitter (General) 3
+332232 Fitter and Turner 3
+351131 Automotive Technician (General) 3
+351231 Automotive Electrician 3
+351331 Panelbeater 3
+351433 Diesel Technician 3
+351435 Marine Technician 3
+351631 Vehicle Painter 3
+361231 Painter 3
+362131 Glazier 3
+362231 Plasterer (Wall and Ceiling) 3
+363131 Plumber (General) 3
+371231 Concreter 3
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 5 of 10
+372132 Carpenter 3
+381231 Electrician (General) 3
+382131 Air Conditioning and Refrigeration Technician 3
+382232 Electronic Equipment Trades Worker 3
+391231 Audio Engineer 3
+392132 Hairdresser 3
+399933 Fire Protection Equipment Technician 3
+411131 Child Protection Practitioner 2
+411132 Family Violence Practitioner 2
+411231 Community Development Officer 2
+411232 Community Support Worker 2
+411632 Family Support Worker 2
+411733 Youth Worker 2
+421131 Aged Care Coordinator 3
+421132 Aged Care Team Leader 3
+422131 Disability Services Officer 2
+422132 Residential Care Officer 2
+431131 Early Childhood Education Room Leader 2
+431132 Early Childhood Educator 3
+441131 Enrolled Nurse 2
+452235 Protective Services Officer 4
+461131 Beauty Therapist 3
+461632 Tour Guide 3
+471131 Bar Attendant 4
+471231 Barista 4
+471531 Bar Supervisor 3
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 6 of 10
+471532 Cafe or Restaurant Supervisor 3
+511231 Program or Project Administrator 2
+541131 Accounts Clerk 4
+542131 Bookkeeper 3
+553131 Receptionist (General) 4
+561131 General Clerk 4
+622131 Property Manager 3
+712231 Delivery Person 4
+713131 Truck Driver (General) 4
+721131 Storeperson 4
+732331 Miner 4
+741331 Forklift Driver 4
+899937 Swimming Pool or Spa Technician 4
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 7 of 10
+Priority occupations
+These occupations have been identified by industry and economic modelling as priority.
+OSCA
+code Occupation OSCA Skill
+level
+111531 Research and Development Manager 1
+111631 Quality Assurance Manager 1
+131331 Project Builder 1
+132232 Production Manager (Manufacturing) 1
+132233 Production Manager (Mining) 1
+141132 School Principal 1
+141333 Medical Administrator 1
+141335 Welfare Centre Manager 1
+141399 Health and Welfare Service Managers nec 1
+141499 Education Managers nec 1
+149333 Laboratory Manager 1
+152931 Apiarist 1
+161999 Hospitality, Tourism and Venue Managers nec 2
+171331 Health Practice Manager 2
+211232 Internal Auditor 1
+223231 Data Analyst 1
+231431 Artistic Director 1
+241131 Architect 1
+241132 Landscape Architect 1
+241232 Engineering Surveyor 1
+241234 Land Surveyor 1
+243131 Chemical Engineer 1
+243232 Geotechnical Engineer 1
+243234 Structural Engineer 1
+243236 Water Engineer 1
+243431 Electronics Engineer 1
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 8 of 10
+244134 Aquaculture or Fisheries Scientist 1
+244231 Chemist 1
+244432 Environmental Research Scientist 1
+251431 Special Education Teacher 1
+252131 University Lecturer 1
+259932 Careers Adviser 1
+261132 Alcohol and Other Drugs Counsellor 1
+261134 Psychotherapist 1
+264935 Pathologist 1
+265231 Nurse Educator 1
+265331 Nursing / Midwifery Unit Manager 1
+265433 Registered Nurse (Aged Care) 1
+271131 Cyber Governance Risk and Compliance Specialist 1
+272232 ICT Support Engineer 1
+273331 Cloud Engineer 1
+281299 Judicial and Other Legal Professionals nec 1
+299134 Helicopter Pilot 1
+311133 Aquaculture or Fisheries Technician 2
+311232 Dental Technician 2
+311331 Community Pharmacy Technician 3
+311531 Chemical Technician 2
+312231 Building Inspector 1
+312234 Safety Inspector 2
+313232 Electrical Engineering Technician 2
+313431 Marine Engineer 2
+313933 Mechanical Engineering Draftsperson 2
+313935 Metallurgical or Materials Technician 2
+322131 Baker 3
+331133 Welder (First Class) 3
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 9 of 10
+332131 Aircraft Maintenance Technician (Avionics) 3
+332132 Aircraft Maintenance Technician (Mechanical) 3
+332234 Metal Machinist (First Class) 3
+332334 Locksmith 3
+342231 Arborist 2
+342232 Tree Worker 3
+342531 Sports Turf Manager 2
+343131 Aquaculture Supervisor 3
+351436 Motorcycle Technician 3
+351437 Small Engine Technician 3
+363932 Fire Protection Plumber 3
+369131 Cabinet Maker 3
+372131 Carpenter and Joiner 3
+381232 Electrical Fitter 3
+381233 Industrial Electrician 3
+382334 Telecommunications Technician 3
+391531 Signwriter 3
+392131 Barber 3
+399132 Gas or Petroleum Production Technician 3
+399938 Shipwright 3
+411633 Financial Counsellor (Community) 2
+411636 Welfare Worker 2
+411732 Youth Justice Worker 2
+421231 Community Aged Care Support Worker 4
+421331 Residential Aged Care Worker 4
+422231 Disability Support Worker 4
+432231 Teaching Assistant 3
+441233 Remedial Massage Therapist 2
+441331 Mental Health Worker 2
+2026 Northern Territory skilled occupation priority list
+Department of Trade, Business and Asian Relations
+31 August 2026 | Page 10 of 10
+441931 Aboriginal and Torres Strait Islander Health Practitioner 3
+441932 Aboriginal and Torres Strait Islander Health Worker 3
+442331 Dental Assistant 4
+442531 Patient Care Assistant 4
+451331 General Duties Police Officer 2
+471331 Cafe Worker 5
+511131 Contract Administrator 2
+552131 Medical Receptionist 4
+571431 Stock Clerk 4
+571531 Warehouse Administrator 4
+631131 Sales Assistant (General) 5
+711231 Bus Driver 4
+711331 Freight Train Driver 3
+713231 Articulated Truck Driver 3
+732131 Crane, Hoist or Lift Operator 4
+741937 Stevedore 4
+811131 Commercial Cleaner 5
+811431 Commercial Housekeeper 5
+811531 Vehicle Detailer 5
+821132 Builder's Labourer 4
+821431 Building Insulation Installer 3
+841132 Fruit Farm Worker 5
+841136 Nut Farm Worker 5
+851231 Kitchenhand (General) 5
+899331 Handyperson 5
+899434 Tyre Fitter 4

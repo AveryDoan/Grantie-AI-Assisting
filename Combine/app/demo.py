@@ -1,0 +1,99 @@
+"""DEMO MODE (APP_MODE=demo): run the whole product without Supabase.
+
+- Data: the synthetic seed in an in-memory store (lost on restart).
+- Login: POST /demo/login issues a short-lived token for a demo user, signed
+  with a random secret generated at startup.
+- LLM: the configured provider if it has a key, otherwise the offline keyword
+  stub (NOT an LLM); every run records which one answered.
+
+Never enable demo mode on a deployment that holds real data: anyone who can
+reach /demo/login can sign in.
+"""
+
+from __future__ import annotations
+
+import secrets
+import time
+
+import jwt
+from pydantic import SecretStr
+
+from app.config import Settings
+from app.llm import LLMClient, LLMError, build_llm_client
+from app.llm.cache import MemoryCache
+from app.llm.stub import OfflineStubProvider
+from app.store.memory import MemoryStore
+from seed import data
+from seed.data import sid
+from seed.run import seed
+
+DEMO_USERS = {
+    "officer": {"id": sid("user:officer"), "display_name": "Demo Officer (fictional)", "org": data.ORG_ID},
+    "admin": {"id": sid("user:admin"), "display_name": "Demo Admin (fictional)", "org": data.ORG_ID},
+    "applicant": {"id": sid("user:applicant"), "display_name": "Demo Applicant (fictional)", "org": None},
+    # A second fictional applicant, used to load the Sita Karki sample files through the real applicant upload flow.
+    "sita": {"id": sid("user:sita"), "display_name": "Sita Karki (fictional)", "org": None},
+}
+
+
+def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dict]]:
+    store = MemoryStore()
+    seed(store)
+    for role, u in DEMO_USERS.items():
+        store.insert("profiles", {"id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
+    store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
+    from redaction.crypto import generate_key
+
+    update = {"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48)), "consistency_layer": True}
+    if not settings.identifier_hash_key.get_secret_value():  # keyed hashes that link applications; ephemeral in demo
+        update["identifier_hash_key"] = SecretStr(secrets.token_urlsafe(32))
+    if not settings.redaction_key.get_secret_value():  # demo data is in memory: an ephemeral key is fine
+        update["redaction_key"] = SecretStr(generate_key())
+    demo_settings = settings.model_copy(update=update)
+
+    _seed_consistency_cases(store, demo_settings, DEMO_USERS["officer"])
+
+    # Populate the evaluation dashboard (clearly labelled as the offline stub).
+    from eval.harness import run_evaluation
+
+    run_evaluation(store, LLMClient(OfflineStubProvider(), temperature=0.0), demo_settings,
+                   provider_label="offline keyword stub (NOT an LLM)")
+    return store, demo_settings, DEMO_USERS
+
+
+def demo_llm_factory(cache: MemoryCache):
+    def make(_store: object, cfg: Settings) -> LLMClient:
+        try:
+            return build_llm_client(cfg, cache=cache)
+        except LLMError:
+            return LLMClient(OfflineStubProvider(), cache=cache, temperature=0.0)
+
+    return make
+
+
+def demo_token(settings: Settings, user_id: str, hours: int = 8) -> str:
+    now = int(time.time())
+    return jwt.encode(
+        {"sub": user_id, "aud": settings.jwt_audience, "role": "authenticated", "iat": now, "exp": now + hours * 3600},
+        settings.supabase_jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+
+def _seed_consistency_cases(store: MemoryStore, settings: Settings, officer: dict) -> None:
+    """F01 to F10 (fictional, with deliberate inconsistencies), assessed with the offline stub so flags are ready to look at.
+
+    The runs are labelled with the stub's model name. An officer can run the check again with the configured AI.
+    """
+    from app.pipeline.orchestrator import run_assessment
+    from app.services.access import Actor
+    from seed.fraud.load import seed_fraud
+
+    ids = seed_fraud(store)
+    actor = Actor(user_id=officer["id"], role="officer", organisation_id=officer["org"])
+    stub = LLMClient(OfflineStubProvider(), temperature=0.0)
+    for app_id in ids.values():
+        try:
+            run_assessment(store, actor, app_id, stub, settings)
+        except Exception:  # the demo must start even if one case cannot be assessed
+            pass

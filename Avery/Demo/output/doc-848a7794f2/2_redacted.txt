@@ -1,0 +1,36 @@
+[page 1]
+Himalayan Institute of Technology
+H
+Department of Computer Engineering
+Baneshwor Campus, [PLACE_1] 44600, Nepal | [PHONE_1] | hit.example.edu.np
+14 September 2026
+Study NT Scholarship Assessment Panel
+Department of Trade, Business and Asian Relations
+Northern Territory Government, Darwin [LOCATION: NT, Australia], Australia
+RE: Letter of support for [PERSON_2], 2026-27 Scholarship Program Round 1 (Study NT)
+To the Assessment Panel,
+I am Associate Professor of Computer Engineering at Himalayan Institute of Technology, and I
+have known [PERSON_1] for four years. I taught her in Data Structures and Machine Learning, I
+supervised her final year project, and I am the faculty adviser to the Women in Technology Society
+she led in 2024. I am pleased to give her my strongest support.
+Academic. [PERSON_1] is one of the three strongest students I have taught in 17 years. She has a GPA of
+3.84 and her work shows real depth, not only high marks. Her project on crop disease detection for
+low bandwidth settings was technically careful, tested with 60 farmers, and won first place at the
+2025 National Student Innovation Showcase. She writes clear code and clear reports, and she
+accepts criticism well.
+Personal and leadership. [PERSON_1] founded Code Pahadi, a free coding club for rural girls, without
+being asked and without funding. I have visited two of its classes. The students are engaged and
+the mentors are former students she trained. As President of the Women in Technology Society
+she grew membership from 40 to 125 and secured 12 internships. She is reliable, generous with
+her time and calm under pressure.
+I have no doubt she will do well in Darwin and give back to the community there. I recommend her
+without reservation. Please contact me if you need more information.
+Yours sincerely,
+[PERSON_3]
+Dr [PERSON_3]
+Associate Professor and Head of Department, Computer Engineering
+Himalayan Institute of Technology
+Relationship: lecturer, project supervisor and faculty adviser. Length of association: 4 years (since
+August 2022).
+[PERSON_4]: [EMAIL_1] | Mobile: [PHONE_2]
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.

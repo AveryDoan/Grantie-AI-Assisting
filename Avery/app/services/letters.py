@@ -1,0 +1,388 @@
+"""Reasons letters (pipeline step 10).
+
+Built ONLY from findings an officer has decided (confirm/override) in the
+latest run; AI suggestions that were never reviewed are not used. The text
+is assembled by a fixed template (no LLM), so the applicant's quotes are
+reproduced exactly and nothing outside the rule pack is invented.
+
+Per reason: what the rule requires; what you wrote (quoted); why this did not
+meet the rule; what would change the outcome (from the rule itself); how to
+ask for a review (from letter_config).
+
+Code checks then run and are stored: quotes match the application, every
+reason cites a confirmed rule, reading grade (textstat), and a quality
+checklist. The officer must approve before the letter's status changes;
+approval also requires the application to be signed off.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+import textstat
+
+from app.pipeline.verification import verify_quote
+from app.config import Settings, get_settings
+from app.services.redaction_service import QuoteRestorer
+from app.services.access import Actor, application_for_staff, require_role
+from app.services.audit import write_audit
+from app.services.errors import Conflict, NotFound, ValidationFailed
+from app.services.review import latest_reviews, latest_run
+from app.store.base import Store, now_iso, one
+
+REASON_HEADER = re.compile(r"^Reason (\d+): rule (\S+)\b", re.M)
+QUOTE_LINE = re.compile(r'^What you wrote: "(.*)"\s*$', re.M)
+TARGET_GRADE = 9.0  # about Year 8; textstat's Flesch-Kincaid grade
+
+
+
+def _what_would_change(rule: dict[str, Any]) -> str:
+    explicit = (rule.get("params") or {}).get("what_would_change")
+    if explicit:
+        return explicit
+    return f"Your application would need to show this: {rule['rule_text']}"
+
+
+def _what_you_wrote(reason: dict[str, Any]) -> str:
+    if reason["quote"]:
+        return f'What you wrote: "{reason["quote"]}"'
+    if reason["finding"].get("check_source") == "code" and reason["rule"].get("rule_type") in ("document_based", "cross_application"):
+        return "What you wrote: We checked this using the documents and records you gave us, not your written answers."
+    return "What you wrote: We did not find anything about this in your application."
+
+
+def _why(finding: dict[str, Any], review: dict[str, Any]) -> str:
+    if review.get("reason"):
+        return review["reason"]
+    if review["final_status"] == "Needs evidence":
+        return "Your application did not give us enough information to check this."
+    if finding.get("check_source") == "code" and finding.get("rationale"):
+        return finding["rationale"]
+    return "The information in your application did not show that this rule was met."
+
+
+def compose_letter(
+    *,
+    program_name: str,
+    pack_version: str,
+    reasons: list[dict[str, Any]],
+    letter_config: dict[str, Any],
+) -> str:
+    review_process = letter_config.get("review_process", "[review process text]")
+    contact = letter_config.get("contact", "[contact details]")
+    deadline = letter_config.get("review_deadline", "[review deadline wording]")
+    lines = [
+        f"About your application to {program_name}",
+        "",
+        "Dear applicant,",
+        "",
+        f"Thank you for applying for {program_name}. An officer has checked your application against "
+        f"the published rules (rule pack {pack_version}). This letter explains each rule your application "
+        "did not meet, or where we need more information.",
+        "",
+    ]
+    for i, r in enumerate(reasons, start=1):
+        rule = r["rule"]
+        clause = f" ({rule['source_clause']})" if rule.get("source_clause") else ""
+        lines += [
+            f"Reason {i}: rule {rule['rule_code']}",
+            f"What the rule requires: {rule['rule_text']}{clause}",
+            _what_you_wrote(r),
+            f"Why this did not meet the rule: {r['why']}",
+            f"What would change the outcome: {_what_would_change(rule)}",
+            f"How to ask for a review: {review_process}",
+            "",
+        ]
+    lines += [
+        "How to ask for a review",
+        f"{review_process} {deadline}",
+        f"Contact: {contact}",
+        "",
+        "A person made this decision. Computer tools only helped the officer find information.",
+    ]
+    return "\n".join(lines)
+
+
+def run_letter_checks(
+    body: str,
+    *,
+    source_text: str,
+    confirmed_rule_codes: set[str],
+    letter_config: dict[str, Any],
+) -> dict[str, Any]:
+    cited = REASON_HEADER.findall(body)
+    cited_codes = [code for _, code in cited]
+    quotes = QUOTE_LINE.findall(body)
+    unmatched = [q for q in quotes if not verify_quote(q, source_text, threshold=100.0).verified]
+    uncited = [c for c in cited_codes if c not in confirmed_rule_codes]
+
+    # Checklist per reason block.
+    blocks = re.split(r"^Reason \d+: ", body, flags=re.M)[1:]
+    review_text = letter_config.get("review_process", "")
+    checklist = []
+    for block in blocks:
+        code = block.split()[1] if len(block.split()) > 1 else "?"
+        checklist.append(
+            {
+                "rule": code,
+                "cites_rule": "What the rule requires:" in block and code in confirmed_rule_codes,
+                "quotes_applicant": bool(re.search(r'^What you wrote: (".+"|We did not find|We checked)', block, re.M)),
+                "explains_link": bool(re.search(r"^Why this did not meet the rule: \S", block, re.M)),
+                "says_what_would_change": bool(re.search(r"^What would change the outcome: \S", block, re.M)),
+                "includes_review_info": bool(review_text) and review_text in block,
+            }
+        )
+
+    prose = QUOTE_LINE.sub("", body)  # grade the officer's wording, not the applicant's
+    grade = round(float(textstat.flesch_kincaid_grade(prose)), 1)
+    lowered = body.lower()
+    no_score = not any(w in lowered for w in (" score", "ranking", "ranked", "ai decided", "the ai has decided"))
+
+    result = {
+        "quotes_match_application": not unmatched,
+        "unmatched_quotes": unmatched,
+        "every_reason_cites_confirmed_rule": bool(cited_codes) and not uncited,
+        "uncited_or_unconfirmed_rules": uncited,
+        "reading_grade": grade,
+        "reading_grade_target": TARGET_GRADE,
+        "reading_grade_ok": grade <= TARGET_GRADE,
+        "no_score_or_ranking_language": no_score,
+        "checklist": checklist,
+        "includes_review_info": bool(review_text) and review_text in body and letter_config.get("contact", "") in body,
+    }
+    result["all_passed"] = (
+        result["quotes_match_application"]
+        and result["every_reason_cites_confirmed_rule"]
+        and result["reading_grade_ok"]
+        and result["no_score_or_ranking_language"]
+        and result["includes_review_info"]
+        and all(all(v for k, v in c.items() if k != "rule") for c in checklist)
+    )
+    return result
+
+
+def _context(store: Store, app: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    from redaction.structured import original_application_text
+    run = latest_run(store, app["id"])
+    if run is None:
+        raise Conflict("There is no complete assessment run for this application")
+    findings = store.select("findings", eq={"run_id": run["id"]})
+    reviews = latest_reviews(store, [f["id"] for f in findings])
+    rules_by_id = {r["id"]: r for r in store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]})}
+    marked = {m["rule_code"] for m in store.select("merit_marks", eq={"application_id": app["id"]})}
+
+    def is_merit(f: dict[str, Any]) -> bool:
+        return (rules_by_id.get(f["rule_id"], {}).get("params") or {}).get("section") == "merit"
+
+    # Merit criteria are decided by the officer's mark (or Not assessed), not by a status; they never appear in the letter.
+    pending = [f for f in findings if (rules_by_id[f["rule_id"]]["rule_code"] not in marked) if is_merit(f)] + [
+        f for f in findings if not is_merit(f) and (f["id"] not in reviews or reviews[f["id"]]["action"] == "ask_applicant")]
+    pack = one(store.select("rule_packs", eq={"id": run["rule_pack_id"]}, limit=1)) or {}
+    program = one(store.select("grant_programs", eq={"id": app["grant_program_id"]}, limit=1)) or {}
+    rules = {r["id"]: r for r in store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]})}
+    confirmed = {rules[f["rule_id"]]["rule_code"] for f in findings if f["id"] in reviews and reviews[f["id"]]["action"] != "ask_applicant"}
+    return {
+        "run": run,
+        "findings": findings,
+        "reviews": reviews,
+        "pending": pending,
+        "pack": pack,
+        "program": program,
+        "rules": rules,
+        # Quotes in findings contain tokens; this maps them back to the applicant's own words.
+        "restorer": QuoteRestorer(store, app, settings or get_settings()),
+        "confirmed_codes": confirmed,
+        "source_text": original_application_text(app.get("application_text") or {}),
+        "app_text": app.get("application_text") or {},
+    }
+
+
+def _typed_answer(ctx: dict[str, Any], rule: dict[str, Any]) -> str | None:
+    """For a rule checked by code from a typed answer (a date, a country), the applicant's own entry, exactly as they typed it.
+    Only used when it appears word for word in the application text."""
+    from app.services.queue import rule_sources
+
+    fields = ((ctx.get("app_text") or {}).get("fields") or {}) | ((ctx.get("app_text") or {}).get("answers") or {})
+    for src in rule_sources(rule):
+        value = str(fields.get(src["typed"]) or "").strip() if src.get("typed") else ""
+        if len(value) >= 3 and verify_quote(value, ctx["source_text"], threshold=100.0).verified:
+            return value
+    return None
+
+
+def _decline_reasons(ctx: dict[str, Any]) -> list[dict[str, Any]]:
+    reasons = []
+    for f in ctx["findings"]:
+        review = ctx["reviews"].get(f["id"])
+        if review is None or review["final_status"] not in ("Not met", "Needs evidence"):
+            continue
+        rule = ctx["rules"][f["rule_id"]]
+        quote = ctx["restorer"].original(f.get("evidence_quote"), "application_text") if f.get("quote_verified") else None
+        if quote and not verify_quote(quote, ctx["source_text"], threshold=100.0).verified:
+            quote = None  # never put words in the applicant's mouth
+        if not quote:
+            quote = _typed_answer(ctx, rule)
+        reasons.append({"rule": rule, "finding": f, "quote": quote, "why": _why(f, review)})
+    reasons.sort(key=lambda r: (r["rule"].get("display_order", 0), r["rule"]["rule_code"]))
+    return reasons
+
+
+def _store_letter(store: Store, actor: Actor, app: dict[str, Any], ctx: dict[str, Any], reasons: list[dict[str, Any]]) -> dict[str, Any]:
+    letter_config = ctx["pack"].get("letter_config") or {}
+    body = compose_letter(
+        program_name=ctx["program"].get("name", "the grant program"),
+        pack_version=ctx["run"]["rule_pack_version"],
+        reasons=reasons,
+        letter_config=letter_config,
+    )
+    checks = run_letter_checks(body, source_text=ctx["source_text"], confirmed_rule_codes=ctx["confirmed_codes"],
+                               letter_config=letter_config)
+    existing = store.select("letters", eq={"application_id": app["id"]})
+    version = max((l["version"] for l in existing), default=0) + 1
+    letter = store.insert(
+        "letters",
+        {
+            "application_id": app["id"],
+            "version": version,
+            "body_text": body,
+            "reading_grade": checks["reading_grade"],
+            "quality_checks": checks,
+            "source_finding_ids": [r["finding"]["id"] for r in reasons],
+            "status": "draft",
+            "kind": "decline",
+        },
+    )[0]
+    write_audit(store, actor, "letter.generated", application_id=app["id"],
+                rule_pack_version=ctx["run"]["rule_pack_version"],
+                details={"letter_id": letter["id"], "version": version, "reasons": len(reasons), "kind": "decline",
+                         "all_checks_passed": checks["all_passed"], "reading_grade": checks["reading_grade"]})
+    return letter
+
+
+def generate_letter(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any]:
+    require_role(actor, "officer")
+    app = application_for_staff(store, actor, application_id)
+    ctx = _context(store, app, settings)
+    if ctx["pending"]:
+        raise Conflict(
+            "Every finding needs an officer decision before a letter can be drafted",
+            details={"pending_findings": [f["id"] for f in ctx["pending"]]},
+        )
+    reasons = _decline_reasons(ctx)
+    if not reasons:
+        raise Conflict("No officer-confirmed unmet rules: a reasons letter is not needed")
+    return _store_letter(store, actor, app, ctx, reasons)
+
+
+def draft_on_confirmation(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    """An officer has just confirmed a rule as Not met: draft the decline letter now, from the decisions made so far.
+
+    It is only a draft. It is never sent: the applicant sees nothing until the officer approves it, and approval needs sign-off.
+    A letter the officer has already edited or approved is never overwritten."""
+    app = application_for_staff(store, actor, application_id)
+    try:
+        ctx = _context(store, app, settings)
+    except Conflict:
+        return None
+    reasons = [r for r in _decline_reasons(ctx) if ctx["reviews"][r["finding"]["id"]]["final_status"] == "Not met"] or []
+    if not reasons:
+        return None
+    all_reasons = _decline_reasons(ctx)
+    latest = max((l for l in store.select("letters", eq={"application_id": application_id}) if l.get("kind", "decline") == "decline"),
+                 key=lambda l: l["version"], default=None)
+    if latest and latest["status"] in ("edited", "approved"):
+        return latest
+    return _store_letter(store, actor, app, ctx, all_reasons)
+
+
+# ---------------------------------------------------------------- the "next steps" letter (eligible applications)
+
+
+def run_next_steps_checks(body: str, letter_config: dict[str, Any]) -> dict[str, Any]:
+    grade = round(float(textstat.flesch_kincaid_grade(body)), 1)
+    lowered = body.lower()
+    no_score = not any(w in lowered for w in (" score", "ranking", "ranked", "ai decided", "the ai has decided"))
+    contact = letter_config.get("contact", "")
+    result = {
+        "quotes_match_application": True, "unmatched_quotes": [], "every_reason_cites_confirmed_rule": True,
+        "uncited_or_unconfirmed_rules": [], "reading_grade": grade, "reading_grade_target": TARGET_GRADE,
+        "reading_grade_ok": grade <= TARGET_GRADE, "no_score_or_ranking_language": no_score, "checklist": [],
+        "includes_review_info": bool(contact) and contact in body,
+    }
+    result["all_passed"] = result["reading_grade_ok"] and no_score and result["includes_review_info"]
+    return result
+
+
+def generate_next_steps(store: Store, actor: Actor, application_id: str, settings: Settings | None = None) -> dict[str, Any]:
+    """The letter for an application whose eligibility rules are all met (or decided by the officer). A draft until approved."""
+    require_role(actor, "officer")
+    app = application_for_staff(store, actor, application_id)
+    ctx = _context(store, app, settings)
+    if ctx["pending"]:
+        raise Conflict("Every rule needs your decision before this letter can be drafted",
+                       details={"pending_findings": [f["id"] for f in ctx["pending"]]})
+    if _decline_reasons(ctx):
+        raise Conflict("An unmet rule needs a reasons letter, not a next-steps letter")
+    cfg = ctx["pack"].get("letter_config") or {}
+    program = ctx["program"].get("name", "the grant program")
+    body = "\n".join([
+        f"About your application to {program}", "", "Dear applicant,", "",
+        f"Thank you for applying for {program}. An officer has checked your application against the published rules "
+        f"(rule pack {ctx['run']['rule_pack_version']}). Your application meets the rules we check first.", "",
+        "What happens next", cfg.get("next_steps", "[next steps and dates]"), "",
+        "If you have a question", f"Contact: {cfg.get('contact', '[contact details]')}", "",
+        "A person made this decision. Computer tools only helped the officer find information.",
+    ])
+    checks = run_next_steps_checks(body, cfg)
+    version = max((l["version"] for l in store.select("letters", eq={"application_id": application_id})), default=0) + 1
+    letter = store.insert("letters", {"application_id": application_id, "version": version, "body_text": body,
+                                      "reading_grade": checks["reading_grade"], "quality_checks": checks,
+                                      "source_finding_ids": [], "status": "draft", "kind": "next_steps"})[0]
+    write_audit(store, actor, "letter.generated", application_id=application_id, rule_pack_version=ctx["run"]["rule_pack_version"],
+                details={"letter_id": letter["id"], "version": version, "kind": "next_steps", "all_checks_passed": checks["all_passed"],
+                         "reading_grade": checks["reading_grade"]})
+    return letter
+
+
+def update_letter(
+    store: Store, actor: Actor, letter_id: str, *, body_text: str | None = None, approve: bool = False
+) -> dict[str, Any]:
+    require_role(actor, "officer")
+    letter = one(store.select("letters", eq={"id": letter_id}, limit=1))
+    if not letter:
+        raise NotFound("Letter not found")
+    app = application_for_staff(store, actor, letter["application_id"])
+    if letter["status"] == "approved":
+        raise Conflict("This letter is approved and cannot be changed; generate a new version")
+    if body_text is None and not approve:
+        raise ValidationFailed("Provide body_text to edit, or approve=true")
+
+    ctx = _context(store, app)
+    letter_config = ctx["pack"].get("letter_config") or {}
+    body = body_text if body_text is not None else letter["body_text"]
+    if letter.get("kind") == "next_steps":
+        checks = run_next_steps_checks(body, letter_config)
+    else:
+        checks = run_letter_checks(body, source_text=ctx["source_text"], confirmed_rule_codes=ctx["confirmed_codes"],
+                                   letter_config=letter_config)
+    values: dict[str, Any] = {"body_text": body, "quality_checks": checks, "reading_grade": checks["reading_grade"]}
+    if body_text is not None:
+        values |= {"status": "edited", "edited_by": actor.user_id}
+
+    if approve:
+        if not checks["quotes_match_application"] or not checks["every_reason_cites_confirmed_rule"]:
+            raise Conflict("The letter fails a required check and cannot be approved", details={"quality_checks": checks})
+        if app["status"] != "signed_off":
+            raise Conflict("Sign off the application before approving its letter")
+        values |= {"status": "approved", "approved_by": actor.user_id, "approved_at": now_iso()}
+
+    updated = store.update("letters", values, eq={"id": letter_id})[0]
+    write_audit(
+        store,
+        actor,
+        "letter.approved" if approve else "letter.edited",
+        application_id=app["id"],
+        details={"letter_id": letter_id, "version": letter["version"], "all_checks_passed": checks["all_passed"]},
+    )
+    return updated

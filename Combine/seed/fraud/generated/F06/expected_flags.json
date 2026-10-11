@@ -1,0 +1,17 @@
+{
+  "code": "F06",
+  "control": false,
+  "should_raise": [
+    "document_integrity.created_after_dated",
+    "document_integrity.editing_software"
+  ],
+  "may_raise": [
+    "document_integrity.modified_after_created"
+  ],
+  "should_not_raise": [
+    "cross_document.*",
+    "timeline.*",
+    "narrative.*",
+    "cross_application.*"
+  ]
+}

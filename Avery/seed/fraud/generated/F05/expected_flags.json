@@ -1,0 +1,14 @@
+{
+  "code": "F05",
+  "control": false,
+  "should_raise": [
+    "narrative.conflicting_statements"
+  ],
+  "may_raise": [],
+  "should_not_raise": [
+    "cross_document.*",
+    "timeline.*",
+    "cross_application.*",
+    "document_integrity.*"
+  ]
+}

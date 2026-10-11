@@ -1,0 +1,69 @@
+{
+  "code": "F09",
+  "title": "One of three applicants sharing a referee phone, an email domain and a letter template (F09)",
+  "display_name": "Amara Locksley",
+  "email": "amara.locksley@example.com",
+  "submitted_at": "2026-10-12T09:00:00+00:00",
+  "application_text": {
+    "fields": {
+      "applicant_name": "Amara Locksley",
+      "date_of_birth": "2001-10-19",
+      "email": "amara.locksley@example.com",
+      "phone": "0491 570 313",
+      "nationality": "Kenya",
+      "australian_or_nz_citizen_or_pr": "No",
+      "residential_address": "88 Acacia Estate, Kisumu 40100, Kenya",
+      "residential_country": "Kenya",
+      "postal_address": "88 Acacia Estate, Kisumu 40100, Kenya",
+      "postal_country": "Kenya",
+      "education_provider": "Charles Darwin University",
+      "course_name": "Master of Public Health",
+      "course_start_date": "2026-11-16",
+      "study_load": "Full-time",
+      "arrival_date": "2026-11-02",
+      "under_18": "No",
+      "declaration_agreed": "Yes",
+      "declaration_name": "Amara Locksley",
+      "declaration_date": "2026-10-12"
+    },
+    "answers": {
+      "current_study": "I work in a community health programme and study part of the week.",
+      "academic_achievements": "I completed my nursing diploma with distinction.",
+      "leadership": "I lead five health volunteers who visit fishing villages.",
+      "community_engagement": "I run a savings group for mothers in the villages I visit.",
+      "nt_contribution": "I want to study how health services reach remote communities and use it to improve care around Lake Victoria.",
+      "biography": "Amara comes from Kisumu on the shore of Lake Victoria and works in a community health programme that visits fishing villages. She trained as a nurse, noticed how often simple problems such as dirty water became serious illness, and decided to study public health. She leads a team of five health volunteers, keeps careful records of every visit and runs a small savings group for mothers. Colleagues describe her as determined, funny and tireless on long field days. She sings in her church choir and loves to cook ugali with sukuma wiki for visiting friends. In Darwin she hopes to complete a Master of Public Health, study how services reach remote communities and bring those lessons home to the lake."
+    }
+  },
+  "documents": [
+    {
+      "file": "coe_1.pdf",
+      "declared_type": "coe"
+    },
+    {
+      "file": "offer_letter_1.pdf",
+      "declared_type": "offer letter"
+    },
+    {
+      "file": "visa_1.pdf",
+      "declared_type": "visa"
+    },
+    {
+      "file": "travel_booking_1.pdf",
+      "declared_type": "travel booking"
+    },
+    {
+      "file": "referee_letter_1.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "referee_letter_2.pdf",
+      "declared_type": "referee letter"
+    },
+    {
+      "file": "headshot_1.pdf",
+      "declared_type": "headshot"
+    }
+  ],
+  "notes": "Each application looks unrelated. Together: the same referee phone number (written two ways), one email domain, one reused letter template with a few words changed, and one shared contact phone number (F07 and F09)."
+}

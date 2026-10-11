@@ -1,0 +1,15 @@
+{
+  "code": "F10",
+  "control": true,
+  "should_raise": [],
+  "may_raise": [
+    "document_integrity.created_after_dated",
+    "cross_document.arrival_vs_start",
+    "document_integrity.modified_after_created"
+  ],
+  "should_not_raise": [
+    "cross_application.*",
+    "timeline.*",
+    "narrative.*"
+  ]
+}

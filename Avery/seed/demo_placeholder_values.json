@@ -1,0 +1,14 @@
+{
+  "_warning": "DEMO VALUES ONLY. These are NOT policy. They exist so the synthetic demo can run end to end. Replace every value with the figure from the current published guidelines before any real use, or run the seed with --keep-placeholders.",
+  "[closing date]": "2026-11-30",
+  "[arrival window start]": "2026-01-01",
+  "[arrival window end]": "2026-12-31",
+  "[maximum grant amount]": "5000",
+  "[eligible incorporation Acts]": ["Associations Act"],
+  "[counts this application]": true,
+  "[guideline clause]": "Demo clause (no real clause reference)",
+  "[guidelines URL]": "https://example.invalid/fictional-guidelines",
+  "[review process text]": "To ask for a review, reply to this letter and tell us which reason you disagree with and why. A different officer will look at it.",
+  "[contact details]": "Fictional Grants Office (demo), demo-grants@example.invalid",
+  "[review deadline wording]": "Please ask within the review period in the guidelines ([review period])."
+}

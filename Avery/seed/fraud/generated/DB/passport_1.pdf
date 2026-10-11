@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Length 329 >>
+stream
+BT /F1 11 Tf 50 760 Td 14 TL
+(Passport) Tj T*
+(Surname: WHITCOMBE) Tj T*
+(Given names: Ilari) Tj T*
+(Nationality: India) Tj T*
+(Date of birth: 21 November 2002) Tj T*
+(Passport number: P2230917) Tj T*
+(Date of issue: 12 March 2022) Tj T*
+(Date of expiry: 2 February 2032) Tj T*
+() Tj T*
+(SAMPLE: FICTIONAL TEST DOCUMENT) Tj T*
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Contents 2 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000106 00000 n 
+0000000486 00000 n 
+0000000612 00000 n 
+0000000669 00000 n 
+trailer
+<< /Size 6 /Root 5 0 R >>
+startxref
+718
+%%EOF

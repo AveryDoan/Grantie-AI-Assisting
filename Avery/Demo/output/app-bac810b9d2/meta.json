@@ -1,0 +1,33 @@
+{
+  "app_id": "app-bac810b9d2",
+  "llm": "offline keyword stub (NOT an LLM; can be wrong)",
+  "ai_status": "blocked_redaction_leak",
+  "counts": {
+    "ADDRESS": 6,
+    "DOB": 2,
+    "EMAIL": 8,
+    "ID": 7,
+    "PERSON": 29,
+    "PHONE": 8,
+    "PLACE": 13,
+    "REFEREE": 32,
+    "URL": 1
+  },
+  "leak_without_ids": {
+    "known_value": 1,
+    "redacted_original": 3,
+    "long_digit_string": 1
+  },
+  "leak_with_ids": {
+    "known_value": 1,
+    "redacted_original": 3
+  },
+  "location_class": "outside_australia",
+  "statuses": {
+    "Met": 0,
+    "Not met": 0,
+    "Needs evidence": 0,
+    "Unclear": 0,
+    "Evidence only": 0
+  }
+}

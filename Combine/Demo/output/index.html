@@ -1,0 +1,48 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Redaction sandbox</title><style>
+:root { --bg:#f5f7f6; --surface:#fff; --fg:#1b2628; --muted:#5a6a6c; --line:#dce3e1; --accent:#0f6b73;
+  --ok:#1b6b3a; --ok-bg:#e4f3e9; --bad:#b3261e; --bad-bg:#fce8e6; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --PERSON:#fde2c8; --REFEREE:#f8d4e4; --EMAIL:#d9e8fb; --PHONE:#dcefd9; --ADDRESS:#ece0fa; --PLACE:#e6f0c8;
+  --DOB:#ffe4a3; --ID:#d3eef0; --URL:#e1e1f7; --HANDLE:#f1dcd0; --MRZ:#ffd0cc; --token:#e2f1f1; }
+@media (prefers-color-scheme: dark) { :root { --bg:#121a1b; --surface:#1a2426; --fg:#e3ecea; --muted:#9db0ad;
+  --line:#2c3a3c; --accent:#5cc3c9; --ok:#7fd39b; --ok-bg:#173023; --bad:#ff9a8f; --bad-bg:#3a1c19; --warn:#f0c46b;
+  --warn-bg:#33290f; --PERSON:#5a3d22; --REFEREE:#55283c; --EMAIL:#24384f; --PHONE:#27402a; --ADDRESS:#3b2d52;
+  --PLACE:#3c4520; --DOB:#5a4614; --ID:#1f4245; --URL:#2f2f55; --HANDLE:#4a3328; --MRZ:#5a2622; --token:#173336;
+  color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 48px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 26px; margin: 0; } h2 { font-size: 18px; margin: 0 0 10px; } p { margin: 0; }
+.muted { color: var(--muted); }
+.banner { border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.banner.officer { background: var(--bad-bg); color: var(--bad); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+pre.doc { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 ui-monospace, Menlo, monospace; margin: 0; }
+iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pane { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+mark { border-radius: 3px; padding: 0 2px; color: inherit; }
+mark.tok { background: var(--token); font-weight: 600; }
+mark.PERSON { background: var(--PERSON); }
+mark.REFEREE { background: var(--REFEREE); }
+mark.EMAIL { background: var(--EMAIL); }
+mark.PHONE { background: var(--PHONE); }
+mark.ADDRESS { background: var(--ADDRESS); }
+mark.PLACE { background: var(--PLACE); }
+mark.DOB { background: var(--DOB); }
+mark.ID { background: var(--ID); }
+mark.URL { background: var(--URL); }
+mark.HANDLE { background: var(--HANDLE); }
+mark.MRZ { background: var(--MRZ); }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pass { color: var(--ok); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.legend mark { padding: 2px 8px; }
+ul { margin: 0; padding-left: 20px; }
+a { color: var(--accent); }
+</style></head><body><main><div class="banner officer">OFFICER-ONLY · local sandbox outputs · never commit, upload or share</div><h1>Redaction sandbox</h1><p class="muted">Documents processed on this machine. Folder names are content hashes, not file names.</p><div class="card"><table><thead><tr><th>Document</th><th>Processed (UTC)</th><th>Kind</th><th class=num>Replaced</th><th>Leak scan</th><th>Open</th></tr></thead><tbody><tr><td>doc-1d163cf06c</td><td>2026-10-09T08:25:39+00:00</td><td>pdf</td><td class=num>19</td><td><span class=pass>PASS</span></td><td><a href="doc-1d163cf06c/3_report.html">report</a> · <a href="doc-1d163cf06c/1_original_view.html">original</a> · <a href="doc-1d163cf06c/2_redacted.txt">redacted</a></td></tr><tr><td>doc-4cd514d487</td><td>2026-10-09T08:25:33+00:00</td><td>pdf</td><td class=num>10</td><td><span class=fail>FAIL</span></td><td><a href="doc-4cd514d487/3_report.html">report</a> · <a href="doc-4cd514d487/1_original_view.html">original</a> · <a href="doc-4cd514d487/2_redacted.txt">redacted</a></td></tr><tr><td>doc-7e5f85b044</td><td>2026-10-09T08:25:40+00:00</td><td>pdf</td><td class=num>6</td><td><span class=pass>PASS</span></td><td><a href="doc-7e5f85b044/3_report.html">report</a> · <a href="doc-7e5f85b044/1_original_view.html">original</a> · <a href="doc-7e5f85b044/2_redacted.txt">redacted</a></td></tr><tr><td>doc-8180ba08ec</td><td>2026-10-09T08:25:34+00:00</td><td>pdf</td><td class=num>8</td><td><span class=pass>PASS</span></td><td><a href="doc-8180ba08ec/3_report.html">report</a> · <a href="doc-8180ba08ec/1_original_view.html">original</a> · <a href="doc-8180ba08ec/2_redacted.txt">redacted</a></td></tr><tr><td>doc-848a7794f2</td><td>2026-10-09T08:25:36+00:00</td><td>pdf</td><td class=num>12</td><td><span class=pass>PASS</span></td><td><a href="doc-848a7794f2/3_report.html">report</a> · <a href="doc-848a7794f2/1_original_view.html">original</a> · <a href="doc-848a7794f2/2_redacted.txt">redacted</a></td></tr><tr><td>doc-879c0fcdda</td><td>2026-10-09T08:25:32+00:00</td><td>pdf</td><td class=num>18</td><td><span class=pass>PASS</span></td><td><a href="doc-879c0fcdda/3_report.html">report</a> · <a href="doc-879c0fcdda/1_original_view.html">original</a> · <a href="doc-879c0fcdda/2_redacted.txt">redacted</a></td></tr><tr><td>doc-dc085eab56</td><td>2026-10-09T08:25:38+00:00</td><td>pdf</td><td class=num>4</td><td><span class=pass>PASS</span></td><td><a href="doc-dc085eab56/3_report.html">report</a> · <a href="doc-dc085eab56/1_original_view.html">original</a> · <a href="doc-dc085eab56/2_redacted.txt">redacted</a></td></tr><tr><td>doc-ebea8bb676</td><td>2026-10-09T08:25:37+00:00</td><td>pdf</td><td class=num>19</td><td><span class=pass>PASS</span></td><td><a href="doc-ebea8bb676/3_report.html">report</a> · <a href="doc-ebea8bb676/1_original_view.html">original</a> · <a href="doc-ebea8bb676/2_redacted.txt">redacted</a></td></tr><tr><td>doc-f7e4e60aa4</td><td>2026-10-09T08:25:42+00:00</td><td>pdf</td><td class=num>9</td><td><span class=pass>PASS</span></td><td><a href="doc-f7e4e60aa4/3_report.html">report</a> · <a href="doc-f7e4e60aa4/1_original_view.html">original</a> · <a href="doc-f7e4e60aa4/2_redacted.txt">redacted</a></td></tr></tbody></table></div><p class="muted">Delete everything with <code>python -m redaction.sandbox wipe</code>.</p></main></body></html>

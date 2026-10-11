@@ -1,0 +1,29 @@
+[page 1]
+[PERSON_1]
+House 22, Ward 5, [PLACE_1], [PERSON_2] 44600, Nepal | [PHONE_1] | [EMAIL_1] |
+[URL_1]
+Education
+Bachelor of Engineering, Computer Engineering, Himalayan Institute of Technology,
+[PERSON_2]. Jan 2023 to Dec 2026 (expected). GPA 3.84/4.0. [PERSON_3]'s Merit Award 2023, [PERSON_4],
+2025.
+Higher Secondary (Science), Gorkha Model College. 2019 to 2021. Result: 3.92 GPA.
+Experience
+Data Analyst (part time intern, then contractor), [PERSON_5]. [PERSON_6] to present.
+Built hospital reporting dashboard, cutting reporting time from 3 days to 4 hours. Trained 2 new
+interns. Python, SQL, Power BI.
+Founder and Lead Mentor, [PERSON_7] (free coding club for rural girls). 2022 to present.
+Grew from 9 students in 1 school to 180+ students in 6 schools with 14 volunteer mentors.
+President, Women in Technology Society, Himalayan Institute of Technology. [PERSON_4].
+Membership up from 40 to 125. Secured 12 internships with local employers.
+Volunteer Team Lead, Gorkha Flood Recovery Digital Skills Project. 2025.
+Led 6 volunteers, trained 300 villagers, moved 41 small businesses online.
+Awards and publications
+First place, National Student Innovation Showcase 2025. Short paper: 'Offline first crop disease
+detection for low bandwidth farms', Himalayan Computing Conference 2025.
+Skills and languages
+Python, SQL, TensorFlow, Power BI, React Native, [PERSON_8]. English (IELTS 7.5), Nepali (native), Hindi
+(fluent).
+Referees
+Dr [PERSON_9] (HIT), [EMAIL_2]. Mr [PERSON_10] ([PERSON_5]),
+[EMAIL_3].
+SAMPLE DOCUMENT - synthetic test data only. Student, referee and booking details are fictional. Not issued by CDU.
