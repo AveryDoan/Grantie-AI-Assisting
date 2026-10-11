@@ -6,7 +6,7 @@ import { Button, ErrorNotice, Icon, StatusChip } from "../../ui";
 export type DialogState =
   | { kind: "override"; finding: Finding }
   | { kind: "confirm-not-met"; finding: Finding }
-  | { kind: "ask"; finding: Finding };
+  | { kind: "ask"; finding: Finding; more?: Finding[] };
 
 export function DecisionDialog({ state, onDone, close }: { state: Exclude<DialogState, { kind: "ask" }>; onDone: () => void; close: () => void }) {
   const f = state.finding;
@@ -68,7 +68,7 @@ export function DecisionDialog({ state, onDone, close }: { state: Exclude<Dialog
   );
 }
 
-export function AskDialog({ detail, finding, onDone, close }: { detail: Detail; finding: Finding; onDone: () => void; close: () => void }) {
+export function AskDialog({ detail, findings, onDone, close }: { detail: Detail; findings: Finding[]; onDone: () => void; close: () => void }) {
   const [draft, setDraft] = useState<EvidenceDraft | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(true);
@@ -80,13 +80,13 @@ export function AskDialog({ detail, finding, onDone, close }: { detail: Detail; 
     let live = true;
     (async () => {
       try {
-        await api.review(finding.id, { action: "ask_applicant" });
-        const d = await api.draftEvidenceRequest(detail.application.id);
+        for (const f of findings) await api.review(f.id, { action: "ask_applicant" });
+        const d = await api.draftEvidenceRequest(detail.application.id, findings.map((f) => f.id));
         if (live) { setDraft(d); setMessage(d.message_text); setBusy(false); }
       } catch (e) { if (live) { setError(e); setBusy(false); } }
     })();
     return () => { live = false; };
-  }, [finding.id, detail.application.id]);
+  }, [findings.map((f) => f.id).join(), detail.application.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const copy = async () => { try { await navigator.clipboard.writeText(message); setCopied(true); } catch { setCopied(false); } };
   const download = () => {
@@ -103,7 +103,7 @@ export function AskDialog({ detail, finding, onDone, close }: { detail: Detail; 
     <div className="modal-backdrop">
       <div className="dialog wide" role="dialog" aria-modal="true" aria-labelledby="ask-title">
         <div className="dialog-head">
-          <div><p className="eyebrow">Request evidence · Rule {finding.rule_code}</p><h2 id="ask-title">Evidence request (draft)</h2></div>
+          <div><p className="eyebrow">Ask applicant for more · {findings.map((f) => f.rule_code).join(", ")}</p><h2 id="ask-title">Evidence request (draft)</h2></div>
           <button className="icon-button" onClick={close} aria-label="Close dialog"><Icon name="close" /></button>
         </div>
         {busy && !draft && <p className="muted">Preparing the draft…</p>}

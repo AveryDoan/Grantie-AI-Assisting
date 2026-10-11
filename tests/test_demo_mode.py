@@ -15,7 +15,7 @@ def test_demo_login_absent_in_normal_mode(store, settings):
 
 def test_demo_mode_end_to_end():
     limiter.reset()
-    client = TestClient(create_app(settings=Settings(_env_file=None, app_mode="demo", llm_provider="stub")))
+    client = TestClient(create_app(settings=Settings(_env_file=None, app_mode="demo", llm_provider="stub", require_redaction_approval=False)))
     assert client.get("/health").json()["mode"] == "demo"
     login = client.post("/demo/login", json={"role": "officer"})
     assert login.status_code == 200

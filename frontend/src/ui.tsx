@@ -30,6 +30,7 @@ export const Icon = ({ name, size = 18 }: { name: string; size?: number }) => {
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     record: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></>,
     eye: <><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
+    lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
     collapse: <><path d="m14 7-5 5 5 5" /><path d="M20 4v16" /></>,
   };
   return (
@@ -142,11 +143,8 @@ export function humanise(key: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function isDecided(f: Finding): boolean {
-  // A merit criterion is done once the officer has marked it (or set it to Not assessed); every other rule by a review.
-  if (f.section === "merit") return !!f.merit_mark;
-  return !!f.latest_review && f.latest_review.action !== "ask_applicant";
-}
+import { isDecided } from "./counts";
+export { isDecided };
 
 /** Status to show: the officer's decision once made, otherwise the AI suggestion. */
 export function effectiveStatus(f: Finding): AIStatus {

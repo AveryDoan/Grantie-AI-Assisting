@@ -1,0 +1,93 @@
+/* Design tokens: the only place colours, type, radii, spacing and shadows are defined. Components use var(--...) only.
+   Section colours show the AREA of work, never the quality of an application. Status colours always come with an icon and a word. */
+:root {
+  /* brand */
+  --brand-navy: #171f55;
+  --brand-orange: #c53d1a;          /* primary action. Slightly deeper than the brand #d74420 so white text passes WCAG AA (5.2:1) */
+  --brand-orange-dark: #a63215;
+  --brand-orange-tint: #fdeee9;
+  --brand-red: #860c18;
+  --brand-teal: #0f766e;            /* the "AI and review" accent */
+  --page: #f6f7fb;
+  --card: #ffffff;
+  --line-soft: #e5e8ef;
+  --ink-soft: #3b4357;
+  --muted-ink: #5f6a7d;     /* brand #697386, darkened slightly to keep 4.5:1 on the page background */
+
+  /* left rail */
+  --seg-track: #e9ecf4; --rail: #ffffff; --rail-line: #e8ebf3; --rail-hover: #f3f5fb; --rail-ink: #2a3157; --rail-muted: #6b7388;
+
+  /* sections: tint for backgrounds, solid for icon and left bar */
+  --sec-docs: #2563eb;        --sec-docs-tint: #eaf2ff;
+  --sec-redaction: #7c3aed;   --sec-redaction-tint: #f1ebff;
+  --sec-elig: #0f766e;        --sec-elig-tint: #e6f6f3;
+  --sec-merit: #b7791f;       --sec-merit-tint: #fff4dd;
+  --sec-consistency: #475569; --sec-consistency-tint: #eef1f6;
+  --sec-linked: #4338ca;      --sec-linked-tint: #eceeff;
+  --sec-outcome: #171f55;     --sec-outcome-tint: #e8eaf6;
+  /* text that sits on a section tint (darker than the solid, to keep 4.5:1) */
+  --sec-merit-ink: #7a4f0e;
+
+  /* statuses */
+  --st-met: #146c34;      --st-met-tint: #e7f6ec;
+  --st-notmet: #b42318;   --st-notmet-tint: #fdecea;
+  --st-needs: #b45309;    --st-needs-tint: #fff3dc;
+  --st-unclear: #6d28d9;  --st-unclear-tint: #f0eafe;
+  --st-judgement: #475569; --st-judgement-tint: #eef1f6;
+
+  /* type */
+  --font: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --fs-title: 28px;   --lh-title: 34px;
+  --fs-section: 20px; --lh-section: 28px;
+  --fs-card: 16px;    --lh-card: 24px;
+  --fs-body: 14px;    --lh-body: 22px;
+  --fs-small: 12px;   --lh-small: 18px;
+
+  /* shape, space, depth, motion */
+  --r-card: 12px; --r-control: 8px; --r-chip: 999px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+  --sh-card: 0 1px 2px rgba(23, 31, 85, .06);
+  --sh-float: 0 12px 32px rgba(23, 31, 85, .18);
+  --t: 150ms;
+
+  /* the older names used across the app, now pointing at the tokens above */
+  --navy: var(--brand-navy);
+  --ink: var(--brand-navy);
+  --muted: var(--muted-ink);
+  --line: var(--line-soft);
+  --surface: var(--page);
+  --surface-subtle: #fafbfd;
+  --blue: var(--brand-orange);
+  --blue-dark: var(--brand-orange-dark);
+  --blue-pressed: #8a2a12;
+  --blue-light: var(--brand-orange-tint);
+  --green: var(--st-met);            --green-bg: var(--st-met-tint);
+  --red: var(--st-notmet);           --red-bg: var(--st-notmet-tint);
+  --amber: var(--st-needs);          --amber-bg: var(--st-needs-tint);
+  --purple: var(--st-unclear);       --purple-bg: var(--st-unclear-tint);
+  --evidence: var(--st-judgement);   --evidence-bg: var(--st-judgement-tint);
+  --white: var(--card);
+  --radius: var(--r-card);
+  --radius-sm: var(--r-control);
+  --shadow-small: var(--sh-card);
+  --shadow-medium: var(--sh-card);
+  --shadow-large: var(--sh-float);
+  --shadow: var(--sh-float);
+  --officer-primary: var(--brand-orange);
+  --officer-primary-dark: var(--brand-orange-dark);
+  --officer-bg: var(--page);
+  --officer-line: var(--line-soft);
+  --officer-muted: var(--muted-ink);
+  --officer-ink: var(--brand-navy);
+}
+
+/* area helpers: any element with one of these classes gets --sec and --sec-tint */
+.sec-docs { --sec: var(--sec-docs); --sec-tint: var(--sec-docs-tint); --sec-ink: var(--sec-docs); }
+.sec-redaction { --sec: var(--sec-redaction); --sec-tint: var(--sec-redaction-tint); --sec-ink: var(--sec-redaction); }
+.sec-elig { --sec: var(--sec-elig); --sec-tint: var(--sec-elig-tint); --sec-ink: var(--sec-elig); }
+.sec-merit { --sec: var(--sec-merit); --sec-tint: var(--sec-merit-tint); --sec-ink: var(--sec-merit-ink); }
+.sec-consistency { --sec: var(--sec-consistency); --sec-tint: var(--sec-consistency-tint); --sec-ink: var(--sec-consistency); }
+.sec-linked { --sec: var(--sec-linked); --sec-tint: var(--sec-linked-tint); --sec-ink: var(--sec-linked); }
+.sec-outcome { --sec: var(--sec-outcome); --sec-tint: var(--sec-outcome-tint); --sec-ink: var(--sec-outcome); }
+
+.sec-done { --sec: var(--st-met); --sec-tint: var(--st-met-tint); --sec-ink: var(--st-met); }

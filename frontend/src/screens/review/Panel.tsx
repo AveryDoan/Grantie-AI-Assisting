@@ -278,7 +278,9 @@ function DocPanel({ slot, c }: { slot: Slot; c: Common }) {
 
 // ---------------------------------------------------------------- panel shell
 
-export function ReviewPanel({ item, slots, onClose, ...c }: Common & { item: PanelItem; slots: Slot[]; onClose: () => void }) {
+export interface PanelNav { position: number; total: number; onPrev?: () => void; onNext?: () => void; onNextUndecided: () => void }
+
+export function ReviewPanel({ item, slots, onClose, nav, ...c }: Common & { item: PanelItem; slots: Slot[]; onClose: () => void; nav?: PanelNav }) {
   const head = useRef<HTMLDivElement>(null);
   const key = item.kind === "rule" ? item.code : item.key;
   useEffect(() => { head.current?.focus(); }, [key]);
@@ -294,11 +296,19 @@ export function ReviewPanel({ item, slots, onClose, ...c }: Common & { item: Pan
     body = s ? <DocPanel slot={s} c={c} /> : <p className="muted">This item is no longer available.</p>;
   }
   return (
-    <aside className="rv-panel" aria-label={`Details: ${title}`}>
+    <aside className="rv-panel sec-elig" aria-label={`Details: ${title}`}>
       <div className="rv-panel-head">
         <div ref={head} tabIndex={-1}><p className="eyebrow">Details</p><h2>{title}</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close details (Esc)"><Icon name="close" /></button>
       </div>
+      {nav && (
+        <div className="rv-panel-nav" role="group" aria-label="Move between rules">
+          <Button variant="secondary" disabled={!nav.onPrev} onClick={nav.onPrev}>Previous (K)</Button>
+          <span aria-live="polite">{nav.position} of {nav.total}</span>
+          <Button variant="secondary" disabled={!nav.onNext} onClick={nav.onNext}>Next (J)</Button>
+          <Button variant="secondary" onClick={nav.onNextUndecided}>Next needing a decision</Button>
+        </div>
+      )}
       <div className="rv-panel-body">{body}</div>
     </aside>
   );

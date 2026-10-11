@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { api } from "./api";
 import { useAuth } from "./auth";
-import { AIBanner, Button, ErrorNotice, Icon, Loading } from "./ui";
+import { Button, ErrorNotice, Icon, Loading } from "./ui";
 import Queue from "./screens/Queue";
 import Application from "./screens/Application";
 import Signoff from "./screens/Signoff";
@@ -13,7 +13,6 @@ import Pool from "./screens/Pool";
 import Lists from "./screens/Lists";
 import PublicHome from "./screens/PublicHome";
 import ApplicantFlow from "./ApplicantFlow";
-import "./officer.css";
 import grantieLogo from "./assets/grantie-logo.png";
 import studyNtLogo from "./assets/study-nt-logo.svg";
 
@@ -137,13 +136,10 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
             <Icon name="search" /><input aria-label="Search applications" placeholder="Search applications by reference or name" value={search} onChange={(e) => setSearch(e.target.value)} />
           </form>
           <div className="topbar-actions">
-            <div className="ai-control-pill"><Icon name="robot" size={17} /><strong>AI suggests.</strong><span>You decide.</span></div>
-            <span className="topbar-divider" />
             <div className="topbar-officer"><span className="avatar">{initials}</span><span><strong>{name}</strong><small>{roleLabel}</small></span></div>
           </div>
         </header>
         <div className="sr-only" aria-live="polite">{TITLES[route.name]}</div>
-        {route.name !== "evaluation" && <AIBanner />}
         <div className="workspace-content">{children}</div>
       </div>
     </div>
@@ -173,7 +169,6 @@ function Login() {
           <img className="login-studynt" src={studyNtLogo} alt="Study NT" />
         </div>
         <h1>Sign in to review applications</h1>
-        <p>AI suggests. You decide. Every finding needs your confirmation.</p>
         <ErrorNotice error={error ?? failure} />
         {me && me.role === "applicant" && (
           <div className="notice warn-notice"><Icon name="info" /><span>You are signed in as an applicant. Sign out to sign in as an officer. <button className="link-button" onClick={logout}>Sign out</button></span></div>

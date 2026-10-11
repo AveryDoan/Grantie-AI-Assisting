@@ -208,3 +208,13 @@ def test_evidence_request_lists_only_needs_evidence_and_is_not_sent(run):
     assert body["status"] == "draft" and body["sent_at"] is None
     assert body["not_sent_note"] == "This draft is not sent from the app."
     assert {i["rule_code"] for i in body["items"]} == {i["rule_code"] for i in items}
+
+
+def test_work_list_says_where_each_application_is_and_never_scores(run):
+    rows = _get(run, "/applications")
+    mine = next(r for r in rows if r["id"] == run["id"])
+    assert mine["current_step"] in (1, 2, 3, 4) and mine["next_action"] and mine["phase"] in ("mine", "waiting", "outcome", "done")
+    assert all({"current_step", "current_step_title", "next_action", "phase", "open_items"} <= set(r) for r in rows)
+    assert not [k for r in rows for k in r if any(w in k for w in ("score", "rank", "total"))]
+    open_dates = [r["submitted_at"] or "" for r in rows if r["status"] != "signed_off"]
+    assert open_dates == sorted(open_dates)   # oldest received first

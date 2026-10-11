@@ -81,7 +81,7 @@ export function MeritViewer({ f, detail, mode = "criterion", locked, onClose, on
             <h2>{title}</h2>
             <div className="rv-chips">
               {mode === "criterion" && f.ai_status === "Evidence only" ? <StatusChip status="Evidence only" /> : mode === "criterion" ? <StatusChip status={effectiveStatus(f)} /> : null}
-              <span className="rv-tag">{mode === "referee" ? "Check only. Not marked." : f.ai_status === "Evidence only" ? "Officer judgement required. No AI mark or suggestion." : CHECKED_BY_LABEL[checkedBy(f)]}</span>
+              <span className="rv-tag">{mode === "referee" ? "Check only. Not marked." : f.ai_status === "Evidence only" ? "Officer judgement" : CHECKED_BY_LABEL[checkedBy(f)]}</span>
             </div>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close (Esc)"><Icon name="close" /></button>
@@ -155,7 +155,7 @@ export function MeritViewer({ f, detail, mode = "criterion", locked, onClose, on
               <div className="rv-assess">
                 <h3 className="rv-pane-title">Your mark</h3>
                 {f.rationale && f.ai_status !== "Evidence only" && <p className="muted">Length check, by code: {f.rationale}</p>}
-                <p className="muted">Your own mark, 0 to 100, for this criterion only. The AI does not suggest one. Marks are not added up or compared. Wording, spelling and English level are not assessed here.</p>
+                <p className="muted">Your mark, 0 to 100.</p>
                 <MarkControl f={f} applicationId={detail.application.id} locked={locked} onChanged={onChanged} />
               </div>
             ) : <p className="muted">The referee check is a check only. It is not marked.</p>}

@@ -115,6 +115,12 @@ export default function Step4Outcome({ id, navigate, onChanged }: { id: string; 
                   <td>{d.decision}{d.overridden ? " (you changed the AI’s suggestion)" : ""}{d.reason ? <small className="rv-reasonline">{d.reason}</small> : null}</td>
                   <td><button className="link-button" onClick={() => navigate({ name: "trace", id, item: `rule:${d.rule_code}` })}>Open evidence <Icon name="arrow" size={14} /></button></td></tr>))}</tbody>
             </table></div>
+            <Button variant="secondary" icon="file" onClick={() => void act(async () => {
+              // The decisions and the audit entries (ids, counts and codes only, never personal values). Not scores.
+              const audit = await api.audit({ application_id: id });
+              const blob = new Blob([JSON.stringify({ record: out.record, audit }, null, 2)], { type: "application/json" });
+              const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `record-${id.slice(0, 8)}.json`; a.click(); URL.revokeObjectURL(a.href);
+            })}>Export record</Button>
             {out.record.reopened.length > 0 && <><h3>Earlier versions</h3><ul className="cx-list">{out.record.reopened.map((r) => <li key={r.version}>Version {r.version} was reopened {formatDate(r.reopened_at, true)}: {r.reason}</li>)}</ul></>}
             {!reopening ? <Button variant="secondary" onClick={() => setReopening(true)}>Reopen this application</Button> : (
               <div className="gf-inline">

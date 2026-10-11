@@ -1,454 +1,351 @@
-// Application review: a tab bar (Overview, Documents, Eligibility, Merit, Consistency of information, Linked applications) and
-// one row per item. Nothing is shown in detail until a row is opened; details open in a side panel so the table stays visible.
-// How an item was redacted and read by the AI is one more click (the trace, scoped to that item).
-// No overall score, ranking or recommendation is shown anywhere. The merit marks belong to the officer and are never totalled.
+// Step 3, Assessment. Two parts, switched at the top:
+//   3a Eligibility and documents rules: one table sorted by need; a row opens the evidence drawer.
+//   3b Merit and consistency: five merit cards (each opens the grading workspace) beside two short lists of signals.
+// Counts come from one place (src/counts.ts), so the header, the switch, the cards and the drawer always agree.
+// No overall score, ranking or recommendation is shown. Merit marks belong to the officer and are never totalled.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type AIStatus, type Finding, type OverviewRow } from "../api";
+import { api, type AIStatus, type Detail, type Finding, type OverviewRow } from "../api";
 import type { Navigate } from "../App";
-import { APP_STATUS_LABEL, Button, ErrorNotice, Icon, Loading, StatusChip, effectiveStatus, formatDate, humanise, isDecided, useLoad } from "../ui";
-import { ConsistencyPanel, ConsistencyTable } from "./review/ConsistencyTab";
+import { isRule, type Counts } from "../counts";
+import { Button, ErrorNotice, Icon, StatusChip, effectiveStatus, isDecided } from "../ui";
+import { ConsistencyPanel, ResultChip } from "./review/ConsistencyTab";
 import { AskDialog, DecisionDialog, type DialogState } from "./review/Dialogs";
-import { LinkedTab } from "./review/LinkedTab";
 import { CRITERIA, MeritViewer } from "./review/MeritViewer";
 import { Badge, DecisionCell, Row } from "./review/parts";
 import { ReviewPanel } from "./review/Panel";
-import {
-  CHECKED_BY_LABEL, NEED_LABEL, buildSlots, byAttention, checkedBy, decisionText, detailsCheck, plainRule, slotCheck, slotDecision, slotFindings,
-  slotNeed, slotSort, slotStatus, type Slot,
-} from "./review/model";
+import { CHECKED_BY_LABEL, byAttention, checkedBy, decisionText, plainRule } from "./review/model";
 
-const TABS = [
-  { id: "overview", title: "Overview" },
-  { id: "documents", title: "Documents" },
-  { id: "eligibility", title: "Eligibility" },
-  { id: "merit", title: "Merit" },
-  { id: "consistency", title: "Consistency of information" },
-  { id: "linked", title: "Linked applications" },
-] as const;
-type TabId = (typeof TABS)[number]["id"];
+export type Part = "3a" | "3b";
+type Chip = "all" | "needs" | "decided";
+type Open = { kind: "rule"; code: string } | { kind: "referee" } | { kind: "cons"; id: string };
 
 const STRIP: { status: AIStatus; label: string }[] = [
-  { status: "Met", label: "Met" }, { status: "Not met", label: "Not met" }, { status: "Unclear", label: "Unclear" },
-  { status: "Needs evidence", label: "Needs evidence" }, { status: "Evidence only", label: "Officer judgement" },
+  { status: "Needs evidence", label: "Needs evidence" }, { status: "Unclear", label: "Unclear" }, { status: "Not met", label: "Not met" },
+  { status: "Met", label: "Met" }, { status: "Evidence only", label: "Officer judgement" },
 ];
+const remember = {
+  get: (k: string, d: string) => { try { return localStorage.getItem(`grantie.${k}`) ?? d; } catch { return d; } },
+  set: (k: string, v: string) => { try { localStorage.setItem(`grantie.${k}`, v); } catch { /* a remembered choice is only a convenience */ } },
+};
+const oneLine = (f: Finding) => f.rationale ?? plainRule(f);
+const criterionName = (f: Finding) => CRITERIA[f.rule_code] ?? plainRule(f);
+const codeOrder = (a: Finding, b: Finding) => a.rule_code.localeCompare(b.rule_code, undefined, { numeric: true });
 
-// ---------------------------------------------------------------- tables
+// ---------------------------------------------------------------- 3a table
 
-function DocumentsTable({ slots, findings, selectedKey, onOpen }: { slots: Slot[]; findings: Finding[]; selectedKey: string | null; onOpen: (s: Slot) => void }) {
-  const attention = slots.filter((s) => slotNeed(s).level === "attention").length;
+function RuleRow({ f, selected, picked, onPick, onOpen, locked }: {
+  f: Finding; selected: boolean; picked: boolean; onPick: () => void; onOpen: () => void; locked: boolean;
+}) {
   return (
-    <>
-      <p className={`rv-counter ${attention ? "on" : ""}`} role="status">
-        <Icon name={attention ? "info" : "check"} size={16} />
-        {attention === 0 ? "No documents need attention" : `${attention} ${attention === 1 ? "document needs" : "documents need"} attention`}
-      </p>
-      <div className="rv-table-wrap" role="region" aria-label="Documents" tabIndex={-1}>
-        <table className="rv-table">
-          <thead><tr><th>Document</th><th className="col-low">File name</th><th>In the right slot?</th><th className="col-low">Details match the form?</th><th>Need</th><th>Status</th><th>Decision</th></tr></thead>
-          <tbody>
-            {slots.map((s) => {
-              const check = slotCheck(s);
-              const details = detailsCheck(s);
-              const need = slotNeed(s);
-              const bad = check !== "Right document" && check !== "None uploaded";
-              return (
-                <Row key={s.key} rowKey={`doc:${s.key}`} selected={selectedKey === `doc:${s.key}`} onOpen={() => onOpen(s)} className={`need-${need.level}`}
-                  label={`${s.label}. ${NEED_LABEL[need.level]}${need.reason ? `. ${need.reason}` : ""}. Open details`}>
-                  <td><strong>{s.label}</strong>{need.reason && <small className="rv-reasonline">{need.reason}</small>}</td>
-                  <td className="col-low rv-file">{s.doc ? s.doc.file_name : "–"}</td>
-                  <td><span className={bad ? "rv-warn" : "rv-ok"}><Icon name={bad ? "question" : "check"} size={14} />{check}</span></td>
-                  <td className="col-low">{details}</td>
-                  <td><span className={`rv-need lvl-${need.level}`}><Icon name={need.level === "ok" ? "check" : need.level === "check" ? "search" : "info"} size={14} />{NEED_LABEL[need.level]}</span></td>
-                  <td><StatusChip status={slotStatus(s)} /></td>
-                  <td><DecisionCell text={slotDecision(s, findings)} /></td>
-                </Row>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <Row rowKey={`rule:${f.rule_code}`} selected={selected} onOpen={onOpen} label={`Rule ${f.rule_code}. ${plainRule(f)}. ${effectiveStatus(f)}. ${decisionText(f)}. Open details`}>
+      <td className="rv-pick" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={picked} disabled={locked} onChange={onPick} aria-label={`Select rule ${f.rule_code} to ask the applicant`} />
+      </td>
+      <td className="rv-id-cell">{f.rule_code}</td>
+      <td><StatusChip status={effectiveStatus(f)} /></td>
+      <td className="col-low"><span className="rv-tag">{CHECKED_BY_LABEL[checkedBy(f)]}</span></td>
+      <td className="rv-oneline">{oneLine(f)}</td>
+      <td><DecisionCell text={decisionText(f)} /></td>
+    </Row>
   );
 }
 
-function RuleRows({ list, selectedKey, onOpen }: { list: Finding[]; selectedKey: string | null; onOpen: (f: Finding) => void }) {
-  return (
-    <>
-      {list.map((f) => (
-        <Row key={f.id} rowKey={`rule:${f.rule_code}`} selected={selectedKey === `rule:${f.rule_code}`} onOpen={() => onOpen(f)} label={`Rule ${f.rule_code}. ${plainRule(f)}. Open details`}>
-          <td className="rv-id-cell">{f.rule_code}</td>
-          <td className="rv-oneline">{plainRule(f)}</td>
-          <td><StatusChip status={effectiveStatus(f)} /></td>
-          <td className="col-low"><span className="rv-tag">{CHECKED_BY_LABEL[checkedBy(f)]}</span></td>
-          <td><DecisionCell text={decisionText(f)} /></td>
-        </Row>
-      ))}
-    </>
-  );
-}
-
-function EligibilityTable({ list, filter, selectedKey, onOpen }: { list: Finding[]; filter: AIStatus | null; selectedKey: string | null; onOpen: (f: Finding) => void }) {
+function EligibilityTable({ list, chip, status, picked, setPicked, selectedKey, onOpen, locked }: {
+  list: Finding[]; chip: Chip; status: AIStatus | null; picked: Set<string>; setPicked: (s: Set<string>) => void;
+  selectedKey: string | null; onOpen: (f: Finding) => void; locked: boolean;
+}) {
   const [showMet, setShowMet] = useState(false);
-  const shown = filter ? list.filter((f) => effectiveStatus(f) === filter) : list;
-  const attention = shown.filter((f) => effectiveStatus(f) !== "Met").sort(byAttention);
-  const met = shown.filter((f) => effectiveStatus(f) === "Met").sort(byAttention);
-  const metOpen = showMet || filter === "Met";
+  const shown = list.filter((f) => (chip === "all" || (chip === "needs" ? !isDecided(f) : isDecided(f))) && (!status || effectiveStatus(f) === status));
+  const toggle = (id: string) => { const n = new Set(picked); if (n.has(id)) n.delete(id); else n.add(id); setPicked(n); };
   if (!shown.length) return <p className="empty-state">No rules match this filter.</p>;
+  const rows = (items: Finding[]) => items.map((f) => (
+    <RuleRow key={f.id} f={f} locked={locked} selected={selectedKey === `rule:${f.rule_code}`} picked={picked.has(f.id)} onPick={() => toggle(f.id)} onOpen={() => onOpen(f)} />
+  ));
+  const met = shown.filter((f) => effectiveStatus(f) === "Met");
+  const need = shown.filter((f) => effectiveStatus(f) !== "Met");
+  const group = (title: string, items: Finding[]) => items.length ? (
+    <>
+      <tr className="rv-group-row"><th colSpan={6} scope="colgroup">{title}</th></tr>
+      {rows(items)}
+    </>
+  ) : null;
+  const isDoc = (f: Finding) => f.section === "documents";
+  const metOpen = showMet || status === "Met";
   return (
-    <div className="rv-table-wrap" role="region" aria-label="Eligibility rules" tabIndex={-1}>
+    <div className="rv-table-wrap" role="region" aria-label="Eligibility and documents rules" tabIndex={-1}>
       <table className="rv-table">
-        <thead><tr><th>Rule</th><th>Rule in plain words</th><th>Status</th><th className="col-low">Checked by</th><th>Decision</th></tr></thead>
+        <thead><tr><th><span className="sr-only">Select</span></th><th>Rule</th><th>Status</th><th className="col-low">Checked by</th><th>Finding in one line</th><th>Officer decision</th></tr></thead>
         <tbody>
-          <RuleRows list={attention} selectedKey={selectedKey} onOpen={onOpen} />
+          {group("Eligibility", need.filter((f) => !isDoc(f)).sort(byAttention))}
+          {group("Documents", need.filter(isDoc).sort(byAttention))}
           {met.length > 0 && (
-            <tr className="rv-group-row"><td colSpan={5}>
-              <button className="rv-group-toggle" aria-expanded={metOpen} onClick={() => setShowMet(!showMet)} disabled={filter === "Met"}>
-                <span className={metOpen ? "rotate" : ""}><Icon name="chevron" size={16} /></span>{met.length} Met
+            <tr className="rv-group-row"><td colSpan={6}>
+              <button className="rv-group-toggle" aria-expanded={metOpen} onClick={() => setShowMet(!showMet)} disabled={status === "Met"}>
+                <span className={metOpen ? "rotate" : ""}><Icon name="chevron" size={16} /></span>{met.length} Met. Scan and confirm one by one.
               </button>
             </td></tr>
           )}
-          {metOpen && <RuleRows list={met} selectedKey={selectedKey} onOpen={onOpen} />}
+          {metOpen && rows([...met].sort(codeOrder))}
         </tbody>
       </table>
     </div>
   );
 }
 
-const criterionName = (f: Finding) => CRITERIA[f.rule_code] ?? plainRule(f);
+// ---------------------------------------------------------------- 3b
 
-function MeritRow({ f, selected, onOpen }: { f: Finding; selected: boolean; onOpen: () => void }) {
+function MeritCard({ f, selected, onOpen }: { f: Finding; selected: boolean; onOpen: () => void }) {
   const m = f.merit_mark;
+  const bullets = (f.ai_summaries_restored ?? []).filter((s) => s.linked && s.text).slice(0, 2);
   const state = m ? (m.not_assessed ? "Not assessed" : `Marked ${m.mark} out of 100`) : "Not marked";
   return (
-    <Row rowKey={`rule:${f.rule_code}`} selected={selected} onOpen={onOpen} label={`${criterionName(f)}. View detail`}>
-      <td><strong>{criterionName(f)}</strong></td>
-      <td><DecisionCell text={state} /></td>
-      <td className="rv-muted">{m?.reason ?? "–"}</td>
-      <td><span className="link-button">View detail <Icon name="arrow" size={14} /></span></td>
-    </Row>
+    <article className={`rv-mcard ${selected ? "selected" : ""}`}>
+      <header><h3>{criterionName(f)}</h3><DecisionCell text={state} /></header>
+      {bullets.length > 0
+        ? <ul>{bullets.map((s, i) => <li key={i}><small>AI summary, check the original</small>{s.text}</li>)}</ul>
+        : <p className="muted">No AI summary with a verified source. Open the document.</p>}
+      <Button variant="secondary" onClick={onOpen}>Open grading workspace</Button>
+    </article>
   );
 }
 
-/** The officer's own marks. They are set in the detail window; nothing is suggested, totalled or compared. */
-function MeritTable({ list, selectedKey, onOpen }: {
-  list: Finding[]; selectedKey: string | null; onOpen: (f: Finding, referee?: boolean) => void;
-}) {
+function SignalList({ rows, selectedKey, onOpen }: { rows: OverviewRow[]; selectedKey: string | null; onOpen: (r: OverviewRow) => void }) {
+  const order = { Differs: 0, "Cannot compare": 1, "Needs evidence": 1, Consistent: 2 } as Record<string, number>;
+  const sorted = [...rows].sort((a, b) => (order[a.result] ?? 2) - (order[b.result] ?? 2));
+  if (!sorted.length) return <p className="empty-state">No comparisons to show for this application.</p>;
   return (
-    <>
-      <p className="rv-judgement-line"><Icon name="eye" size={16} />Officer judgement required. No AI mark or suggestion. Marks are not added up or compared.</p>
-      <div className="rv-table-wrap" role="region" aria-label="Merit criteria" tabIndex={-1}>
-        <table className="rv-table rv-merit">
-          <thead><tr><th>Criterion</th><th>Officer decision</th><th>Reason for mark</th><th><span className="sr-only">Action</span></th></tr></thead>
-          <tbody>
-            {list.flatMap((f) => {
-              const rows = [<MeritRow key={f.id} f={f} selected={selectedKey === `rule:${f.rule_code}`} onOpen={() => onOpen(f)} />];
-              if (f.rule_code === "M2") {
-                rows.push(
-                  <Row key={`${f.id}-ref`} rowKey="referee" selected={selectedKey === "referee"} onOpen={() => onOpen(f, true)} label="Referee check. View detail">
-                    <td><strong>Referee check</strong><small className="rv-sub">Is the referee identified and contactable?</small></td>
-                    <td><span className="rv-decision">Check only. Not marked</span></td>
-                    <td className="rv-muted">–</td>
-                    <td><span className="link-button">View detail <Icon name="arrow" size={14} /></span></td>
-                  </Row>,
-                );
-              }
-              return rows;
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <ul className="rv-signals">
+      {sorted.map((r) => (
+        <li key={r.id}>
+          <button className={selectedKey === `cons:${r.id}` ? "selected" : ""} onClick={() => onOpen(r)}
+            aria-label={`${r.check}: ${r.compared}. ${r.result}. ${r.decision}. Open details`}>
+            <span><strong>{r.check}</strong><small>{r.compared}</small></span>
+            <span className="rv-signal-r"><ResultChip result={r.result} /><small>{r.decision}</small></span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 // ---------------------------------------------------------------- page
 
-type Open = { kind: "rule"; code: string } | { kind: "doc"; key: string } | { kind: "referee" } | { kind: "cons"; id: string };
-
-function OverviewCard({ title, lines, onGo, badge }: { title: string; lines: string[]; onGo: () => void; badge?: number | null }) {
-  return (
-    <button className="rv-ocard" onClick={onGo}>
-      <span className="rv-ocard-head"><strong>{title}</strong>{badge ? <Badge n={badge} label="to look at" /> : null}</span>
-      {lines.map((l) => <span key={l} className="rv-ocard-line">{l}</span>)}
-      <span className="rv-ocard-go">Open <Icon name="arrow" size={14} /></span>
-    </button>
-  );
-}
-
-export interface Embedded { onNext: () => void; onChanged: () => void; nextReady: boolean }
-
-export default function Review({ id, navigate, embedded }: { id: string; navigate: Navigate; embedded?: Embedded }) {
-  const { data: detail, error, loading, reload: reloadDetail } = useLoad(() => api.detail(id), [id]);
-  const reload = () => { reloadDetail(); embedded?.onChanged(); };
+export default function Review({ detail, reload, part, setPart, counts, navigate }: {
+  detail: Detail; reload: () => void; part: Part; setPart: (p: Part) => void; counts: Counts; navigate: Navigate;
+}) {
+  const id = detail.application.id;
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const [item, setItem] = useState<Open | null>(null);
-  const [filter, setFilter] = useState<AIStatus | null>(null);
-  const [tab, setTab] = useState<TabId>("overview");
+  const [chip, setChip] = useState<Chip>(remember.get("assess.chip", "all") as Chip);
+  const [status, setStatus] = useState<AIStatus | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const lastRow = useRef<string | null>(null);
+  const scrollY = useRef(0);
 
-  const closePanel = useCallback(() => {
-    setItem(null);
-    const key = lastRow.current;
-    if (key) setTimeout(() => document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`)?.focus(), 0);
-  }, []);
-
-  // Keyboard: arrows move between rows, Esc closes the panel (a dialog or the source drawer handles its own Esc first).
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && item && !dialog) { e.preventDefault(); closePanel(); return; }
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      const el = document.activeElement as HTMLElement | null;
-      if (!el?.hasAttribute("data-row")) return;
-      const rows = [...document.querySelectorAll<HTMLElement>("[data-row]")];
-      const next = rows[rows.indexOf(el) + (e.key === "ArrowDown" ? 1 : -1)];
-      if (next) { e.preventDefault(); next.focus(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [item, dialog, closePanel]);
+  useEffect(() => remember.set("assess.chip", chip), [chip]);
 
   const model = useMemo(() => {
-    if (!detail) return null;
     const findings = detail.findings;
     return {
-      slots: buildSlots(detail),
-      eligibility: findings.filter((f) => f.section === "eligibility" || f.section === null),
-      merit: findings.filter((f) => f.section === "merit").sort((a, b) => a.rule_code.localeCompare(b.rule_code, undefined, { numeric: true })),
-      documentRules: findings.filter((f) => f.section === "documents"),
+      rules: findings.filter(isRule),
+      merit: findings.filter((f) => !isRule(f)).sort(codeOrder),
       overview: (detail.consistency?.overview ?? []) as OverviewRow[],
+      linked: detail.linked_applications ?? [],
     };
   }, [detail]);
 
-  if (error) return <main className="page"><ErrorNotice error={error} /></main>;
-  if (!detail || !model) return <main className="page"><Loading /></main>;
+  // The order the officer moves through: items that need a decision first (by need), then the rest.
+  const order = useMemo(() => [...model.rules].sort(byAttention), [model.rules]);
+  const locked = detail.application.status === "signed_off";
+  const count = (s: AIStatus) => model.rules.filter((f) => effectiveStatus(f) === s).length;
 
-  const app = detail.application;
-  const locked = app.status === "signed_off";
-  const total = detail.findings.length;
-  const decided = detail.findings.filter(isDecided).length;
-  const allDecided = total > 0 && decided === total;
-  const count = (s: AIStatus) => detail.findings.filter((f) => effectiveStatus(f) === s).length;
-  const injection = detail.latest_run?.injection_flags ?? [];
-  const consistencyOn = detail.consistency?.enabled;
-  const differs = model.overview.filter((r) => r.result === "Differs");
-  const toCheck = differs.filter((r) => r.decision === "Not decided").length;
-  const linked = detail.linked_applications ?? [];
-  const undecided = (list: Finding[]) => list.filter((f) => !isDecided(f)).length;
-  const attention = model.slots.filter((s) => slotNeed(s).level === "attention").length;
-  const marked = model.merit.filter((f) => f.merit_mark).length;
-  const notChecked = !detail.latest_run && !app.manual_assessment_requested;
+  const openRule = (code: string) => { scrollY.current = window.scrollY; lastRow.current = `rule:${code}`; setItem({ kind: "rule", code }); };
+  const closePanel = useCallback(() => {
+    setItem(null);
+    const key = lastRow.current;
+    setTimeout(() => {
+      window.scrollTo({ top: scrollY.current });
+      if (key) document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`)?.focus();
+    }, 0);
+  }, []);
 
-  const locking = busy || loading;
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true); setActionError(null);
     try { await fn(); reload(); } catch (e) { setActionError(e); } finally { setBusy(false); }
   };
   const confirm = (f: Finding) => void act(() => api.review(f.id, { action: "confirm" }));
 
-  const openItem = (next: Open, rowKey: string) => { lastRow.current = rowKey; setItem(next); };
-  const selectedKey = !item ? null : item.kind === "rule" ? `rule:${item.code}` : item.kind === "doc" ? `doc:${item.key}` : item.kind === "referee" ? "referee" : `cons:${item.id}`;
-  const goTab = (t: TabId) => { setItem(null); setTab(t); };
-  const scopedTrace = (target: string) => navigate({ name: "trace", id, item: target });
+  const pos = item?.kind === "rule" ? order.findIndex((f) => f.rule_code === item.code) : -1;
+  const go = (delta: number) => { const f = order[pos + delta]; if (f) openRule(f.rule_code); };
+  const nextUndecided = (from: number) => order.find((f, i) => i > from && !isDecided(f)) ?? order.find((f) => !isDecided(f)) ?? null;
+  const reviewNext = () => { const f = nextUndecided(pos); if (f) { if (part !== "3a") setPart("3a"); openRule(f.rule_code); } };
 
-  const merited = item?.kind === "rule" ? detail.findings.find((x) => x.rule_code === item.code && x.section === "merit") ?? null : null;
-  const viewer = item?.kind === "referee" ? detail.findings.find((x) => x.rule_code === "M2") ?? null : merited;
-  const sideItem = item && !viewer && item.kind !== "cons" && item.kind !== "referee" ? item : null;
+  // Keyboard: arrows move between rows, Enter opens, Esc closes, J / K = next / previous item, C = confirm the shown result.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.tagName === "SELECT" || t.isContentEditable);
+      if (e.key === "Escape" && item && !dialog) { e.preventDefault(); closePanel(); return; }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (item?.kind === "rule" && !dialog) {
+        const k = e.key.toLowerCase();
+        if (k === "j") { e.preventDefault(); go(1); return; }
+        if (k === "k") { e.preventDefault(); go(-1); return; }
+        if (k === "c" && !locked && !busy) {
+          const f = order[pos];
+          if (f && f.ai_status !== "Evidence only" && !isDecided(f)) { e.preventDefault(); confirm(f); }
+          return;
+        }
+      }
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      if (!t?.hasAttribute("data-row")) return;
+      const rows = [...document.querySelectorAll<HTMLElement>("[data-row]")];
+      const next = rows[rows.indexOf(t) + (e.key === "ArrowDown" ? 1 : -1)];
+      if (next) { e.preventDefault(); next.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });   // re-bound each render so the handler always sees the current item and order
+
+  const injection = detail.latest_run?.injection_flags ?? [];
+  const notChecked = !detail.latest_run && !detail.application.manual_assessment_requested;
+  const selectedKey = !item ? null : item.kind === "rule" ? `rule:${item.code}` : item.kind === "referee" ? "referee" : `cons:${item.id}`;
+  const scopedTrace = (target: string) => navigate({ name: "trace", id, item: target });
+  const viewer = item?.kind === "referee" ? detail.findings.find((x) => x.rule_code === "M2") ?? null
+    : item?.kind === "rule" ? detail.findings.find((x) => x.rule_code === item.code && x.section === "merit") ?? null : null;
+  const sideItem = item?.kind === "rule" && !viewer ? item : null;
   const consRow = item?.kind === "cons" ? model.overview.find((r) => r.id === item.id) ?? null : null;
   const sideOpen = Boolean(sideItem || consRow);
-
-  const slotsShown = [...model.slots]
-    .filter((s) => !filter || slotFindings(s, detail.findings).some((f) => effectiveStatus(f) === filter))
-    .sort((a, b) => slotSort(a, b, detail.findings));
-  const hasDocuments = model.documentRules.length > 0 || detail.documents.length > 0;
-
-  const badge = (t: TabId): number | null =>
-    t === "documents" ? attention : t === "eligibility" ? undecided(model.eligibility) : t === "merit" ? model.merit.length - marked
-      : t === "consistency" ? toCheck : t === "linked" ? (linked.length || null) : null;
-  const badgeLabel: Record<TabId, string> = { overview: "", documents: "need attention", eligibility: "not decided", merit: "not marked", consistency: "to check", linked: "linked applications" };
+  const pickedFindings = model.rules.filter((f) => picked.has(f.id));
 
   return (
-    <main className={`review-page rv-page ${sideOpen ? "has-panel" : ""}`}>
-      <div className="review-top rv-top">
-        <div className="breadcrumb"><button onClick={() => navigate({ name: "queue" })}><Icon name="left" />Applications</button><span>/</span><span>{app.reference}</span></div>
-        <div className="review-heading rv-heading">
-          <div>
-            <p className="eyebrow">Application {app.reference} · {app.program_name}</p>
-            <h1>{app.applicant_name ?? "Applicant"}</h1>
-            <p>Received {formatDate(app.submitted_at)} · {APP_STATUS_LABEL[app.status] ?? app.status}{detail.latest_run ? ` · Rule pack ${detail.latest_run.rule_pack_version}` : ""}</p>
-          </div>
-          {total > 0 && (
-            <div className="progress-block">
-              <span><strong>{decided} of {total}</strong> rules decided</span>
-              <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={decided} aria-label="Rules decided"><i style={{ width: `${(decided / total) * 100}%` }} /></div>
-            </div>
-          )}
-          <div className="review-heading-actions">
-            <Button variant="secondary" icon="shield" onClick={() => navigate({ name: "trace", id })}>Redaction & AI trace</Button>
-            <span className="rv-tip-wrap">
-              <Button disabled={!locked && !allDecided} onClick={() => (embedded ? embedded.onNext() : navigate({ name: "signoff", id }))}
-                title={!locked && !allDecided ? `Decide every rule and mark every merit criterion first: ${total - decided} still to do.` : undefined}>
-                {locked ? "View outcome" : embedded ? "Next step: Outcome" : "Review sign-off"} <Icon name="arrow" />
-              </Button>
-              {!locked && !allDecided && total > 0 && <small className="rv-why" id="signoff-why">Unlocks when all {total} items are decided or marked ({total - decided} to go).</small>}
-            </span>
-          </div>
+    <div className={`rv-page ${sideOpen ? "has-panel" : ""}`}>
+      <div className="rv-nav">
+        <div role="tablist" className="rv-tablist" aria-label="Assessment parts">
+          <button role="tab" aria-selected={part === "3a"} className={part === "3a" ? "active" : ""} onClick={() => { setItem(null); setPart("3a"); }}>
+            <span>3a Eligibility and documents</span>{counts.eligibility.undecided ? <Badge n={counts.eligibility.undecided} label="to decide" /> : null}
+          </button>
+          <button role="tab" aria-selected={part === "3b"} className={part === "3b" ? "active" : ""} onClick={() => { setItem(null); setPart("3b"); }}>
+            <span>3b Merit and consistency</span>{counts.merit.unmarked + counts.consistency.toCheck ? <Badge n={counts.merit.unmarked + counts.consistency.toCheck} label="to do" /> : null}
+          </button>
         </div>
-        {total > 0 && (
-          <div className="rv-strip" aria-label="Rule status counts. Select one to filter the tables.">
-            {STRIP.map(({ status, label }) => {
-              const on = filter === status;
-              return (
-                <button key={status} className={`rv-count ${on ? "on" : ""}`} aria-pressed={on} onClick={() => { setFilter(on ? null : status); if (!on) goTab("eligibility"); }}
-                  title={on ? "Show all" : `Show only: ${label}`}>
-                  {status === "Evidence only" ? <span className="judgement-chip"><Icon name="eye" size={15} />{label}</span> : <StatusChip status={status} />}
-                  <strong>{count(status)}</strong>
-                </button>
-              );
-            })}
-            {consistencyOn && (
-              <button className="rv-flags-chip" onClick={() => goTab("consistency")} title="Consistency items are separate from the rule counts">
-                <Icon name="info" size={14} />Consistency items to check: <strong>{toCheck}</strong>
-              </button>
-            )}
-            <p>No overall score is calculated.</p>
-          </div>
-        )}
-        {filter && (
-          <p className="rv-filterbar" role="status">Showing only <strong>{filter === "Evidence only" ? "Officer judgement" : filter}</strong>.{" "}
-            <button className="link-button" onClick={() => setFilter(null)}>Show all</button></p>
-        )}
+        <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>Esc</kbd> close</small>
       </div>
-      <nav className="rv-nav" aria-label="Application sections">
-        <div role="tablist" className="rv-tablist">
-          {TABS.map((t) => {
-            const n = badge(t.id);
-            return (
-              <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? "active" : ""} onClick={() => goTab(t.id)}>
-                <span>{t.title}</span>{n ? <Badge n={n} label={badgeLabel[t.id]} /> : null}
-              </button>
-            );
-          })}
-        </div>
-        <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move between rows · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</small>
-      </nav>
 
       <div className="rv-layout">
         <div className="rv-main">
           {injection.length > 0 && (
             <div className="notice warn-notice" role="alert"><Icon name="shield" />
-              <span><strong>Instruction-like text was found in this application and was not followed.</strong>{" "}
-                {injection.map((fl) => `${humanise(fl.source)}: “${fl.excerpt}”`).join(" · ")}. AI confidence has been lowered; read these answers yourself.</span>
+              <span><strong>Instruction-like text was found in this application and was not followed.</strong> AI confidence has been lowered; read these answers yourself.</span>
             </div>
           )}
           <ErrorNotice error={actionError} />
-          {app.manual_assessment_requested && <div className="notice"><Icon name="user" />The applicant asked for a person to assess this application. AI assessment will not run.</div>}
+          {detail.application.manual_assessment_requested && <div className="notice"><Icon name="user" />The applicant asked for a person to assess this application. AI assessment will not run.</div>}
           {notChecked && (
             <div className="panel empty-state">
               <p>This application has not been checked yet. The check redacts personal details first, then asks the AI.</p>
               <Button icon="search" disabled={busy || locked} onClick={() => void act(() => api.assess(id))}>{busy ? "Checking…" : "Run AI check"}</Button>
-              <Button variant="quiet" icon="shield" onClick={() => navigate({ name: "trace", id })}>See the redacted text first</Button>
             </div>
           )}
 
-          {tab === "overview" && (
-            <section className="rv-section" aria-label="Overview">
-              <div className="rv-ocards">
-                <OverviewCard title="Documents" badge={attention} onGo={() => goTab("documents")}
-                  lines={[attention ? `${attention} ${attention === 1 ? "document needs" : "documents need"} attention` : "No documents need attention"]} />
-                <OverviewCard title="Eligibility" badge={undecided(model.eligibility)} onGo={() => goTab("eligibility")}
-                  lines={[`${count("Unclear")} unclear · ${count("Needs evidence")} need evidence · ${count("Not met")} not met`]} />
-                <OverviewCard title="Merit" badge={model.merit.length - marked} onGo={() => goTab("merit")}
-                  lines={[`${marked} of ${model.merit.length} criteria marked or set to Not assessed`, "Marks are yours. Nothing is added up or compared."]} />
-                <OverviewCard title="Consistency of information" badge={toCheck} onGo={() => goTab("consistency")}
-                  lines={consistencyOn ? [`${differs.length} ${differs.length === 1 ? "difference" : "differences"} to check · ${model.overview.filter((r) => r.result === "Cannot compare").length} could not be compared`] : ["Switched off for this site"]} />
-                <OverviewCard title="Linked applications" badge={linked.length} onGo={() => goTab("linked")}
-                  lines={[linked.length ? `${linked.length} ${linked.length === 1 ? "application shares" : "applications share"} something with this one` : "No linked applications found."]} />
-              </div>
-            </section>
-          )}
-
-          {tab === "documents" && (
-            <section className="rv-section" aria-label="Documents">
+          {part === "3a" && (
+            <section className="rv-section" aria-label="Eligibility and documents">
               <div className="rv-section-body">
-                <p className="muted rv-hint">Check these first: right document, in the right place.</p>
-                {!hasDocuments ? <p className="empty-state">This grant does not ask for documents.</p>
-                  : slotsShown.length === 0 ? <p className="empty-state">No documents match this filter.</p>
-                  : <DocumentsTable slots={slotsShown} findings={detail.findings} selectedKey={selectedKey} onOpen={(s) => openItem({ kind: "doc", key: s.key }, `doc:${s.key}`)} />}
-              </div>
-            </section>
-          )}
-
-          {tab === "eligibility" && (
-            <section className="rv-section" aria-label="Eligibility">
-              <div className="rv-section-body">
-                <div className="rv-filters" role="group" aria-label="Filter eligibility rules">
-                  {(["Unclear", "Needs evidence", "Not met", "Met"] as AIStatus[]).map((s) => {
-                    const n = model.eligibility.filter((f) => effectiveStatus(f) === s).length;
-                    return <button key={s} className={`rv-filter ${filter === s ? "on" : ""}`} aria-pressed={filter === s} onClick={() => setFilter(filter === s ? null : s)}>{s} <strong>{n}</strong></button>;
-                  })}
+                <div className="rv-toolrow">
+                  <div className="rv-filters" role="group" aria-label="Filter rules">
+                    {([["all", "All", model.rules.length], ["needs", "Needs me", counts.eligibility.undecided], ["decided", "Decided", counts.eligibility.decided]] as [Chip, string, number][]).map(([k, label, n]) => (
+                      <button key={k} className={`rv-filter ${chip === k ? "on" : ""}`} aria-pressed={chip === k} onClick={() => setChip(k)}>{label} <strong>{n}</strong></button>
+                    ))}
+                    <span className="rv-filter-sep" aria-hidden="true" />
+                    {STRIP.filter(({ status: st }) => count(st) > 0).map(({ status: st, label }) => (
+                      <button key={st} className={`rv-filter ${status === st ? "on" : ""}`} aria-pressed={status === st} onClick={() => setStatus(status === st ? null : st)}>{label} <strong>{count(st)}</strong></button>
+                    ))}
+                  </div>
+                  <div className="rv-toolbtns">
+                    <Button variant="secondary" icon="arrow" disabled={counts.eligibility.undecided === 0} onClick={reviewNext}>Review next</Button>
+                    <Button variant="secondary" icon="send" disabled={locked || pickedFindings.length === 0}
+                      onClick={() => pickedFindings[0] && setDialog({ kind: "ask", finding: pickedFindings[0], more: pickedFindings })}>
+                      Ask applicant for more{pickedFindings.length ? ` (${pickedFindings.length})` : ""}
+                    </Button>
+                  </div>
                 </div>
-                {model.eligibility.length === 0
+                {model.rules.length === 0
                   ? <p className="empty-state">{notChecked ? "Not checked yet. Run the AI check to see the rules." : "No eligibility rules."}</p>
-                  : <EligibilityTable list={model.eligibility} filter={filter} selectedKey={selectedKey} onOpen={(f) => openItem({ kind: "rule", code: f.rule_code }, `rule:${f.rule_code}`)} />}
+                  : <EligibilityTable list={model.rules} chip={chip} status={status} picked={picked} setPicked={setPicked} selectedKey={selectedKey} locked={locked}
+                      onOpen={(f) => openRule(f.rule_code)} />}
               </div>
             </section>
           )}
 
-          {tab === "merit" && (
-            <section className="rv-section" aria-label="Merit">
+          {part === "3b" && (
+            <section className="rv-section rv-two" aria-label="Merit and consistency">
               <div className="rv-section-body">
-                {model.merit.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "This grant has no merit criteria."}</p>
-                  : <MeritTable list={model.merit} selectedKey={selectedKey}
-                      onOpen={(f, referee) => openItem(referee ? { kind: "referee" } : { kind: "rule", code: f.rule_code }, referee ? "referee" : `rule:${f.rule_code}`)} />}
+                <h2 className="rv-h2">Merit criteria</h2>
+                {model.merit.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "This grant has no merit criteria."}</p> : (
+                  <div className="rv-mcards">
+                    {model.merit.flatMap((f) => {
+                      const cards = [<MeritCard key={f.id} f={f} selected={selectedKey === `rule:${f.rule_code}`} onOpen={() => openRule(f.rule_code)} />];
+                      if (f.rule_code === "M2") {
+                        cards.push(
+                          <article key="ref" className={`rv-mcard ${selectedKey === "referee" ? "selected" : ""}`}>
+                            <header><h3>Referee check</h3><span className="rv-decision">Check only. Not marked</span></header>
+                            <p className="muted">Is the referee identified and contactable?</p>
+                            <Button variant="secondary" onClick={() => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "referee" }); }}>View detail</Button>
+                          </article>,
+                        );
+                      }
+                      return cards;
+                    })}
+                  </div>
+                )}
               </div>
-            </section>
-          )}
-
-          {tab === "consistency" && (
-            <section className="rv-section" aria-label="Consistency of information">
-              <div className="rv-section-body">
-                <p className="rv-subtitle">Checks whether the details match across the form, the documents and the timeline.
-                  <span className="rv-tip-wrap">
-                    <button className="icon-button rv-info" aria-label="About consistency results" aria-describedby="rv-tip-cons"><Icon name="info" size={16} /></button>
-                    <span role="tooltip" id="rv-tip-cons" className="rv-tip">A difference is something to check, not a conclusion. Results never change a rule result and never block sign-off.</span>
-                  </span>
-                </p>
-                {consistencyOn === false ? <p className="empty-state">The consistency check is switched off for this site.</p>
+              <aside className="rv-side-lists" aria-label="Signals to check">
+                <section className="rv-sidecard sec-consistency">
+                <h2>Consistency of information</h2>
+                {detail.consistency?.enabled === false ? <p className="empty-state">The consistency check is switched off for this site.</p>
                   : detail.consistency?.unavailable ? <p className="empty-state">Could not load the consistency results. Please review manually.</p>
-                  : model.overview.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "No comparisons to show for this application."}</p>
-                  : <ConsistencyTable rows={model.overview} selectedKey={selectedKey} onOpen={(r) => openItem({ kind: "cons", id: r.id }, `cons:${r.id}`)} />}
-              </div>
-            </section>
-          )}
-
-          {tab === "linked" && (
-            <section className="rv-section" aria-label="Linked applications">
-              <div className="rv-section-body"><LinkedTab rows={linked} onOpen={(other) => navigate({ name: "review", id: other })} /></div>
+                  : <SignalList rows={model.overview} selectedKey={selectedKey}
+                      onOpen={(r) => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "cons", id: r.id }); }} />}
+                </section>
+                <section className="rv-sidecard sec-linked">
+                <h2>Linked applications</h2>
+                {model.linked.length === 0 ? <p className="empty-state">No linked applications found.</p> : (
+                  <ul className="rv-signals">
+                    {model.linked.map((l) => (
+                      <li key={l.application_id}>
+                        <button onClick={() => l.can_open && navigate({ name: "review", id: l.application_id })} disabled={!l.can_open}
+                          aria-label={`${l.reference}. ${l.strength}. ${l.can_open ? "Open" : "No access"}`}>
+                          <span><strong>{l.reference}</strong><small>{l.shared.map((s) => s.what).join(", ")}</small></span>
+                          <span className="rv-signal-r"><small>{l.strength}</small></span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                </section>
+              </aside>
             </section>
           )}
         </div>
 
-        {sideItem && (sideItem.kind === "rule" || sideItem.kind === "doc") && (
-          <ReviewPanel item={sideItem} slots={model.slots} detail={detail} locked={locked} busy={locking} onClose={closePanel}
-            onDialog={setDialog} onConfirm={confirm} onChanged={reload} onTrace={scopedTrace} />
+        {sideItem && (
+          <ReviewPanel item={sideItem} slots={[]} detail={detail} locked={locked} busy={busy} onClose={closePanel}
+            onDialog={setDialog} onConfirm={confirm} onChanged={reload} onTrace={scopedTrace}
+            nav={{ position: pos + 1, total: order.length, onPrev: pos > 0 ? () => go(-1) : undefined, onNext: pos < order.length - 1 ? () => go(1) : undefined, onNextUndecided: reviewNext }} />
         )}
         {consRow && (
           <ConsistencyPanel row={consRow} detail={detail} flags={detail.consistency?.flags ?? []} locked={locked} onChanged={reload} onClose={closePanel} onTrace={scopedTrace} />
         )}
       </div>
 
-      {viewer && (
-        <MeritViewer f={viewer} detail={detail} mode={item?.kind === "referee" ? "referee" : "criterion"} locked={locked} onClose={closePanel} onChanged={reload} onTrace={scopedTrace} />
-      )}
+      {viewer && <MeritViewer f={viewer} detail={detail} mode={item?.kind === "referee" ? "referee" : "criterion"} locked={locked} onClose={closePanel} onChanged={reload} onTrace={scopedTrace} />}
 
       {dialog && dialog.kind === "ask" && (
-        <AskDialog detail={detail} finding={dialog.finding} close={() => setDialog(null)} onDone={() => { setDialog(null); reload(); }} />
+        <AskDialog detail={detail} findings={dialog.more ?? [dialog.finding]} close={() => setDialog(null)} onDone={() => { setDialog(null); setPicked(new Set()); reload(); }} />
       )}
-      {dialog && dialog.kind !== "ask" && (
-        <DecisionDialog state={dialog} close={() => setDialog(null)} onDone={() => { setDialog(null); reload(); }} />
-      )}
-    </main>
+      {dialog && dialog.kind !== "ask" && <DecisionDialog state={dialog} close={() => setDialog(null)} onDone={() => { setDialog(null); reload(); }} />}
+    </div>
   );
 }

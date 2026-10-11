@@ -3,16 +3,19 @@ import { Button, Icon } from "../../ui";
 import type { StepInfo } from "../../api";
 
 
+/** The colour of each area of work. The same class carries through to the band, the cards and the drawer. */
+export const SEC: Record<number, string> = { 1: "sec-docs", 2: "sec-redaction", 3: "sec-elig", 4: "sec-outcome" };
+
 export function StepBar({ steps, shown, onGo }: { steps: StepInfo[]; shown: number; onGo: (n: number) => void }) {
   return (
     <nav className="gf-bar" aria-label="Application steps">
       <ol>
         {steps.map((s) => (
-          <li key={s.step} className={`gf-step ${s.status} ${shown === s.step ? "shown" : ""} ${s.unlocked ? "" : "locked"}`}>
+          <li key={s.step} className={`gf-step ${SEC[s.step]} ${s.status} ${shown === s.step ? "shown" : ""} ${s.unlocked ? "" : "locked"}`}>
             <button onClick={() => onGo(s.step)} disabled={!s.unlocked} aria-current={shown === s.step ? "step" : undefined}
               title={s.unlocked ? undefined : `Finish step ${s.step - 1} first`}>
-              <span className="gf-num" aria-hidden="true">{s.status === "done" ? <Icon name="check" size={16} /> : s.step}</span>
-              <span className="gf-text"><strong>{s.title}</strong></span>
+              <span className="gf-num" aria-hidden="true">{!s.unlocked ? <Icon name="lock" size={16} /> : s.status === "done" ? <Icon name="check" size={16} /> : s.step}</span>
+              <span className="gf-text"><strong>{s.title}</strong><small className="gf-state">{!s.unlocked ? "Locked" : s.status === "done" ? "Done" : s.status === "waiting" ? "Waiting for applicant" : s.status === "in_progress" ? "In progress" : "Not started"}</small></span>
             </button>
           </li>
         ))}

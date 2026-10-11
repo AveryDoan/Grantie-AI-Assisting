@@ -6,7 +6,6 @@ import type { LinkedApplication } from "../../api";
 export function LinkedTab({ rows, onOpen }: { rows: LinkedApplication[]; onOpen: (id: string) => void }) {
   return (
     <>
-      <p className="rv-judgement-line">Links are for the officer to check. A link is not a finding against any applicant.</p>
       {rows.length === 0 ? <p className="empty-state">No linked applications found.</p> : (
         <div className="rv-table-wrap" role="region" aria-label="Linked applications" tabIndex={-1}>
           <table className="rv-table">

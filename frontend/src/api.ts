@@ -117,6 +117,10 @@ export interface QueueItem {
   attention: Attention;
   open_items: number;
   waiting_since?: string | null;   // when the request for more documents was sent (only while waiting for the applicant)
+  current_step: number;           // 1 Documents, 2 Redaction check, 3 Assessment, 4 Outcome
+  current_step_title: string;
+  next_action: string;            // "Continue at Assessment", "Waiting for applicant", "View record"
+  phase: "mine" | "waiting" | "outcome" | "done";
   flags_to_check: number;   // a count only: shown when at least one open flag is strong; never used to sort
 }
 
