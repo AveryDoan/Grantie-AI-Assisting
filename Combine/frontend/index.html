@@ -123,7 +123,7 @@
 </style><style>
 .detail-step-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:20px 0 15px}.detail-step{font:inherit;border:1px solid #e2c9c4;background:#fff5f2;border-radius:9px;padding:13px 8px;min-height:68px;cursor:pointer;color:#803020;font-weight:750;text-align:center;position:relative}.detail-step.active{background:#9b3028;color:white;border-color:#9b3028}.detail-step:disabled{opacity:.45;cursor:not-allowed;background:#f2f2f2;color:#666}.detail-step.complete:not(.active)::after{content:'✓ PASS';display:block;font-size:10px;color:#167847;margin-top:5px}.detail-step.active.complete::after{content:'✓ PASS';display:block;font-size:10px;color:#fff;margin-top:5px}
 #detailpage .detail-grid{display:block!important}#detailpage .detail-grid>*{width:100%;max-width:none;box-sizing:border-box}#detailpage .detail-grid>#step-docs,#detailpage #step-consistency,#detailpage #step-assessment{width:100%}
-#detailpage .detail-step-content-hidden{display:none!important}.step-next{margin:12px 0 22px;padding:15px;border-radius:10px;background:#fbf8f4;border:1px solid #e9ddd3;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.step-next button{padding:10px 18px;border-radius:7px;background:#923025;color:white;border:0;cursor:pointer;font-weight:700}.step-next button:disabled{opacity:.45;cursor:not-allowed}.step-next span{color:#5c5f65;font-size:13px}
+#detailpage .detail-step-content-hidden{display:none!important}.detail-step.demo-bypassed:not(.active)::after{content:'DEMO BYPASSED';display:block;font-size:10px;color:#9a5b0b;margin-top:5px}.detail-step.demo-bypassed.active::after{content:'DEMO BYPASSED';display:block;font-size:10px;color:#fff2c9;margin-top:5px}.step-next{margin:12px 0 22px;padding:15px;border-radius:10px;background:#fbf8f4;border:1px solid #e9ddd3;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.step-next button{padding:10px 18px;border-radius:7px;background:#923025;color:white;border:0;cursor:pointer;font-weight:700}.step-next button:disabled{opacity:.45;cursor:not-allowed}.step-next span{color:#5c5f65;font-size:13px}.step-next .demo-bypass{background:#fff;color:#8c5510;border:1px solid #e7c98f}.step-next .demo-bypass:hover{background:#fff7e6}
 @media(max-width:820px){.detail-step-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-step{min-height:52px}}
 </style><style>
 .elig-click{cursor:pointer}.elig-click:hover{background:#fff8f3}.elig-code{display:inline-block;background:#e8eaf5;color:#29366a;padding:6px 9px;border-radius:7px;font-size:12px;font-weight:800}.elig-open{border:1px solid #d5dbea;border-radius:7px;background:#fff;padding:7px 11px;font-weight:700;color:#28366f;cursor:pointer}.elig-shade{position:fixed;inset:0;background:#12203999;z-index:240;display:none}.elig-shade.active{display:block}.elig-side{position:fixed;right:0;top:0;height:100vh;width:min(550px,100vw);overflow-y:auto;background:#fff;z-index:241;box-shadow:-14px 0 40px #18223930;display:none;padding:28px;box-sizing:border-box}.elig-side.active{display:block}.elig-side h2{margin:10px 0;font-size:23px}.elig-side h3{font-size:15px;color:#243258;margin:22px 0 9px}.elig-side .evidence-box{border:1px solid #e1e6ef;background:#f8fafc;border-radius:10px;padding:13px;margin:9px 0;font-size:13px}.elig-side .alertbox{background:#fff7e8;border-left:4px solid #d48b23;padding:14px;border-radius:6px;font-size:13px;line-height:1.65}.elig-side .missingbox{background:#fff0f0;border-left:4px solid #c34848;padding:14px;border-radius:6px;font-size:13px;line-height:1.65}.elig-side label{display:block;margin:12px 0 5px;font-weight:700;font-size:13px}.elig-side select,.elig-side textarea{width:100%;padding:11px;border:1px solid #d8deea;border-radius:8px}.elig-side .sidebar-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.elig-side .sidebar-top button{background:white;border:1px solid #ddd;border-radius:7px;padding:9px;cursor:pointer}
@@ -549,26 +549,27 @@ async function approveAveryRedaction(){if(!current)return;const approveLocally=(
 const redactionOpenDetail=openDetail;openDetail=function(id){redactionOpenDetail(id);setTimeout(loadAveryRedaction,0)};
 document.getElementById('runpii')?.addEventListener('click',runAveryRedaction);
 const names=['step-docs','piistage','step-eligibility','step-consistency','step-assessment'];
-let activeStep=0, piiPassedByApplication={};
+let activeStep=0, piiPassedByApplication={}, demoBypassByApplication={};
 const nextHost=document.createElement('div');nextHost.className='step-next';nextHost.id='stepNextHost';
 const grid=document.querySelector('#detailpage .detail-grid');grid.insertAdjacentElement('afterend',nextHost);
 function checkPass(){
  if(!current)return [false,false,false,false,false];
  const docs=docTypes.filter((d,i)=>!(current.id.endsWith('03')&&i===5));
- const docsOK=docs.length===docTypes.length && docs.every((d,i)=>(demoAllPass?[true,true,true]:demoDocumentChecks(current.id,i)).every(Boolean));
- const piiOK=docsOK && !!piiPassedByApplication[current.id];
+ const bypass=demoBypassByApplication[current.id]||{};
+ const docsOK=!!bypass[0]||(docs.length===docTypes.length && docs.every((d,i)=>(demoAllPass?[true,true,true]:demoDocumentChecks(current.id,i)).every(Boolean)));
+ const piiOK=docsOK && (!!bypass[1]||!!piiPassedByApplication[current.id]);
  const decisions=reviews[current.id]||{};
- const eligOK=piiOK && requirements.every((r,i)=>decisions[i]==='Meets');
+ const eligOK=piiOK && (!!bypass[2]||requirements.every((r,i)=>decisions[i]==='Meets'));
  const items=consistencyItems(current),saved=consistencyReviews[current.id]||{};
- const consistencyOK=eligOK && items.length>0 && items.every((r,i)=>saved[i]==='verified');
- return [docsOK,piiOK,eligOK,consistencyOK,false];
+ const consistencyOK=eligOK && (!!bypass[3]||(items.length>0 && items.every((r,i)=>saved[i]==='verified')));
+ return [docsOK,piiOK,eligOK,consistencyOK,!!bypass[4]];
 }
 function refreshSteps(){
  if(!current||document.querySelector('#detailpage').classList.contains('hidden'))return;
  const passed=checkPass();let accessible=0;for(let i=0;i<4 && passed[i];i++)accessible=i+1;
  activeStep=Math.min(activeStep,accessible);
  document.querySelectorAll('#detail-step-tabs .detail-step').forEach((b,i)=>{
- b.disabled=i>accessible;b.classList.toggle('active',i===activeStep);b.classList.toggle('complete',!!passed[i]);b.setAttribute('aria-current',i===activeStep?'step':'false');
+ b.disabled=i>accessible;b.classList.toggle('active',i===activeStep);b.classList.toggle('complete',!!passed[i]);b.classList.toggle('demo-bypassed',!!(demoBypassByApplication[current.id]||{})[i]);b.setAttribute('aria-current',i===activeStep?'step':'false');
  });
  names.forEach((id,i)=>document.getElementById(id).classList.toggle('detail-step-content-hidden',i!==activeStep));
  let messages=['All required documents must pass document type, sufficiency, and readability checks.',
@@ -576,8 +577,10 @@ function refreshSteps(){
  'All eligibility criteria must be marked Meets. Evidence requests and ineligibility sign-off do not pass.',
  'All consistency findings must be marked Verified / resolved by an officer.',
  'You have reached the Assessment Criteria stage.'];
- nextHost.innerHTML='<span>'+messages[activeStep]+'</span>'+(activeStep<4?'<button type="button" id="detailNext" '+(!passed[activeStep]?'disabled':'')+'>Continue to '+['PII Detection','Eligibility checklist','Consistency','Assessment Criteria'][activeStep]+' →</button>':'<span>Final assessment step</span>');
+ const bypass=(demoBypassByApplication[current.id]||{})[activeStep];
+ nextHost.innerHTML='<span>'+messages[activeStep]+'</span>'+(activeStep<4?'<button type="button" id="detailNext" '+(!passed[activeStep]?'disabled':'')+'>Continue to '+['PII Detection','Eligibility checklist','Consistency','Assessment Criteria'][activeStep]+' →</button>':'<span>'+(passed[4]?'Assessment step marked complete for demo.':'Final assessment step')+'</span>')+'<button type="button" class="demo-bypass" id="demoBypassStep">'+(bypass?'✓ Demo bypassed · undo':'⤼ Bypass this step · demo')+'</button>';
  const n=document.getElementById('detailNext');if(n)n.addEventListener('click',()=>{activeStep++;refreshSteps();document.getElementById('detail-step-tabs').scrollIntoView({block:'start'});});
+ document.getElementById('demoBypassStep').addEventListener('click',()=>{const state=demoBypassByApplication[current.id]||(demoBypassByApplication[current.id]={});state[activeStep]=!state[activeStep];refreshSteps();});
 }
 document.querySelectorAll('#detail-step-tabs .detail-step').forEach(b=>b.addEventListener('click',()=>{if(b.disabled)return;activeStep=Number(b.dataset.step);refreshSteps();}));
 const oldOpen=openDetail;openDetail=function(id){activeStep=0;oldOpen(id);refreshSteps();};
