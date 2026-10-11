@@ -162,7 +162,6 @@
 <section aria-labelledby="piiheading" class="pii-panel pii-stage-locked" id="piistage">
 <div class="pii-head"><div><div class="eyebrow">Step 2 · Privacy and data minimisation</div><h2 id="piiheading">PII Detection &amp; Redaction</h2><p class="muted">Protect personal information after document-quality checks and before eligibility analysis</p></div><span class="pii-tag" id="piistatus">LOCKED · AWAITING DOCUMENT PASS</span></div>
 <div class="pii-content">
-<div class="pii-flow"><div><b>01 · Validate documents</b><span>All uploaded files pass document type, sufficiency, and readability checks.</span></div><div><b>02 · Extract &amp; protect PII</b><span>Extract text; detect and redact personal identifiers using the proposed Python pipeline.</span></div><div><b>03 · Assess eligibility</b><span>Pass a minimised, redacted evidence set to the assessment workflow; retain authorised evidence access for officers.</span></div></div>
 <div class="scroller"><table class="pii-table"><thead><tr><th>Job</th><th>Tool</th><th>Note</th></tr></thead><tbody>
 <tr><td><b>Detect and replace PII</b></td><td>Microsoft Presidio</td><td>Main choice · recognisers plus anonymisation</td></tr>
 <tr><td><b>Names and places</b></td><td>spaCy</td><td>NLP recogniser used with Presidio (language models require installation/configuration)</td></tr>
