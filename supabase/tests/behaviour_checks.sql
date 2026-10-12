@@ -155,7 +155,8 @@ select checks.expect_count($$select 1 from applications where id='60000000-0000-
 select checks.expect_error($$insert into officer_reviews (finding_id,officer_id,action,final_status) values ('80000000-0000-0000-0000-000000000011',auth.uid(),'confirm','Met')$$,'signed off','no reviews after sign-off');
 select checks.expect_count($$update officer_reviews set reason='rewrite' returning 1$$,0,'officer cannot edit reviews (RLS)');
 -- letters
-insert into letters (id,application_id,version,body_text) values ('90000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001',1,'Draft');
+-- every rule is Met here, so the letter is a next-steps letter (a decline letter must cite a confirmed Not met: 0019)
+insert into letters (id,application_id,version,body_text,kind) values ('90000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001',1,'Draft','next_steps');
 commit;
 
 select checks.expect_error($$update officer_reviews set reason='rewrite'$$,'append-only','reviews append-only even for owner');
@@ -163,7 +164,8 @@ begin; select checks.as_user('00000000-0000-0000-0000-0000000000c1');
 select checks.expect_count('select * from letters',0,'applicant cannot see draft letter');
 rollback;
 begin; select checks.as_user('00000000-0000-0000-0000-0000000000a1');
-update letters set status='approved', approved_by=auth.uid(), approved_at=now() where id='90000000-0000-0000-0000-000000000001';
+update letters set status='approved', approved_by=auth.uid(), approved_at=now(), letter_viewed_at=now(), viewed_by=auth.uid(), checks_passed=true,
+  signed_off_by=auth.uid(), signed_off_at=now(), released_at=now(), released_by=auth.uid() where id='90000000-0000-0000-0000-000000000001';
 select checks.expect_error($$update letters set body_text='changed' where id='90000000-0000-0000-0000-000000000001'$$,'approved and cannot be changed','approved letter frozen');
 commit;
 begin; select checks.as_user('00000000-0000-0000-0000-0000000000c1');
