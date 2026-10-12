@@ -154,7 +154,7 @@ export interface AiUseField {
   action: { action: "no_action" | "note" | "ask"; label: string; note: string | null; request_id: string | null } | null;
 }
 export interface AiUseView {
-  enabled: boolean; policy: string | null; acknowledged: boolean; acknowledged_at: string | null; min_words: number;
+  enabled: boolean; preview?: boolean; policy: string | null; acknowledged: boolean; acknowledged_at: string | null; min_words: number;
   fields: AiUseField[]; model: string | null; revision: string | null; thresholds: { weak: number; stronger: number } | null; checked_at: string | null;
 }
 

@@ -27,9 +27,11 @@ def pack_config(store: Store, app: dict[str, Any]) -> dict[str, Any]:
 
 
 def ai_use_enabled(store: Store, app: dict[str, Any]) -> bool:
-    """Shown only if the rule pack declares an AI-use policy AND its fairness gate switched the check on."""
-    cfg = pack_config(store, app)
-    return bool(cfg.get("ai_use_policy")) and bool((cfg.get("ai_check") or {}).get("enabled"))
+    """Shown only if the rule pack declares an AI-use policy AND its fairness gate switched the check on
+    (or, in demo mode only, as a marked preview on the synthetic demo applications)."""
+    from app.services import ai_use
+
+    return ai_use.active(store, app)[0]
 
 
 def opened(store: Store, application_id: str) -> set[str]:

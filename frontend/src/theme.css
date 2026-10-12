@@ -427,3 +427,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .ai-text { margin: var(--sp-2) 0; padding: var(--sp-3); max-height: 260px; overflow-y: auto; background: var(--page); border-radius: var(--r-control); white-space: pre-wrap; }
 .ai-actions { display: grid; gap: var(--sp-2); justify-items: start; }
 .ai-note { display: grid; gap: var(--sp-2); width: 100%; }
+.ai-preview { margin: 0; display: flex; gap: 6px; align-items: center; padding: var(--sp-2) var(--sp-3); border: 1px dashed var(--sec-ai); border-radius: var(--r-control); color: var(--ink-soft); background: var(--card); }
+/* dialogs sit above the sticky case header and top bar, and scroll inside when tall */
+.modal-backdrop { z-index: 100; }
+.ai-drawer { max-height: calc(100vh - 48px); overflow-y: auto; }
+.ai-drawer .ai-text { border-left: 3px solid var(--sec-ai); }
+.ai-drawer .eyebrow { color: var(--sec-ai); }

@@ -1,0 +1,135 @@
+{
+  "date": "2026-10-12",
+  "model": "openai-community/roberta-base-openai-detector",
+  "revision": "6cba99c003b711c7fe94f8a3aa2be35a792cb6fa",
+  "thresholds": {
+    "weak": 0.941126,
+    "stronger": 0.996165
+  },
+  "flag_rate": {
+    "a": 0.0,
+    "b": 0.08333333333333333,
+    "c": 0.0,
+    "d": 0.0,
+    "e": 0.0
+  },
+  "stronger_rate": {
+    "a": 0.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 0.0,
+    "e": 0.0
+  },
+  "counts": {
+    "a": {
+      "texts": 12,
+      "checked": 12,
+      "too_short": 0
+    },
+    "b": {
+      "texts": 12,
+      "checked": 12,
+      "too_short": 0
+    },
+    "c": {
+      "texts": 12,
+      "checked": 12,
+      "too_short": 0
+    },
+    "d": {
+      "texts": 10,
+      "checked": 10,
+      "too_short": 0
+    },
+    "e": {
+      "texts": 1,
+      "checked": 1,
+      "too_short": 0
+    }
+  },
+  "provenance": {
+    "a": [
+      "synthetic: written by an AI assistant (Claude) to imitate this writing style. NOT human-written."
+    ],
+    "b": [
+      "synthetic: written by an AI assistant (Claude) to imitate this writing style. NOT human-written."
+    ],
+    "c": [
+      "synthetic: written by an AI assistant (Claude) to imitate this writing style. NOT human-written."
+    ],
+    "d": [
+      "llm:gemini:gemini-3.5-flash"
+    ],
+    "e": [
+      "synthetic: written by an AI assistant (Claude) to imitate this writing style. NOT human-written. Grammar edited by llm:gemini:gemini-3.5-flash."
+    ]
+  },
+  "gate": {
+    "second_language_rate": 0.0,
+    "polished_rate": 0.0,
+    "gap": 0.0,
+    "limit": 0.02,
+    "rates_ok": true,
+    "human_provenance": false,
+    "enabled": false
+  },
+  "scores": {
+    "a": [
+      0.0002,
+      0.0005,
+      0.0002,
+      0.0002,
+      0.0002,
+      0.0002,
+      0.0005,
+      0.0002,
+      0.0002,
+      0.0007,
+      0.0075,
+      0.0009
+    ],
+    "b": [
+      0.9411,
+      0.0036,
+      0.015,
+      0.0348,
+      0.0007,
+      0.6718,
+      0.9962,
+      0.0028,
+      0.0006,
+      0.0006,
+      0.3307,
+      0.0003
+    ],
+    "c": [
+      0.0003,
+      0.0002,
+      0.0021,
+      0.0002,
+      0.0002,
+      0.0003,
+      0.0002,
+      0.0002,
+      0.0015,
+      0.0002,
+      0.001,
+      0.0313
+    ],
+    "d": [
+      0.0002,
+      0.0002,
+      0.0011,
+      0.0002,
+      0.0002,
+      0.0008,
+      0.0002,
+      0.0002,
+      0.0002,
+      0.0002
+    ],
+    "e": [
+      0.2814
+    ]
+  }
+}

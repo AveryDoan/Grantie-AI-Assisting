@@ -82,12 +82,24 @@ def test_it_is_off_unless_the_pack_has_a_policy_and_the_gate_switched_it_on(stor
     assert store.select("ai_use_checks") == []
 
 
+def test_the_demo_preview_only_applies_in_demo_mode(store, officer, stub_llm, settings, monkeypatch):
+    aid = assessed(store, officer, stub_llm, settings)
+    switch_on(store, aid, enabled=False)
+    app = one(store.select("applications", eq={"id": aid}, limit=1))
+    monkeypatch.setattr(ai_use, "demo_preview", lambda: False)
+    assert ai_use.active(store, app) == (False, False)
+    monkeypatch.setattr(ai_use, "demo_preview", lambda: True)
+    assert ai_use.active(store, app) == (True, True)
+    assert ai_use.view(store, app)["preview"] is True
+    assert "ai_use" in [s["key"] for s in steps.state(store, app, settings)["steps"][2]["substeps"]]
+
+
 def test_a_run_checks_only_configured_fields_keeps_the_trace_and_is_logged(store, officer, stub_llm, settings):
     aid = assessed(store, officer, stub_llm, settings)
     switch_on(store, aid)
     give_answers(store, aid, academic_achievements=LONG, leadership="Short answer.", nt_contribution=LONG)
     seen = []
-    out = ai_use.run_check(store, officer, aid, scorer=lambda w: seen.extend(w) or [0.99] * len(w), count_tokens=count_words,
+    out = ai_use.run_check(store, officer, aid, scorer=lambda w: seen.extend(w) or [0.9999] * len(w), count_tokens=count_words,
                            info={"model": "fake-detector", "revision": "r1"})
     results = {f["field"]: f["result"] for f in out["fields"]}
     assert set(results) == {"academic_achievements", "leadership", "community_engagement"}     # nt_contribution is not configured

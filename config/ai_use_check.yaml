@@ -5,7 +5,17 @@ revision: 6cba99c003b711c7fe94f8a3aa2be35a792cb6fa
 licence: MIT
 window_tokens: 400
 thresholds:
-  weak: 0.95        # mean detector score at or above this: "Weak signal"
-  stronger: 0.99    # at or above this: "Stronger signal"
-enabled: false      # true only when the fairness gate passed
-gate: {}
+  weak: 0.941126
+  stronger: 0.996165
+enabled: false
+# Demo only (APP_MODE=demo): show sub-step 3.3 on the synthetic demo applications, clearly marked as a preview, even though
+# the gate is not passed. Never applies outside demo mode.
+demo_preview: true
+gate:
+  second_language_rate: 0.0
+  polished_rate: 0.0
+  gap: 0.0
+  limit: 0.02
+  rates_ok: true
+  human_provenance: false
+  date: '2026-10-12'

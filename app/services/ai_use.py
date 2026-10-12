@@ -28,6 +28,23 @@ def policy(store: Store, app: dict[str, Any]) -> AiUsePolicy:
     return AiUsePolicy.model_validate((pack or {}).get("letter_config") or {})
 
 
+def demo_preview() -> bool:
+    """Demo mode only: show the check on the synthetic demo applications as a marked preview, although the gate is not passed."""
+    from app.config import get_settings
+
+    return bool(detector.load_config().get("demo_preview")) and get_settings().app_mode == "demo"
+
+
+def active(store: Store, app: dict[str, Any]) -> tuple[bool, bool]:
+    """(shown and runnable, is a demo preview). Real use needs the policy AND the passed gate."""
+    pol = policy(store, app)
+    if pol.enabled:
+        return True, False
+    if pol.ai_use_policy and demo_preview():
+        return True, True
+    return False, False
+
+
 def fields_from(redacted_text: str) -> dict[str, str]:
     """Each "field_name: value" block of the REDACTED application text (a value may run over several lines)."""
     marks = list(_FIELD.finditer(redacted_text or ""))
@@ -66,7 +83,8 @@ def run_check(store: Store, actor: Actor, application_id: str, *, scorer: Any = 
     require_role(actor, "officer", "admin")
     app = application_for_staff(store, actor, application_id)
     pol = policy(store, app)
-    if not pol.enabled:
+    on, preview = active(store, app)
+    if not on:
         raise Conflict("The AI-use check is not switched on for this grant (it has not passed its fairness test).")
     if not app.get("redacted_text"):
         raise Conflict("Approve the redaction check first. The check reads redacted text only.")
@@ -90,7 +108,8 @@ def run_check(store: Store, actor: Actor, application_id: str, *, scorer: Any = 
         tally[r.result] = tally.get(r.result, 0) + 1
     # Ids, counts and the model only. Never the text, never a score.
     write_audit(store, actor, "ai_use_check.run", application_id=application_id,
-                details={"check_id": row["id"], "model": info["model"], "revision": info["revision"], "fields": len(results), "results": tally})
+                details={"check_id": row["id"], "model": info["model"], "revision": info["revision"], "fields": len(results), "results": tally,
+                         "demo_preview": preview})
     return view(store, app)
 
 
@@ -147,8 +166,9 @@ def view(store: Store, app: dict[str, Any]) -> dict[str, Any]:
     pol = policy(store, app)
     check = latest_check(store, app["id"])
     answers = {**(((app.get("application_text") or {}).get("fields")) or {}), **(((app.get("application_text") or {}).get("answers")) or {})}
+    on, preview = active(store, app)
     out: dict[str, Any] = {
-        "enabled": pol.enabled, "policy": pol.ai_use_policy,
+        "enabled": on, "preview": preview, "policy": pol.ai_use_policy,
         "acknowledged": bool(app.get("ai_use_acknowledged")), "acknowledged_at": app.get("ai_use_acknowledged_at"),
         "fields": [], "model": None, "revision": None, "thresholds": None, "checked_at": None, "min_words": pol.ai_check_fields.min_words,
     }

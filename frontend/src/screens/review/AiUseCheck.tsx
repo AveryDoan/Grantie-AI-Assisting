@@ -29,6 +29,10 @@ export function AiUseCheck({ detail, locked, onChanged }: { detail: Detail; lock
 
   return (
     <section className="rv-section ai-use" aria-label="AI-use check">
+      {view.preview && (
+        <p className="ai-preview" role="note"><Icon name="info" size={15} />Demo preview. This check has not passed its fairness test, so it is off for real
+          applications. It is shown here on the synthetic demo applicant only, to demonstrate how it would work.</p>
+      )}
       <article className="ai-info">
         <h3>The form's rule on AI use</h3>
         <blockquote>{view.policy}</blockquote>
