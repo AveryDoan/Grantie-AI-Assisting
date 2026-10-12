@@ -54,7 +54,7 @@ from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
 from app.services import ai_use, audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
-from app.services.errors import ServiceError
+from app.services.errors import NotFound, ServiceError
 from app.store.base import Store, StoreError, one
 
 log = get_logger(__name__)
@@ -270,7 +270,9 @@ def create_app(
 
     @r.get("/pool/linked-applications")
     def linked_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
-        """Groups of applications that share an attribute. Names the attribute, never its value."""
+        """Groups of applications that share an attribute. Disabled unless linked_applications.enabled (config/features.yaml)."""
+        if not settings.linked_applications_on:
+            raise NotFound("Linked applications are not part of this product")
         return consistency.linked_groups(s, actor, settings)
 
     # ---------------------------------------------------- the original PDF: signed link, locate, blur, burned-in export

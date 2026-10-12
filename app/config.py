@@ -64,6 +64,20 @@ class Settings(BaseSettings):
     # HMAC key for the identifier hashes used to link applications (base64/url-safe, >= 32 bytes).
     # Identifiers are never stored or logged, only keyed hashes. Never commit this value.
     identifier_hash_key: SecretStr = SecretStr("")
+    # Linked applications (cross-application check). None = use config/features.yaml (linked_applications.enabled: false).
+    linked_applications_enabled: bool | None = None
+
+    @property
+    def linked_applications_on(self) -> bool:
+        if self.linked_applications_enabled is not None:
+            return self.linked_applications_enabled
+        from pathlib import Path
+
+        import yaml
+
+        p = Path(__file__).resolve().parents[1] / "config" / "features.yaml"
+        cfg = (yaml.safe_load(p.read_text(encoding="utf-8")) or {}) if p.exists() else {}
+        return bool((cfg.get("linked_applications") or {}).get("enabled"))
 
     # --- API ----------------------------------------------------------------
     rate_limit_per_minute: int = 60

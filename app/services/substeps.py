@@ -63,8 +63,9 @@ def _counts(store: Store, app: dict[str, Any], run: dict[str, Any] | None, pendi
     rules = store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]}) if run else []
     merit_codes = {r["rule_code"] for r in rules if (r.get("params") or {}).get("section") == "merit"}
     rule_codes = {r["rule_code"] for r in rules} - merit_codes
+    # Consistency of information only (cross-document, timeline, document metadata, narrative). Linked applications are not counted.
     flags = [r for r in store.select("consistency_flags", eq={"application_id": app["id"]})
-             if r.get("status") == "open" and r.get("verification") == "verified"]
+             if r.get("status") == "open" and r.get("verification") == "verified" and r.get("check_type") != "cross_application"]
     return {
         ELIGIBILITY: {"open": len([c for c in pending if c in rule_codes]), "total": len(rule_codes)},
         MERIT: {"open": len([c for c in pending if c in merit_codes]), "total": len(merit_codes)},

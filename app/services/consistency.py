@@ -110,16 +110,18 @@ def run_for_assessment(store: Store, actor: Actor, app: dict[str, Any], run: dic
         result = run_consistency(ctx)
         trace = dict(result.trace)
 
-        # The pool check: hash this application's identifiers and wording, then refresh every linked application.
-        previously_linked = cross_application.linked_apps(store, app["id"])
-        idents, fingers = cross_application.collect_identifiers(ctx), cross_application.collect_fingerprints(ctx)
-        if ctx.hash_key:
-            cross_application.save(store, app["id"], idents, fingers)
-        group = {app["id"]} | previously_linked | cross_application.linked_apps(store, app["id"])
-        pool_counts = {"identifiers": len(idents), "fingerprints": len(fingers), "linked_applications": len(group) - 1}
-        for aid in group:
-            persist_flags(store, aid, None, cross_application.flags_for(store, aid), {"cross_application"})
-        trace["cross_application"] = pool_counts if ctx.hash_key else {"skipped": "IDENTIFIER_HASH_KEY is not set"}
+        if settings.linked_applications_on:
+            # The pool check (disabled by default: linked applications are not part of the product). Hash this application's
+            # identifiers and wording, then refresh every linked application.
+            previously_linked = cross_application.linked_apps(store, app["id"])
+            idents, fingers = cross_application.collect_identifiers(ctx), cross_application.collect_fingerprints(ctx)
+            if ctx.hash_key:
+                cross_application.save(store, app["id"], idents, fingers)
+            group = {app["id"]} | previously_linked | cross_application.linked_apps(store, app["id"])
+            pool_counts = {"identifiers": len(idents), "fingerprints": len(fingers), "linked_applications": len(group) - 1}
+            for aid in group:
+                persist_flags(store, aid, None, cross_application.flags_for(store, aid), {"cross_application"})
+            trace["cross_application"] = pool_counts if ctx.hash_key else {"skipped": "IDENTIFIER_HASH_KEY is not set"}
         mine = [f for f in result.flags]
         persist_flags(store, app["id"], run["id"], mine, {"cross_document", "timeline", "document_integrity", "narrative"})
         store.update("assessment_runs", {"consistency_trace": trace}, eq={"id": run["id"]})
@@ -191,6 +193,8 @@ def flags_to_check(store: Store, app_ids: list[str], settings: Settings) -> dict
         return {}
     by_app: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
+        if r["check_type"] == "cross_application" and not settings.linked_applications_on:
+            continue
         if r["status"] == "open" and r["verification"] == "verified":
             by_app.setdefault(r["application_id"], []).append(r)
     return {a: len(rs) for a, rs in by_app.items() if any(r["strength"] == "strong" for r in rs)}

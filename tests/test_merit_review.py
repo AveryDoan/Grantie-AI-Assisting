@@ -287,6 +287,37 @@ def test_linked_applications_show_hashed_references_only(pool):
     assert all(r["can_open"] for r in rows)
 
 
+def test_linked_applications_are_switched_off_by_default(pool):
+    """Not part of the product (config/features.yaml): no list, no endpoint, no flags, no count. The engine stays, unused."""
+    from app.config import Settings
+    from app.services import consistency as consistency_service
+    from app.services import steps as steps_service
+
+    store, ids, actor, settings = pool
+    off = settings.model_copy(update={"linked_applications_enabled": None})
+    assert off.linked_applications_on is False                      # the shipped default
+    detail = queue_service.application_detail(store, actor, ids["F07"], off)
+    assert "linked_applications" not in detail
+    assert not [r for r in detail["consistency"]["overview"] if "cross" in (r.get("family") or "")]
+    sub = {s["key"]: s for s in steps_service.state(store, store.select("applications", eq={"id": ids["F07"]})[0], off)["steps"][2]["substeps"]}
+    flags = [f for f in store.select("consistency_flags", eq={"application_id": ids["F07"]})
+             if f["status"] == "open" and f["verification"] == "verified" and f["check_type"] != "cross_application"]
+    assert sub["consistency"]["count"] == len(flags), "3.2 counts consistency of information only"
+    assert consistency_service.flags_to_check(store, [ids["F07"]], off).get(ids["F07"], 0) <= len(flags)
+    assert Settings(_env_file=None).linked_applications_on is False
+
+
+def test_the_linked_applications_endpoint_is_gone_when_switched_off(store, settings, officer):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    limiter.reset()
+    c = TestClient(create_app(store=store, settings=settings))
+    r = c.get("/pool/linked-applications", headers=token(settings, officer.user_id))
+    assert r.status_code == 404
+
+
 def test_there_are_no_links_for_an_application_that_shares_nothing(pool):
     store, ids, actor, settings = pool
     assert queue_service.application_detail(store, actor, ids["DD"], settings)["linked_applications"] == []

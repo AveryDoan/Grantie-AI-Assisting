@@ -1,3 +1,6 @@
+> Note (Oct 2026): linked applications (the cross-application pool check) are disabled in the product; the F07 to F09
+> rows below describe the engine, which is kept but switched off. See README, "Disabled features".
+
 # Consistency layer evaluation
 
 Signals, never verdicts: these flags point at things an officer should check. They are not scores, ratings or recommendations.

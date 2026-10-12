@@ -27,6 +27,9 @@ HASH_KEY = "test-only-identifier-hash-key-0123456789abcdef"
 
 
 def make_settings(**kw) -> Settings:
+    # The cross-application engine is disabled in the product (config/features.yaml) but kept; these tests switch it on to
+    # keep it working for the day it is restored.
+    kw.setdefault("linked_applications_enabled", True)
     return Settings(_env_file=None, llm_provider="stub", redaction_key=generate_key(), consistency_layer=True, require_redaction_approval=False,
                     identifier_hash_key=HASH_KEY, supabase_jwt_secret="test-secret-for-hs256-only-0123456789", **kw)
 

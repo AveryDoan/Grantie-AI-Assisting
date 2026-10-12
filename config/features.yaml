@@ -1,0 +1,5 @@
+# Product features that can be switched off without removing code. Settings (env vars) override these defaults.
+linked_applications:
+  # Linked applications (the cross-application "pool" check, keyed identifier hashes, the Linked applications list) are not
+  # part of the product. The tables, hashing code and engine code stay in place, unused. Set true to restore the feature.
+  enabled: false

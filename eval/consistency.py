@@ -85,8 +85,9 @@ def run_cases(llm: Any, *, echo=print) -> tuple[list[CaseResult], dict[str, Any]
     uid = data.sid("user:consistency-eval")
     store.insert("profiles", {"id": uid, "role": "officer", "organisation_id": data.ORG_ID})
     actor = Actor(user_id=uid, role="officer", organisation_id=data.ORG_ID)
+    # Linked applications are disabled in the product, but this harness measures the whole engine, cross-application included.
     settings = Settings(_env_file=None, llm_provider="stub", redaction_key=generate_key(), consistency_layer=True,
-                        identifier_hash_key="evaluation-only-hash-key-0123456789abcdef")
+                        identifier_hash_key="evaluation-only-hash-key-0123456789abcdef", linked_applications_enabled=True)
     exp = expected()
     stats = {"cases": 0, "failed": []}
     runs: dict[str, dict[str, Any]] = {}

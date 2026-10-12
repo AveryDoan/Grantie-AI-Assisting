@@ -300,7 +300,9 @@ def application_detail(store: Store, actor: Actor, application_id: str, settings
         "ai_use": ai_use_service.view(store, app),
         "merit_summaries": merit_summary.views(store, app, restorer, restorer.source_texts() if run else {}) if run else {},
         "consistency": consistency_service.application_flags(store, app, settings or get_settings(), restorer),
-        "linked_applications": linked_service.for_application(store, actor, app, reference) if (settings or get_settings()).consistency_layer else [],
+        # Linked applications are disabled (config/features.yaml); the key is only present when the feature is switched back on.
+        **({"linked_applications": linked_service.for_application(store, actor, app, reference)}
+           if (settings or get_settings()).consistency_layer and (settings or get_settings()).linked_applications_on else {}),
         "disclaimer": "AI output is a suggestion only. An officer decides every finding and signs off the decision.",
     }
 
