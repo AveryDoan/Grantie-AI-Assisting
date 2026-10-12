@@ -107,7 +107,6 @@ function ConsistencyTrace({ detail }: { detail: Detail }) {
           <ul className="cx-list">
             <li>Across documents: {t.cross_document?.error ? `did not run (${t.cross_document.error})` : `${t.cross_document?.flags ?? 0} flag(s)`}</li>
             <li>Document signals (weak only): {t.document_integrity?.error ? `did not run (${t.document_integrity.error})` : `${t.document_integrity?.flags ?? 0} flag(s)`}</li>
-            <li>Across applications: {t.cross_application?.skipped ?? `${t.cross_application?.identifiers ?? 0} identifiers and ${t.cross_application?.fingerprints ?? 0} document fingerprints stored as keyed hashes only; ${t.cross_application?.linked_applications ?? 0} linked application(s)`}</li>
           </ul>
         </div>
       )}

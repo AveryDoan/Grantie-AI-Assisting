@@ -9,7 +9,6 @@ import LetterScreen from "./screens/Letter";
 import Audit from "./screens/Audit";
 import Evaluation from "./screens/Evaluation";
 import AiTrace from "./screens/AiTrace";
-import Pool from "./screens/Pool";
 import Lists from "./screens/Lists";
 import PublicHome from "./screens/PublicHome";
 import ApplicantFlow from "./ApplicantFlow";
@@ -24,7 +23,6 @@ export type Route =
   | { name: "home" }
   | { name: "apply" }
   | { name: "queue"; q?: string }
-  | { name: "pool" }
   | { name: "lists" }
   | { name: "review"; id: string; step?: number; sub?: string }
   | { name: "trace"; id: string; item?: string }
@@ -46,7 +44,6 @@ function parse(hash: string): Route {
   }
   if (parts[0] === "queue") return { name: "queue", q: new URLSearchParams(query).get("q") ?? undefined };
   if (parts[0] === "apply") return { name: "apply" };
-  if (parts[0] === "pool") return { name: "pool" };
   if (parts[0] === "lists") return { name: "lists" };
   if (parts[0] === "audit") return { name: "audit" };
   if (parts[0] === "evaluation") return { name: "evaluation" };
@@ -57,7 +54,6 @@ export function href(route: Route): string {
   switch (route.name) {
     case "home": return "#/";
     case "apply": return "#/apply";
-    case "pool": return "#/pool";
     case "lists": return "#/lists";
     case "queue": return route.q ? `#/queue?q=${encodeURIComponent(route.q)}` : "#/queue";
     case "review": return route.step ? `#/applications/${route.id}?step=${route.step}${route.step === 3 && route.sub ? `&sub=${route.sub}` : ""}` : `#/applications/${route.id}`;
@@ -85,7 +81,7 @@ function useRoute(): [Route, Navigate] {
 }
 
 const TITLES: Record<Route["name"], string> = {
-  home: "", apply: "", queue: "Applications", pool: "Linked applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
+  home: "", apply: "", queue: "Applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
   letter: "Outcome letter", audit: "Audit trail", evaluation: "Evaluation",
 };
 
@@ -207,7 +203,6 @@ export default function App() {
       {/* A new key per application: the screen never shows one application's content (or buttons) under another's address. */}
       {route.name === "review" && <Application key={route.id} id={route.id} step={route.step} sub={route.sub} navigate={navigate} />}
       {route.name === "trace" && <AiTrace key={`${route.id}-${route.item ?? ""}`} id={route.id} item={route.item} navigate={navigate} />}
-      {route.name === "pool" && <Pool navigate={navigate} />}
       {route.name === "lists" && <Lists />}
       {route.name === "signoff" && <Signoff key={route.id} id={route.id} navigate={navigate} />}
       {route.name === "letter" && <LetterScreen key={route.id} id={route.id} navigate={navigate} />}

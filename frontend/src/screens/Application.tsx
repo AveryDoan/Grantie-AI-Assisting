@@ -61,7 +61,7 @@ export default function Application({ id, step, sub, navigate }: { id: string; s
 
   return (
     <main className="gf-page">
-      <header className={`gf-head ${SEC[shown]}`}>
+      <header className={`gf-head ${SEC[shown]} ${shown === 3 ? "gf-head-compact" : ""}`}>
         <div className="gf-head-row">
           <div className="gf-id">
             <button className="link-button" onClick={() => navigate({ name: "queue" })}><Icon name="left" size={14} />Applications</button>
@@ -76,7 +76,7 @@ export default function Application({ id, step, sub, navigate }: { id: string; s
             </div>
           </details>
         </div>
-        <StepBar steps={st.steps} shown={shown} onGo={go} />
+        <StepBar steps={st.steps} shown={shown} onGo={go} compact={shown === 3} />
         <div className="gf-progress">
           {detail.latest_run && (
             <p className="gf-count" aria-live="polite">

@@ -19,10 +19,12 @@ test("a rule is decided by an officer review; asking the applicant is not a deci
 
 test("the pill, the section card and the header read the same backend numbers", () => {
   const review = src("../src/screens/Review.tsx");
+  const bar = src("../src/screens/steps/SubStepBar.tsx");
   const application = src("../src/screens/Application.tsx");
-  // pill and card both print the sub-step's own count
-  assert.match(review, /data-count=\{s\.count\}/, "the pill shows the sub-step count");
-  assert.match(review, /data-count=\{current\.count\}/, "the section card shows the same sub-step count");
+  // the sub-step card (the pill) prints the backend's count for that sub-step, and Review passes the backend's list straight in
+  assert.match(bar, /data-count=\{s\.count\}/, "the sub-step card shows the sub-step count");
+  assert.match(bar, /\{s\.count > 0 && <span className="ss-count"/, "the count badge is the same number");
+  assert.match(review, /<SubStepBar subs=\{subs\}/, "the cards get the backend's sub-steps unchanged");
   // the header shows the backend's progress, which is the sum of the blocking sub-step counts
   assert.match(application, /step3\?\.progress/);
   assert.match(application, /step3\?\.substeps/);

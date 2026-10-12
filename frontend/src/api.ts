@@ -54,7 +54,6 @@ export interface ConsistencyTrace {
   document_integrity?: { flags?: number; error?: string };
   timeline?: { input?: { sources: { source: string; label: string; characters: number }[]; notes: string[] }; returned?: TraceItem[]; verified?: number; dropped_unverified?: number; flags?: number; error?: string; skipped?: string };
   narrative?: { input?: { sources: { source: string; label: string; characters: number }[]; notes: string[] }; returned?: TraceItem[]; verified?: number; dropped_unverified?: number; flags?: number; error?: string; skipped?: string };
-  cross_application?: { identifiers?: number; fingerprints?: number; linked_applications?: number; skipped?: string };
 }
 
 /** One side of a comparison: the value, where it came from, and (when known) where it sits in the original text. */
@@ -90,22 +89,7 @@ export interface ConsistencyView {
 }
 
 /** Another application that shares something with this one. Hashed references only; never another applicant's details. */
-export interface LinkedApplication {
-  application_id: string;
-  reference: string;
-  shared: { what: string; ref: string; strength: "Exact match" | "Similar" }[];
-  strength: "Exact match" | "Similar";
-  can_open: boolean;
-}
-
 export interface MeritMark { mark: number | null; not_assessed: boolean; reason: string | null; updated_at: string | null }
-
-export interface LinkedGroup {
-  id: string;
-  applications: { id: string; reference: string; applicant_name: string | null }[];
-  attributes: { check_id: string; label: string; strength: "strong" | "weak" }[];
-  open_flags: number;
-}
 
 export interface QueueItem {
   id: string;
@@ -318,7 +302,6 @@ export interface Detail {
   application: ApplicationRecord;
   documents: DocumentRow[];
   source_texts?: Record<string, { label: string; text: string }>;
-  linked_applications?: LinkedApplication[];
   merit_summaries?: Record<string, MeritSummary>;
   ai_use?: AiUseView;
   latest_run: Run | null;
@@ -613,7 +596,6 @@ export const api = {
     request<ReferenceListPreview>(`/reference-lists/${name}/preview`, { method: "POST", body: { text } }),
   saveReferenceList: (name: string, body: { text: string; edition?: string; source?: string }) =>
     request<ReferenceListSummary & { warnings: string[] }>(`/reference-lists/${name}`, { method: "PUT", body }),
-  linkedGroups: () => request<LinkedGroup[]>("/pool/linked-applications"),
   redact: (id: string, force = false) =>
     request<{ run_id: string; reused: boolean; report: Record<string, unknown> }>(`/applications/${id}/redact`, { method: "POST", body: { force } }),
   redactionReport: (id: string) => request<RedactionReport>(`/applications/${id}/redaction-report`),

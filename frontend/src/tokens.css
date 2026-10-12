@@ -1,5 +1,6 @@
 /* Design tokens: the only place colours, type, radii, spacing and shadows are defined. Components use var(--...) only.
-   Section colours show the AREA of work, never the quality of an application. Status colours always come with an icon and a word. */
+   Section colours show the AREA of work, never the quality of an application. Status colours always come with an icon and a word.
+   No side stripes or left-border accents anywhere in the product: bands and cards use a tinted fill and a full thin border. */
 :root {
   /* brand */
   --brand-navy: #171f55;
@@ -15,7 +16,7 @@
   --muted-ink: #5f6a7d;     /* brand #697386, darkened slightly to keep 4.5:1 on the page background */
 
   /* left rail */
-  --seg-track: #e9ecf4; --rail: #ffffff; --rail-line: #e8ebf3; --rail-hover: #f3f5fb; --rail-ink: #2a3157; --rail-muted: #6b7388;
+  --chevron: #b8bfcc; --row-attention: #fffaf0; --seg-track: #e9ecf4; --rail: #ffffff; --rail-line: #e8ebf3; --rail-hover: #f3f5fb; --rail-ink: #2a3157; --rail-muted: #6b7388;
 
   /* sections: tint for backgrounds, solid for icon and left bar */
   --sec-docs: #2563eb;        --sec-docs-tint: #eaf2ff;
@@ -24,7 +25,6 @@
   --sec-merit: #b7791f;       --sec-merit-tint: #fff4dd;
   --sec-ai: #0369a1;          --sec-ai-tint: #e0f2fe;      /* AI-use check: sky blue, never a warning colour */
   --sec-consistency: #475569; --sec-consistency-tint: #eef1f6;
-  --sec-linked: #4338ca;      --sec-linked-tint: #eceeff;
   --sec-outcome: #171f55;     --sec-outcome-tint: #e8eaf6;
   /* text that sits on a section tint (darker than the solid, to keep 4.5:1) */
   --sec-merit-ink: #7a4f0e;
@@ -89,7 +89,6 @@
 .sec-merit { --sec: var(--sec-merit); --sec-tint: var(--sec-merit-tint); --sec-ink: var(--sec-merit-ink); }
 .sec-ai { --sec: var(--sec-ai); --sec-tint: var(--sec-ai-tint); --sec-ink: var(--sec-ai); }
 .sec-consistency { --sec: var(--sec-consistency); --sec-tint: var(--sec-consistency-tint); --sec-ink: var(--sec-consistency); }
-.sec-linked { --sec: var(--sec-linked); --sec-tint: var(--sec-linked-tint); --sec-ink: var(--sec-linked); }
 .sec-outcome { --sec: var(--sec-outcome); --sec-tint: var(--sec-outcome-tint); --sec-ink: var(--sec-outcome); }
 
 .sec-done { --sec: var(--st-met); --sec-tint: var(--st-met-tint); --sec-ink: var(--st-met); }

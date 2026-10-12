@@ -139,7 +139,7 @@ export default function LetterScreen({ id, navigate }: { id: string; navigate: N
                 title={signedOff ? undefined : "Sign off the application before approving its letter"}
                 onClick={() => void act(() => api.patchLetter(letter.id, { approve: true }))}>Approve letter</Button>
             )}
-            {!approved && !signedOff && <small className="locked"><Icon name="clock" />Approval unlocks after sign-off. The applicant only sees an approved letter.</small>}
+            {!approved && !signedOff && <small className="lock-note"><Icon name="clock" />Approval unlocks after sign-off. The applicant only sees an approved letter.</small>}
             {!approved && <Button variant="quiet" disabled={busy} onClick={() => void act(() => api.generateLetter(id))}>Regenerate from decisions</Button>}
             <Button onClick={() => navigate({ name: "audit" })}>Continue to audit trail <Icon name="arrow" /></Button>
           </aside>
@@ -189,7 +189,7 @@ export function LetterEditor({ letter, programName, signedOff, onChanged, onRege
             title={signedOff ? undefined : "Sign off the application before approving its letter"}
             onClick={() => void act(() => api.patchLetter(letter.id, { approve: true }))}>Approve letter</Button>
         )}
-        {!approved && !signedOff && <small className="locked"><Icon name="clock" />The letter is released only after you sign off. The applicant only sees an approved letter.</small>}
+        {!approved && !signedOff && <small className="lock-note"><Icon name="clock" />The letter is released only after you sign off. The applicant only sees an approved letter.</small>}
         {!approved && onRegenerate && <Button variant="quiet" disabled={busy} onClick={() => void act(onRegenerate)}>Draft again from my decisions</Button>}
         <Button variant="secondary" icon="download" onClick={() => window.print()}>Print / save as PDF</Button>
       </aside>

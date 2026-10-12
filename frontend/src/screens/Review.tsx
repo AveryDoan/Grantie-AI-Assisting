@@ -1,7 +1,7 @@
 // Step 3, Assessment, in sub-steps shown as pills: 3.1 Eligibility, 3.2 Consistency, 3.3 AI-use check (only when the rule pack has
 // an AI-use policy and the check is enabled), then Merit (3.4, or 3.3 without the AI-use check).
 //   Eligibility: one table of the S rules, with the document rules (D) under a "Documents" heading; a row opens the evidence drawer.
-//   Consistency: "Consistency of information" and "Linked applications". Signals only; a dismissal needs a reason.
+//   Consistency: "Consistency of information" (cross-document, timeline, document metadata, narrative). Signals only; a dismissal needs a reason.
 //   Merit: the criteria cards, each opening the grading workspace, and the officer's marks.
 // Every count comes from the backend (steps endpoint, step 3 "substeps"), so the pills, cards and header always agree.
 // No overall score, ranking or recommendation is shown. Merit marks belong to the officer and are never totalled.
@@ -16,35 +16,11 @@ import { AskDialog, DecisionDialog, type DialogState } from "./review/Dialogs";
 import { CRITERIA, MeritViewer } from "./review/MeritViewer";
 import { MeritWorkspace } from "./review/MeritWorkspace";
 import { AiUseCheck } from "./review/AiUseCheck";
+import { SubStepBar } from "./steps/SubStepBar";
 import { DecisionCell, Row } from "./review/parts";
 import { ReviewPanel } from "./review/Panel";
 import { CHECKED_BY_LABEL, byAttention, checkedBy, decisionText, plainRule } from "./review/model";
 
-const SUB_SEC: Record<SubStepKey, string> = { eligibility: "sec-elig", consistency: "sec-consistency", ai_use: "sec-ai", merit: "sec-merit" };
-const SUB_ICON: Record<SubStepKey, string> = { eligibility: "list", consistency: "eye", ai_use: "robot", merit: "user" };
-
-/** The sub-step pills: number, name, count and status. A locked pill cannot be opened. */
-function SubStepPills({ subs, shown, onGo }: { subs: SubStep[]; shown: SubStepKey; onGo: (k: SubStepKey) => void }) {
-  return (
-    <nav className="ss-bar" aria-label="Assessment sub-steps">
-      <ol>
-        {subs.map((s) => {
-          const label = s.status === "done" ? "Complete" : s.status === "reviewed" ? "Reviewed" : s.blocking ? (s.count ? `${s.count} to do` : "Not started") : "Optional";
-          return (
-            <li key={s.key} className={`ss-pill ${SUB_SEC[s.key]} ${s.status} ${shown === s.key ? "shown" : ""}`}>
-              <button onClick={() => onGo(s.key)} disabled={!s.unlocked} aria-current={shown === s.key ? "step" : undefined}
-                title={s.unlocked ? undefined : "Run the AI check first"} data-count={s.count}>
-                <span className="ss-num" aria-hidden="true">{s.status === "done" || s.status === "reviewed" ? <Icon name="check" size={14} /> : s.number}</span>
-                <span className="ss-text"><strong>{s.number} {s.title}</strong><small>{label}</small></span>
-                {s.count > 0 && <span className="ss-count" aria-label={`${s.count} open`}>{s.count}</span>}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
 type Chip = "all" | "needs" | "decided";
 type Open = { kind: "rule"; code: string } | { kind: "referee" } | { kind: "cons"; id: string };
 
@@ -181,7 +157,6 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
       rules: findings.filter(isRule),
       merit: findings.filter((f) => !isRule(f)).sort(codeOrder),
       overview: (detail.consistency?.overview ?? []) as OverviewRow[],
-      linked: detail.linked_applications ?? [],
     };
   }, [detail]);
 
@@ -261,15 +236,7 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
 
   return (
     <div className={`rv-page ${sideOpen ? "has-panel" : ""}`}>
-      <SubStepPills subs={subs} shown={current?.key ?? "eligibility"} onGo={goSub} />
-      {current && (
-        <section className={`ss-head ${SUB_SEC[current.key]}`} aria-label={`${current.number} ${current.title}`} data-count={current.count}>
-          <span className="gf-band-icon"><Icon name={SUB_ICON[current.key]} size={20} /></span>
-          <h2>{current.number} {current.title}</h2>
-          <p>{current.missing ?? (current.blocking ? "Complete." : "Optional. Never blocks the outcome.")}</p>
-          {current.key === "eligibility" && <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>Esc</kbd> close</small>}
-        </section>
-      )}
+      <SubStepBar subs={subs} shown={current?.key ?? "eligibility"} onGo={goSub} />
 
       <div className="rv-layout">
         <div className="rv-main">
@@ -300,6 +267,7 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
                       <button key={st} className={`rv-filter ${status === st ? "on" : ""}`} aria-pressed={status === st} onClick={() => setStatus(status === st ? null : st)}>{label} <strong>{count(st)}</strong></button>
                     ))}
                   </div>
+                  <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>Esc</kbd> close</small>
                   <div className="rv-toolbtns">
                     <Button variant="secondary" icon="arrow" disabled={!elig?.count} onClick={reviewNext}>Review next</Button>
                     <Button variant="secondary" icon="send" disabled={locked || pickedFindings.length === 0}
@@ -324,22 +292,6 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
                   : detail.consistency?.unavailable ? <p className="empty-state">Could not load the consistency results. Please review manually.</p>
                   : <SignalList rows={model.overview} selectedKey={selectedKey}
                       onOpen={(r) => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "cons", id: r.id }); }} />}
-              </section>
-              <section className="rv-sidecard sec-linked">
-                <h2>Linked applications</h2>
-                {model.linked.length === 0 ? <p className="empty-state">No linked applications found.</p> : (
-                  <ul className="rv-signals">
-                    {model.linked.map((l) => (
-                      <li key={l.application_id}>
-                        <button onClick={() => l.can_open && navigate({ name: "review", id: l.application_id })} disabled={!l.can_open}
-                          aria-label={`${l.reference}. ${l.strength}. ${l.can_open ? "Open" : "No access"}`}>
-                          <span><strong>{l.reference}</strong><small>{l.shared.map((s) => s.what).join(", ")}</small></span>
-                          <span className="rv-signal-r"><small>{l.strength}</small></span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </section>
             </section>
           )}
@@ -371,7 +323,7 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
           {current && (
             <footer className="ss-foot">
               <Button variant="secondary" disabled={!prev || !prev.unlocked} onClick={() => prev && goSub(prev.key)}><Icon name="left" />{prev ? `Back: ${prev.number} ${prev.title}` : "Back"}</Button>
-              <small>{current.missing ?? (current.blocking ? "This part is complete." : "Optional. Looking here never blocks the outcome.")}</small>
+              <span />
               {next
                 ? <Button variant="secondary" disabled={!next.unlocked} onClick={() => goSub(next.key)}>{`Next: ${next.number} ${next.title}`} <Icon name="arrow" /></Button>
                 : <Button variant="secondary" disabled={subs.some((s) => s.blocking && s.status !== "done")} onClick={onOutcome}>Next: Outcome <Icon name="arrow" /></Button>}

@@ -88,7 +88,7 @@ export default function Signoff({ id, navigate }: { id: string; navigate: Naviga
           ) : (
             <Button disabled={!ready || !acknowledged || busy} onClick={() => void signOff()}>Sign off decision</Button>
           )}
-          {!ready && !signedOff && <small className="locked"><Icon name="clock" />Sign-off unlocks when every rule has your decision.</small>}
+          {!ready && !signedOff && <small className="lock-note"><Icon name="clock" />Sign-off unlocks when every rule has your decision.</small>}
         </aside>
       </div>
     </main>

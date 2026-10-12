@@ -6,7 +6,29 @@ import type { StepInfo } from "../../api";
 /** The colour of each area of work. The same class carries through to the band, the cards and the drawer. */
 export const SEC: Record<number, string> = { 1: "sec-docs", 2: "sec-redaction", 3: "sec-elig", 4: "sec-outcome" };
 
-export function StepBar({ steps, shown, onGo }: { steps: StepInfo[]; shown: number; onGo: (n: number) => void }) {
+/** The four big steps. `compact` (used inside Assessment) is a slim strip: icon and name only; status is the icon and colour. */
+export function StepBar({ steps, shown, onGo, compact }: { steps: StepInfo[]; shown: number; onGo: (n: number) => void; compact?: boolean }) {
+  if (compact) {
+    return (
+      <nav className="gf-strip" aria-label="Application steps">
+        <ol>
+          {steps.map((s) => {
+            const state = shown === s.step ? "active" : !s.unlocked ? "locked" : s.status === "done" ? "done" : "open";
+            const label = state === "active" ? "current step" : state === "locked" ? "locked" : state === "done" ? "done" : s.label.toLowerCase();
+            return (
+              <li key={s.step} className={`gf-chip ${SEC[s.step]} ${state}`}>
+                <button onClick={() => onGo(s.step)} disabled={!s.unlocked} aria-current={shown === s.step ? "step" : undefined}
+                  aria-label={`${s.title}, ${label}`} title={s.unlocked ? `${s.title}: ${s.label}` : `Finish step ${s.step - 1} first`}>
+                  <Icon name={state === "locked" ? "lock" : state === "done" ? "check" : state === "active" ? "arrow" : "clock"} size={14} />
+                  <span>{s.title}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+    );
+  }
   return (
     <nav className="gf-bar" aria-label="Application steps">
       <ol>
