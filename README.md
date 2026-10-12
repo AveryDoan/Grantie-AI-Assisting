@@ -557,3 +557,24 @@ git push -u origin main
 ```
 
 Do not commit `.env` files or secrets. Use the included `.env.example` files as templates.
+
+## Optional AI-use check (sub-step 3.3)
+
+We include an optional weak signal because the form has an AI-use rule. It is tested for fairness, never decides anything, and is off if the test fails.
+
+The form says: "Applicants should only use AI for basic tasks like spelling, grammar and organising ideas. AI should not be used to write, improve or paraphrase any part of your application." Applicants confirm "I have followed these rules." on the declaration step; the answer is stored with the application (`ai_use_acknowledged`, migration 0018).
+
+- **What it is:** a local detector model (`openai-community/roberta-base-openai-detector`, MIT, pinned revision; see `docs/models.md`) run on CPU over the redacted text of the configured answer fields (`ai_check_fields` in the rule pack). No external API is called. Answers under 80 words are "Too short to check"; the rest get "No signal", "Weak signal" or "Stronger signal". No percentages are shown.
+- **What it is not:** it never changes a rule status, a merit mark, a letter, the panel summary or the outcome, and it never blocks sign-off (`tests/test_ai_use.py`). The only follow-up is a neutral request to explain an answer in one's own words, drafted through the evidence-request flow for the officer to edit and approve.
+- **Install and download the model once** (weights go to the Hugging Face cache, never into the repo):
+  ```bash
+  pip install -e '.[ai_check]' --extra-index-url https://download.pytorch.org/whl/cpu
+  python -m app.pipeline.ai_use --download
+  ```
+- **Run it:** an officer opens Assessment, sub-step 3.3, and clicks "Run AI-use check" (`POST /applications/{id}/ai-use-check`). Each run and each officer action is in the audit log; the trace (model, revision, thresholds, raw scores) is in `ai_use_checks`.
+- **Fairness evaluation (required before it can be switched on):**
+  ```bash
+  LLM_PROVIDER=gemini python -m eval.ai_use_check --generate   # makes the LLM-written and grammar-edited sets
+  python -m eval.ai_use_check                                  # scores, sets thresholds, applies the gate
+  ```
+  It writes `eval/reports/ai_use_check.md` and `config/ai_use_check.yaml`. The check is shown only when the rule pack has an AI-use policy and the gate passed; reseed (or update the rule pack) after the gate changes.

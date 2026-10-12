@@ -115,6 +115,24 @@ function ConsistencyTrace({ detail }: { detail: Detail }) {
   );
 }
 
+/** The optional AI-use check: what it reads, what it runs and what it keeps. A weak signal; it decides nothing. */
+function AiUseTrace({ detail }: { detail: Detail }) {
+  const v = detail.ai_use;
+  if (!v) return null;
+  return (
+    <Section eyebrow="Optional · AI-use check" title="AI-use check (a weak signal)"
+      intro="Runs only when an officer asks, and only when the rule pack has an AI-use policy and the check passed its fairness test. It never changes a rule, a mark, a letter or the outcome.">
+      <table className="data-table trace-table"><tbody>
+        <tr><th>Status for this grant</th><td>{v.enabled ? "Switched on (fairness test passed)" : "Off: the fairness test has not passed"}</td></tr>
+        <tr><th>Input</th><td>The redacted text of these answers only: {v.fields.map((f) => f.label).join("; ") || "none"}. Placeholders become neutral words; answers under {v.min_words} words are not checked.</td></tr>
+        <tr><th>Model</th><td>{v.model ?? "openai-community/roberta-base-openai-detector"} on this server (CPU). No external service is called.{v.revision ? ` Revision ${v.revision}.` : ""}</td></tr>
+        <tr><th>Output</th><td>One result per answer: Too short to check, No signal, Weak signal or Stronger signal{v.thresholds ? ` (from the average detector output; weak from ${v.thresholds.weak}, stronger from ${v.thresholds.stronger})` : ""}. Raw scores are kept in the trace table for audit and are not shown on screen.</td></tr>
+        <tr><th>Last run</th><td>{v.checked_at ? formatDate(v.checked_at, true) : "Not run"}</td></tr>
+      </tbody></table>
+    </Section>
+  );
+}
+
 export default function AiTrace({ id, item, navigate }: { id: string; item?: string; navigate: Navigate }) {
   const detailLoad = useLoad(() => api.detail(id), [id]);
   const reportLoad = useLoad(() => api.redactionReport(id), [id]);
@@ -254,5 +272,7 @@ export default function AiTrace({ id, item, navigate }: { id: string; item?: str
     </Section>
 
     {(!scoped || scopeFlag) && <ConsistencyTrace detail={detail} />}
+
+    {!scoped && <AiUseTrace detail={detail} />}
   </main>;
 }
