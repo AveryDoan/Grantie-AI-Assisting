@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { createPortal } from "react-dom";
 import { api, type CompareSpan, type CompareText } from "../../api";
 import { Button, ErrorNotice, Icon, Loading } from "../../ui";
+import { usePersisted } from "../../persisted";
 import { MarkPersonal } from "./MarkPersonal";
 
 function Pane({ text, spans, side, active, setActive, refEl, onScroll, shown }: {
@@ -40,7 +41,7 @@ export function CompareViewer({ appId, source, title, onClose, onChanged }: { ap
   const [error, setError] = useState<unknown>(null);
   const [reveal, setReveal] = useState(false);
   const [active, setActive] = useState<string | null>(null);
-  const [type, setType] = useState("");
+  const [type, setType] = usePersisted("compare.type", "");
   const [tab, setTab] = useState<"orig" | "red">("orig");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);

@@ -4,6 +4,7 @@
 // Editing a finished step reopens the later steps (the server records that and leaves a notice here).
 import { useEffect, useState } from "react";
 import { api, type SubStepKey } from "../api";
+import { usePersisted } from "../persisted";
 import type { Navigate } from "../App";
 import { APP_STATUS_LABEL, Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../ui";
 import Review from "./Review";
@@ -24,7 +25,7 @@ export default function Application({ id, step, sub, navigate }: { id: string; s
   const { data: st, error, reload } = useLoad(() => api.steps(id), [id]);
   const { data: detail, reload: reloadDetail } = useLoad(() => api.detail(id), [id]);
   const [view, setView] = useState<number | null>(step ?? null);
-  const [subKey, setSubKey] = useState<SubStepKey | null>(SUB_KEYS.includes(sub as SubStepKey) ? (sub as SubStepKey) : null);
+  const [subKey, setSubKey] = usePersisted<SubStepKey | null>(`sub.${id}`, SUB_KEYS.includes(sub as SubStepKey) ? (sub as SubStepKey) : null);
   const shown = view ?? st?.current ?? 1;
   const setSub = (k: SubStepKey) => { setSubKey(k); window.scrollTo({ top: 0 }); };
 

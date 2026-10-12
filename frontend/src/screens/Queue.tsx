@@ -1,6 +1,7 @@
 // Work list: "Which application do I open next?" Tiles filter the table. Oldest first, never ranked by applicant.
 // No score, rank or comparison column. "Open items" is a count of things still waiting for the officer.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { usePersisted } from "../persisted";
 import { api, type QueueItem } from "../api";
 import type { Navigate } from "../App";
 import { STAGES, stageCounts, stageOf, type Stage } from "../stages";
@@ -20,8 +21,9 @@ export default function Queue({ navigate, initialSearch = "", filter, officer, p
   // A filter from the overview: the backend returns exactly the rows that tile or card counted.
   const scoped = Boolean(filter || officer || pack);
   const { data, error } = useLoad(() => (scoped ? api.queueFiltered(filter, officer ?? "all", pack) : api.queue()), [filter, officer, pack]);
-  const [search, setSearch] = useState(initialSearch);
-  const [stage, setStage] = useState<Stage | "all">("all");
+  const [search, setSearch] = usePersisted("queue.search", initialSearch);
+  const [stage, setStage] = usePersisted<Stage | "all">("queue.stage", "all");
+  useEffect(() => { if (initialSearch) setSearch(initialSearch); }, [initialSearch]); // eslint-disable-line react-hooks/exhaustive-deps
   const filtered = search !== "" || stage !== "all";
 
   const all = data ?? [];

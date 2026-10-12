@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { api, type HeldLetter, type RoundDecision } from "../api";
+import { usePersisted, usePersistedSet } from "../persisted";
 import { Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../ui";
 
 const MIN_NOTE = 20;
@@ -14,13 +15,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function RoundDecisions() {
   const { data, error, reload } = useLoad(api.roundDecisions, []);
   const held = useLoad(api.heldLetters, []);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [decision, setDecision] = useState<RoundDecision["decision"] | "">("");
-  const [decidedBy, setDecidedBy] = useState("Assessment panel");
-  const [authority, setAuthority] = useState("");
-  const [date, setDate] = useState(today());
-  const [reference, setReference] = useState("");
-  const [note, setNote] = useState("");
+  const [pickedSet, setPickedSet] = usePersistedSet("rounds.picked");
+  const picked = pickedSet;
+  const setPicked = (f: Set<string> | ((s: Set<string>) => Set<string>)) => setPickedSet(typeof f === "function" ? f(pickedSet) : f);
+  const [decision, setDecision] = usePersisted<RoundDecision["decision"] | "">("rounds.decision", "");
+  const [decidedBy, setDecidedBy] = usePersisted("rounds.by", "Assessment panel");
+  const [authority, setAuthority] = usePersisted("rounds.authority", "");
+  const [date, setDate] = usePersisted("rounds.date", today());
+  const [reference, setReference] = usePersisted("rounds.ref", "");
+  const [note, setNote] = usePersisted("rounds.note", "");
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
@@ -46,7 +49,7 @@ export default function RoundDecisions() {
         decided_by: decidedBy.trim(), authority: authority.trim(), decided_at: date, reference: reference.trim(),
         reason_note: note.trim() || null, typed_count: typed });
       setSaved(`${chosen.length} ${chosen.length === 1 ? "decision" : "decisions"} recorded. Draft letters are ready in each application’s Outcome step. Nothing was sent.`);
-      setPicked(new Set()); setConfirming(false); reload(); held.reload();
+      setPicked(new Set()); setReference(""); setNote(""); setConfirming(false); reload(); held.reload();
     } catch (e) { setFailure(e); setConfirming(false); } finally { setBusy(false); }
   };
 
