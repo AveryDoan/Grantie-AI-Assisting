@@ -457,6 +457,14 @@ export type StepStatus = "not_started" | "in_progress" | "done" | "waiting";
 export interface StepInfo {
   step: 1 | 2 | 3 | 4; key: string; title: string; status: StepStatus; label: string; unlocked: boolean;
   missing: string[]; notice: string | null; pending_rules?: string[];
+  substeps?: SubStep[];                        // step 3 only: the backend is the one source of these counts
+  progress?: { decided: number; total: number };
+}
+
+export type SubStepKey = "eligibility" | "consistency" | "ai_use" | "merit";
+export interface SubStep {
+  key: SubStepKey; number: string; title: string; count: number; total: number;
+  status: "not_started" | "in_progress" | "done" | "reviewed"; blocking: boolean; unlocked: boolean; missing: string | null;
 }
 export interface StepsState { steps: StepInfo[]; current: number; legacy: boolean }
 
@@ -540,6 +548,7 @@ export const api = {
   draftEvidenceRequest: (id: string, finding_ids?: string[]) =>
     request<EvidenceDraft>(`/applications/${id}/evidence-request`, { method: "POST", body: { finding_ids: finding_ids ?? null } }),
   regenerateMeritSummary: (id: string, code: string) => request<{ status: string; version: number }>(`/applications/${id}/merit/${code}/summary`, { method: "POST" }),
+  openSubstep: (id: string, key: SubStepKey) => request<{ key: string; opened: boolean }>(`/applications/${id}/substeps/${key}/opened`, { method: "POST" }),
   signoffStatement: () => request<{ statement: string }>("/signoff-statement"),
   signoff: (id: string) =>
     request<{ id: string }>(`/applications/${id}/signoff`, { method: "POST", body: { statement_acknowledged: true } }),

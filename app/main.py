@@ -51,7 +51,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps
+from app.services import audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
@@ -316,6 +316,12 @@ def create_app(
                                s: Store = Depends(get_store)) -> dict[str, Any]:
         """A draft only. Nothing is sent until the officer approves and sends it."""
         return doc_step.draft_request(s, actor, application_id, [i.model_dump() for i in body.items])
+
+    @r.post("/applications/{application_id}/substeps/{key}/opened")
+    def substep_opened(application_id: str, key: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The officer opened an optional sub-step (3.2 Consistency, 3.3 AI-use check): show its Reviewed tick. Never blocks."""
+        require_role(actor, "officer", "admin")
+        return substeps.mark_opened(s, actor, application_for_staff(s, actor, application_id), key)
 
     @r.get("/applications/{application_id}/evidence-request/items")
     def evidence_items(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:

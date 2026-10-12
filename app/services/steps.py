@@ -130,7 +130,11 @@ def state(store: Store, app: dict[str, Any], settings: Any = None) -> dict[str, 
         miss3 = ["The AI check has not run yet"]
     elif pending:
         miss3 = [f"{len(pending)} rule{'s' if len(pending) != 1 else ''} still need{'s' if len(pending) == 1 else ''} your decision or mark"]
-    out.append({"step": 3, "unlocked": unlocked3, "status": s3, "notice": rec(3).get("notice"), "missing": miss3, "pending_rules": pending})
+    from app.services import substeps as substeps_service
+
+    subs = substeps_service.substeps(store, app, run, pending, unlocked3)
+    out.append({"step": 3, "unlocked": unlocked3, "status": s3, "notice": rec(3).get("notice"), "missing": miss3, "pending_rules": pending,
+                "substeps": subs, "progress": substeps_service.progress(subs)})
 
     # 4 Outcome
     unlocked4 = s3 == "done"

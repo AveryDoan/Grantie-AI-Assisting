@@ -26,7 +26,7 @@ export type Route =
   | { name: "queue"; q?: string }
   | { name: "pool" }
   | { name: "lists" }
-  | { name: "review"; id: string; step?: number }
+  | { name: "review"; id: string; step?: number; sub?: string }
   | { name: "trace"; id: string; item?: string }
   | { name: "signoff"; id: string }
   | { name: "letter"; id: string }
@@ -39,8 +39,10 @@ function parse(hash: string): Route {
   if (parts[0] === "applications" && parts[1]) {
     if (parts[2] === "signoff" || parts[2] === "letter") return { name: "review", id: parts[1], step: 4 };
     if (parts[2] === "trace") return { name: "trace", id: parts[1], item: new URLSearchParams(query).get("item") ?? undefined };
-    const stepParam = Number(new URLSearchParams(query).get("step"));
-    return { name: "review", id: parts[1], step: stepParam >= 1 && stepParam <= 4 ? stepParam : undefined };
+    const q = new URLSearchParams(query);
+    const stepParam = Number(q.get("step"));
+    const sub = q.get("sub") ?? undefined;   // step 3 sub-step: eligibility, consistency, ai_use or merit
+    return { name: "review", id: parts[1], step: stepParam >= 1 && stepParam <= 4 ? stepParam : undefined, sub: stepParam === 3 ? sub : undefined };
   }
   if (parts[0] === "queue") return { name: "queue", q: new URLSearchParams(query).get("q") ?? undefined };
   if (parts[0] === "apply") return { name: "apply" };
@@ -58,7 +60,7 @@ export function href(route: Route): string {
     case "pool": return "#/pool";
     case "lists": return "#/lists";
     case "queue": return route.q ? `#/queue?q=${encodeURIComponent(route.q)}` : "#/queue";
-    case "review": return route.step ? `#/applications/${route.id}?step=${route.step}` : `#/applications/${route.id}`;
+    case "review": return route.step ? `#/applications/${route.id}?step=${route.step}${route.step === 3 && route.sub ? `&sub=${route.sub}` : ""}` : `#/applications/${route.id}`;
     case "trace": return `#/applications/${route.id}/trace${route.item ? `?item=${encodeURIComponent(route.item)}` : ""}`;
     case "signoff": return `#/applications/${route.id}/signoff`;
     case "letter": return `#/applications/${route.id}/letter`;
@@ -203,7 +205,7 @@ export default function App() {
     <Shell route={route} navigate={navigate}>
       {route.name === "queue" && <Queue key={route.q ?? ""} navigate={navigate} initialSearch={route.q} />}
       {/* A new key per application: the screen never shows one application's content (or buttons) under another's address. */}
-      {route.name === "review" && <Application key={route.id} id={route.id} step={route.step} navigate={navigate} />}
+      {route.name === "review" && <Application key={route.id} id={route.id} step={route.step} sub={route.sub} navigate={navigate} />}
       {route.name === "trace" && <AiTrace key={`${route.id}-${route.item ?? ""}`} id={route.id} item={route.item} navigate={navigate} />}
       {route.name === "pool" && <Pool navigate={navigate} />}
       {route.name === "lists" && <Lists />}

@@ -27,7 +27,7 @@ const TEXT: [string, string, string][] = [
   ["active step pill: eligibility", W, "sec-elig"], ["active step pill: outcome", W, "sec-outcome"],
   ["section text docs", "sec-docs", "sec-docs-tint"], ["section text redaction", "sec-redaction", "sec-redaction-tint"], ["section text eligibility", "sec-elig", "sec-elig-tint"],
   ["section text merit", "sec-merit-ink", "sec-merit-tint"], ["section text consistency", "sec-consistency", "sec-consistency-tint"],
-  ["section text linked", "sec-linked", "sec-linked-tint"], ["section text outcome", "sec-outcome", "sec-outcome-tint"],
+  ["section text linked", "sec-linked", "sec-linked-tint"], ["section text AI-use check", "sec-ai", "sec-ai-tint"], ["active pill: AI-use check", W, "sec-ai"], ["section text outcome", "sec-outcome", "sec-outcome-tint"],
   ["band text on tint", "brand-navy", "sec-docs-tint"], ["band text on merit tint", "brand-navy", "sec-merit-tint"],
 ];
 const ICONS: [string, string, string][] = [

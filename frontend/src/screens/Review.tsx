@@ -1,22 +1,50 @@
-// Step 3, Assessment. Two parts, switched at the top:
-//   3a Eligibility and documents rules: one table sorted by need; a row opens the evidence drawer.
-//   3b Merit and consistency: five merit cards (each opens the grading workspace) beside two short lists of signals.
-// Counts come from one place (src/counts.ts), so the header, the switch, the cards and the drawer always agree.
+// Step 3, Assessment, in sub-steps shown as pills: 3.1 Eligibility, 3.2 Consistency, 3.3 AI-use check (only when the rule pack has
+// an AI-use policy and the check is enabled), then Merit (3.4, or 3.3 without the AI-use check).
+//   Eligibility: one table of the S rules, with the document rules (D) under a "Documents" heading; a row opens the evidence drawer.
+//   Consistency: "Consistency of information" and "Linked applications". Signals only; a dismissal needs a reason.
+//   Merit: the criteria cards, each opening the grading workspace, and the officer's marks.
+// Every count comes from the backend (steps endpoint, step 3 "substeps"), so the pills, cards and header always agree.
 // No overall score, ranking or recommendation is shown. Merit marks belong to the officer and are never totalled.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type AIStatus, type Detail, type Finding, type OverviewRow } from "../api";
 import type { Navigate } from "../App";
-import { isRule, type Counts } from "../counts";
+import type { SubStep, SubStepKey } from "../api";
+import { isRule } from "../counts";
 import { Button, ErrorNotice, Icon, StatusChip, effectiveStatus, isDecided } from "../ui";
 import { ConsistencyPanel, ResultChip } from "./review/ConsistencyTab";
 import { AskDialog, DecisionDialog, type DialogState } from "./review/Dialogs";
 import { CRITERIA, MeritViewer } from "./review/MeritViewer";
 import { MeritWorkspace } from "./review/MeritWorkspace";
-import { Badge, DecisionCell, Row } from "./review/parts";
+import { AiUseCheck } from "./review/AiUseCheck";
+import { DecisionCell, Row } from "./review/parts";
 import { ReviewPanel } from "./review/Panel";
 import { CHECKED_BY_LABEL, byAttention, checkedBy, decisionText, plainRule } from "./review/model";
 
-export type Part = "3a" | "3b";
+const SUB_SEC: Record<SubStepKey, string> = { eligibility: "sec-elig", consistency: "sec-consistency", ai_use: "sec-ai", merit: "sec-merit" };
+const SUB_ICON: Record<SubStepKey, string> = { eligibility: "list", consistency: "eye", ai_use: "robot", merit: "user" };
+
+/** The sub-step pills: number, name, count and status. A locked pill cannot be opened. */
+function SubStepPills({ subs, shown, onGo }: { subs: SubStep[]; shown: SubStepKey; onGo: (k: SubStepKey) => void }) {
+  return (
+    <nav className="ss-bar" aria-label="Assessment sub-steps">
+      <ol>
+        {subs.map((s) => {
+          const label = s.status === "done" ? "Complete" : s.status === "reviewed" ? "Reviewed" : s.blocking ? (s.count ? `${s.count} to do` : "Not started") : "Optional";
+          return (
+            <li key={s.key} className={`ss-pill ${SUB_SEC[s.key]} ${s.status} ${shown === s.key ? "shown" : ""}`}>
+              <button onClick={() => onGo(s.key)} disabled={!s.unlocked} aria-current={shown === s.key ? "step" : undefined}
+                title={s.unlocked ? undefined : "Run the AI check first"} data-count={s.count}>
+                <span className="ss-num" aria-hidden="true">{s.status === "done" || s.status === "reviewed" ? <Icon name="check" size={14} /> : s.number}</span>
+                <span className="ss-text"><strong>{s.number} {s.title}</strong><small>{label}</small></span>
+                {s.count > 0 && <span className="ss-count" aria-label={`${s.count} open`}>{s.count}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 type Chip = "all" | "needs" | "decided";
 type Open = { kind: "rule"; code: string } | { kind: "referee" } | { kind: "cons"; id: string };
 
@@ -131,8 +159,8 @@ function SignalList({ rows, selectedKey, onOpen }: { rows: OverviewRow[]; select
 
 // ---------------------------------------------------------------- page
 
-export default function Review({ detail, reload, part, setPart, counts, navigate }: {
-  detail: Detail; reload: () => void; part: Part; setPart: (p: Part) => void; counts: Counts; navigate: Navigate;
+export default function Review({ detail, reload, sub, setSub, subs, onOutcome, navigate }: {
+  detail: Detail; reload: () => void; sub: SubStepKey; setSub: (k: SubStepKey) => void; subs: SubStep[]; onOutcome: () => void; navigate: Navigate;
 }) {
   const id = detail.application.id;
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -181,7 +209,17 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
   const pos = item?.kind === "rule" ? order.findIndex((f) => f.rule_code === item.code) : -1;
   const go = (delta: number) => { const f = order[pos + delta]; if (f) openRule(f.rule_code); };
   const nextUndecided = (from: number) => order.find((f, i) => i > from && !isDecided(f)) ?? order.find((f) => !isDecided(f)) ?? null;
-  const reviewNext = () => { const f = nextUndecided(pos); if (f) { if (part !== "3a") setPart("3a"); openRule(f.rule_code); } };
+  const reviewNext = () => { const f = nextUndecided(pos); if (f) { if (sub !== "eligibility") setSub("eligibility"); openRule(f.rule_code); } };
+  const current = subs.find((s) => s.key === sub) ?? subs[0];
+  const at = subs.findIndex((s) => s.key === current?.key);
+  const prev = at > 0 ? subs[at - 1] : null;
+  const next = at >= 0 && at < subs.length - 1 ? subs[at + 1] : null;
+  const elig = subs.find((s) => s.key === "eligibility");
+  const goSub = (k: SubStepKey) => { setItem(null); setSub(k); };
+  // Opening an optional sub-step (Consistency, AI-use check) gives it a "Reviewed" tick. It never blocks.
+  useEffect(() => {
+    if ((sub === "consistency" || sub === "ai_use") && current?.status !== "reviewed" && current?.unlocked) void api.openSubstep(id, sub).then(reload).catch(() => undefined);
+  }, [sub]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard: arrows move between rows, Enter opens, Esc closes, J / K = next / previous item, C = confirm the shown result.
   useEffect(() => {
@@ -223,17 +261,15 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
 
   return (
     <div className={`rv-page ${sideOpen ? "has-panel" : ""}`}>
-      <div className="rv-nav">
-        <div role="tablist" className="rv-tablist" aria-label="Assessment parts">
-          <button role="tab" aria-selected={part === "3a"} className={part === "3a" ? "active" : ""} onClick={() => { setItem(null); setPart("3a"); }}>
-            <span>3a Eligibility and documents</span>{counts.eligibility.undecided ? <Badge n={counts.eligibility.undecided} label="to decide" /> : null}
-          </button>
-          <button role="tab" aria-selected={part === "3b"} className={part === "3b" ? "active" : ""} onClick={() => { setItem(null); setPart("3b"); }}>
-            <span>3b Merit and consistency</span>{counts.merit.unmarked + counts.consistency.toCheck ? <Badge n={counts.merit.unmarked + counts.consistency.toCheck} label="to do" /> : null}
-          </button>
-        </div>
-        <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>Esc</kbd> close</small>
-      </div>
+      <SubStepPills subs={subs} shown={current?.key ?? "eligibility"} onGo={goSub} />
+      {current && (
+        <section className={`ss-head ${SUB_SEC[current.key]}`} aria-label={`${current.number} ${current.title}`} data-count={current.count}>
+          <span className="gf-band-icon"><Icon name={SUB_ICON[current.key]} size={20} /></span>
+          <h2>{current.number} {current.title}</h2>
+          <p>{current.missing ?? (current.blocking ? "Complete." : "Optional. Never blocks the outcome.")}</p>
+          {current.key === "eligibility" && <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>Esc</kbd> close</small>}
+        </section>
+      )}
 
       <div className="rv-layout">
         <div className="rv-main">
@@ -251,12 +287,12 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
             </div>
           )}
 
-          {part === "3a" && (
-            <section className="rv-section" aria-label="Eligibility and documents">
+          {current?.key === "eligibility" && (
+            <section className="rv-section" aria-label="Eligibility">
               <div className="rv-section-body">
                 <div className="rv-toolrow">
                   <div className="rv-filters" role="group" aria-label="Filter rules">
-                    {([["all", "All", model.rules.length], ["needs", "Needs me", counts.eligibility.undecided], ["decided", "Decided", counts.eligibility.decided]] as [Chip, string, number][]).map(([k, label, n]) => (
+                    {([["all", "All", model.rules.length], ["needs", "Needs me", elig?.count ?? 0], ["decided", "Decided", (elig?.total ?? 0) - (elig?.count ?? 0)]] as [Chip, string, number][]).map(([k, label, n]) => (
                       <button key={k} className={`rv-filter ${chip === k ? "on" : ""}`} aria-pressed={chip === k} onClick={() => setChip(k)}>{label} <strong>{n}</strong></button>
                     ))}
                     <span className="rv-filter-sep" aria-hidden="true" />
@@ -265,7 +301,7 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
                     ))}
                   </div>
                   <div className="rv-toolbtns">
-                    <Button variant="secondary" icon="arrow" disabled={counts.eligibility.undecided === 0} onClick={reviewNext}>Review next</Button>
+                    <Button variant="secondary" icon="arrow" disabled={!elig?.count} onClick={reviewNext}>Review next</Button>
                     <Button variant="secondary" icon="send" disabled={locked || pickedFindings.length === 0}
                       onClick={() => pickedFindings[0] && setDialog({ kind: "ask", finding: pickedFindings[0], more: pickedFindings })}>
                       Ask applicant for more{pickedFindings.length ? ` (${pickedFindings.length})` : ""}
@@ -280,37 +316,16 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
             </section>
           )}
 
-          {part === "3b" && (
-            <section className="rv-section rv-two" aria-label="Merit and consistency">
-              <div className="rv-section-body">
-                <h2 className="rv-h2">Merit criteria</h2>
-                {model.merit.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "This grant has no merit criteria."}</p> : (
-                  <div className="rv-mcards">
-                    {model.merit.flatMap((f) => {
-                      const cards = [<MeritCard key={f.id} f={f} selected={selectedKey === `rule:${f.rule_code}`} onOpen={() => openRule(f.rule_code)} />];
-                      if (f.rule_code === "M2") {
-                        cards.push(
-                          <article key="ref" className={`rv-mcard ${selectedKey === "referee" ? "selected" : ""}`}>
-                            <header><h3>Referee check</h3><span className="rv-decision">Check only. Not marked</span></header>
-                            <p className="muted">Is the referee identified and contactable?</p>
-                            <Button variant="secondary" onClick={() => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "referee" }); }}>View detail</Button>
-                          </article>,
-                        );
-                      }
-                      return cards;
-                    })}
-                  </div>
-                )}
-              </div>
-              <aside className="rv-side-lists" aria-label="Signals to check">
-                <section className="rv-sidecard sec-consistency">
+          {current?.key === "consistency" && (
+            <section className="rv-two-signals" aria-label="Consistency">
+              <section className="rv-sidecard sec-consistency">
                 <h2>Consistency of information</h2>
                 {detail.consistency?.enabled === false ? <p className="empty-state">The consistency check is switched off for this site.</p>
                   : detail.consistency?.unavailable ? <p className="empty-state">Could not load the consistency results. Please review manually.</p>
                   : <SignalList rows={model.overview} selectedKey={selectedKey}
                       onOpen={(r) => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "cons", id: r.id }); }} />}
-                </section>
-                <section className="rv-sidecard sec-linked">
+              </section>
+              <section className="rv-sidecard sec-linked">
                 <h2>Linked applications</h2>
                 {model.linked.length === 0 ? <p className="empty-state">No linked applications found.</p> : (
                   <ul className="rv-signals">
@@ -325,9 +340,42 @@ export default function Review({ detail, reload, part, setPart, counts, navigate
                     ))}
                   </ul>
                 )}
-                </section>
-              </aside>
+              </section>
             </section>
+          )}
+
+          {current?.key === "ai_use" && <AiUseCheck detail={detail} locked={locked} onChanged={reload} />}
+
+          {current?.key === "merit" && (
+            <section className="rv-section" aria-label="Merit">
+              {model.merit.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "This grant has no merit criteria."}</p> : (
+                <div className="rv-mcards rv-mcards-grid">
+                  {model.merit.flatMap((f) => {
+                    const cards = [<MeritCard key={f.id} f={f} selected={selectedKey === `rule:${f.rule_code}`} onOpen={() => openRule(f.rule_code)} />];
+                    if (f.rule_code === "M2") {
+                      cards.push(
+                        <article key="ref" className={`rv-mcard ${selectedKey === "referee" ? "selected" : ""}`}>
+                          <header><h3>Referee check</h3><span className="rv-decision">Check only. Not marked</span></header>
+                          <p className="muted">Is the referee identified and contactable?</p>
+                          <Button variant="secondary" onClick={() => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "referee" }); }}>View detail</Button>
+                        </article>,
+                      );
+                    }
+                    return cards;
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
+          {current && (
+            <footer className="ss-foot">
+              <Button variant="secondary" disabled={!prev || !prev.unlocked} onClick={() => prev && goSub(prev.key)}><Icon name="left" />{prev ? `Back: ${prev.number} ${prev.title}` : "Back"}</Button>
+              <small>{current.missing ?? (current.blocking ? "This part is complete." : "Optional. Looking here never blocks the outcome.")}</small>
+              {next
+                ? <Button variant="secondary" disabled={!next.unlocked} onClick={() => goSub(next.key)}>{`Next: ${next.number} ${next.title}`} <Icon name="arrow" /></Button>
+                : <Button variant="secondary" disabled={subs.some((s) => s.blocking && s.status !== "done")} onClick={onOutcome}>Next: Outcome <Icon name="arrow" /></Button>}
+            </footer>
           )}
         </div>
 
