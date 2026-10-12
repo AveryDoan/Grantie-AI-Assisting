@@ -11,7 +11,7 @@ import type { Navigate } from "../App";
 import type { SubStep, SubStepKey } from "../api";
 import { isRule } from "../counts";
 import { Button, ErrorNotice, Icon, StatusChip, effectiveStatus, isDecided } from "../ui";
-import { ConsistencyPanel, ResultChip } from "./review/ConsistencyTab";
+import { ConsistencyPanel, ConsistencyTable } from "./review/ConsistencyTab";
 import { AskDialog, DecisionDialog, type DialogState } from "./review/Dialogs";
 import { CRITERIA, MeritViewer } from "./review/MeritViewer";
 import { MeritWorkspace } from "./review/MeritWorkspace";
@@ -19,7 +19,7 @@ import { AiUseCheck } from "./review/AiUseCheck";
 import { SubStepBar } from "./steps/SubStepBar";
 import { DecisionCell, Row } from "./review/parts";
 import { ReviewPanel } from "./review/Panel";
-import { CHECKED_BY_LABEL, byAttention, checkedBy, decisionText, plainRule } from "./review/model";
+import { byAttention, decisionText, plainRule } from "./review/model";
 
 type Chip = "all" | "needs" | "decided";
 type Open = { kind: "rule"; code: string } | { kind: "referee" } | { kind: "cons"; id: string };
@@ -48,7 +48,6 @@ function RuleRow({ f, selected, picked, onPick, onOpen, locked }: {
       </td>
       <td className="rv-id-cell">{f.rule_code}</td>
       <td><StatusChip status={effectiveStatus(f)} /></td>
-      <td className="col-low"><span className="rv-tag">{CHECKED_BY_LABEL[checkedBy(f)]}</span></td>
       <td className="rv-oneline">{oneLine(f)}</td>
       <td><DecisionCell text={decisionText(f)} /></td>
     </Row>
@@ -70,7 +69,7 @@ function EligibilityTable({ list, chip, status, picked, setPicked, selectedKey, 
   const need = shown.filter((f) => effectiveStatus(f) !== "Met");
   const group = (title: string, items: Finding[]) => items.length ? (
     <>
-      <tr className="rv-group-row"><th colSpan={6} scope="colgroup">{title}</th></tr>
+      <tr className="rv-group-row"><th colSpan={5} scope="colgroup">{title}</th></tr>
       {rows(items)}
     </>
   ) : null;
@@ -79,12 +78,12 @@ function EligibilityTable({ list, chip, status, picked, setPicked, selectedKey, 
   return (
     <div className="rv-table-wrap" role="region" aria-label="Eligibility and documents rules" tabIndex={-1}>
       <table className="rv-table">
-        <thead><tr><th><span className="sr-only">Select</span></th><th>Rule</th><th>Status</th><th className="col-low">Checked by</th><th>Finding in one line</th><th>Officer decision</th></tr></thead>
+        <thead><tr><th><span className="sr-only">Select</span></th><th>Rule</th><th>Status</th><th>Finding in one line</th><th>Officer decision</th></tr></thead>
         <tbody>
           {group("Eligibility", need.filter((f) => !isDoc(f)).sort(byAttention))}
           {group("Documents", need.filter(isDoc).sort(byAttention))}
           {met.length > 0 && (
-            <tr className="rv-group-row"><td colSpan={6}>
+            <tr className="rv-group-row"><td colSpan={5}>
               <button className="rv-group-toggle" aria-expanded={metOpen} onClick={() => setShowMet(!showMet)} disabled={status === "Met"}>
                 <span className={metOpen ? "rotate" : ""}><Icon name="chevron" size={16} /></span>{met.length} Met. Scan and confirm one by one.
               </button>
@@ -111,25 +110,6 @@ function MeritCard({ f, selected, onOpen }: { f: Finding; selected: boolean; onO
         : <p className="muted">No AI summary with a verified source. Open the document.</p>}
       <Button variant="secondary" onClick={onOpen}>Open grading workspace</Button>
     </article>
-  );
-}
-
-function SignalList({ rows, selectedKey, onOpen }: { rows: OverviewRow[]; selectedKey: string | null; onOpen: (r: OverviewRow) => void }) {
-  const order = { Differs: 0, "Cannot compare": 1, "Needs evidence": 1, Consistent: 2 } as Record<string, number>;
-  const sorted = [...rows].sort((a, b) => (order[a.result] ?? 2) - (order[b.result] ?? 2));
-  if (!sorted.length) return <p className="empty-state">No comparisons to show for this application.</p>;
-  return (
-    <ul className="rv-signals">
-      {sorted.map((r) => (
-        <li key={r.id}>
-          <button className={selectedKey === `cons:${r.id}` ? "selected" : ""} onClick={() => onOpen(r)}
-            aria-label={`${r.check}: ${r.compared}. ${r.result}. ${r.decision}. Open details`}>
-            <span><strong>{r.check}</strong><small>{r.compared}</small></span>
-            <span className="rv-signal-r"><ResultChip result={r.result} /><small>{r.decision}</small></span>
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -285,14 +265,14 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
           )}
 
           {current?.key === "consistency" && (
-            <section className="rv-two-signals" aria-label="Consistency">
-              <section className="rv-sidecard sec-consistency">
-                <h2>Consistency of information</h2>
+            <section className="rv-section" aria-label="Consistency of information">
+              <div className="rv-section-body">
                 {detail.consistency?.enabled === false ? <p className="empty-state">The consistency check is switched off for this site.</p>
                   : detail.consistency?.unavailable ? <p className="empty-state">Could not load the consistency results. Please review manually.</p>
-                  : <SignalList rows={model.overview} selectedKey={selectedKey}
-                      onOpen={(r) => { scrollY.current = window.scrollY; lastRow.current = null; setItem({ kind: "cons", id: r.id }); }} />}
-              </section>
+                  : model.overview.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "No comparisons to show for this application."}</p>
+                  : <ConsistencyTable rows={model.overview} selectedKey={selectedKey}
+                      onOpen={(r) => { scrollY.current = window.scrollY; lastRow.current = `cons:${r.id}`; setItem({ kind: "cons", id: r.id }); }} />}
+              </div>
             </section>
           )}
 
