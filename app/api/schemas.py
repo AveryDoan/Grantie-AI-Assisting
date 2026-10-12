@@ -156,3 +156,9 @@ class LocateIn(BaseModel):
 
 class EvidenceDraftIn(BaseModel):
     finding_ids: list[str] | None = None
+
+
+class AiUseActionIn(BaseModel):
+    field: str
+    action: str          # no_action | note | ask
+    note: str | None = None

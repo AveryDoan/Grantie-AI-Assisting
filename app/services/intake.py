@@ -43,7 +43,9 @@ def programs(store: Store) -> list[dict[str, Any]]:
     out = []
     for p in store.select("grant_programs", eq={"active": True}):
         if store.select("rule_packs", eq={"grant_program_id": p["id"], "status": "approved"}, limit=1):
-            out.append({"id": p["id"], "name": p["name"], "description": p.get("description")})
+            pack = one(store.select("rule_packs", eq={"grant_program_id": p["id"], "status": "approved"}, limit=1)) or {}
+            out.append({"id": p["id"], "name": p["name"], "description": p.get("description"),
+                        "ai_use_policy": (pack.get("letter_config") or {}).get("ai_use_policy")})
     return sorted(out, key=lambda p: p["name"])
 
 
@@ -83,11 +85,19 @@ def create_draft(store: Store, actor: Actor, *, grant_program_id: str, fields: d
     applicant = _applicant_for(store, actor, f.get("applicant_name"))
     app = store.insert("applications", {
         "grant_program_id": grant_program_id, "rule_pack_id": pack.id, "applicant_id": applicant["id"],
-        "application_text": {"fields": f, "answers": a}, "status": "draft",
+        "application_text": {"fields": f, "answers": a}, "status": "draft", **_acknowledgement(f, None),
     })[0]
     write_audit(store, actor, "application.draft_created", application_id=app["id"],
                 details={"fields": len(f), "answers": len(a)})
     return {"id": app["id"], "status": app["status"]}
+
+
+def _acknowledgement(fields: dict[str, Any], app: dict[str, Any] | None) -> dict[str, Any]:
+    """The applicant's answer to "I have followed these rules." (the form's AI-use rule), kept with the application."""
+    yes = str(fields.get("ai_use_acknowledged") or "").strip().lower() in ("yes", "true", "1", "on")
+    if yes and app and app.get("ai_use_acknowledged"):
+        return {}   # already recorded: keep the original time
+    return {"ai_use_acknowledged": yes, "ai_use_acknowledged_at": now_iso() if yes else None}
 
 
 def _draft(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
@@ -98,9 +108,9 @@ def _draft(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
 
 
 def update_draft(store: Store, actor: Actor, application_id: str, *, fields: dict[str, Any], answers: dict[str, Any]) -> dict[str, Any]:
-    _draft(store, actor, application_id)
+    app = _draft(store, actor, application_id)
     f, a = _clean(fields), _clean(answers)
-    store.update("applications", {"application_text": {"fields": f, "answers": a}}, eq={"id": application_id})
+    store.update("applications", {"application_text": {"fields": f, "answers": a}, **_acknowledgement(f, app)}, eq={"id": application_id})
     write_audit(store, actor, "application.draft_saved", application_id=application_id,
                 details={"fields": len(f), "answers": len(a)})
     return {"id": application_id, "status": "draft"}

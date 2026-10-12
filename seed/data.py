@@ -97,11 +97,32 @@ PROGRAMS = [
     },
 ]
 
+# The form's rule on AI use (exact text), the answer fields the optional AI-use check reads, and whether the check is on.
+# "enabled" comes from the fairness gate (python -m eval.ai_use_check writes config/ai_use_check.yaml); it is never set here.
+AI_USE_POLICY = ("Applicants should only use AI for basic tasks like spelling, grammar and organising ideas. AI should not be used "
+                 "to write, improve or paraphrase any part of your application.")
+
+
+def _ai_check_enabled() -> bool:
+    from pathlib import Path
+
+    import yaml
+
+    p = Path(__file__).resolve().parents[1] / "config" / "ai_use_check.yaml"
+    return bool((yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("enabled")) if p.exists() else False
+
+
+SNT_AI_USE = {
+    "ai_use_policy": AI_USE_POLICY,
+    "ai_check_fields": {"fields": ["academic_achievements", "leadership", "community_engagement", "nt_contribution"], "min_words": 80},
+    "ai_check": {"enabled": _ai_check_enabled()},
+}
+
 PACKS = [
     {"id": SNT_PACK, "grant_program_id": SNT_PROGRAM, "version": "v2",
      "source_notes": "Study NT rules S1-S16, document requirements D1-D7 and merit criteria M1-M5 as supplied by the "
                      "project owner (8 Oct 2026). Interpretations to confirm are listed in seed/data.py ASSUMPTIONS.",
-     "letter_config": LETTER_CONFIG},
+     "letter_config": {**LETTER_CONFIG, **SNT_AI_USE}},
     {"id": CBF_PACK, "grant_program_id": CBF_PROGRAM, "version": "v1",
      "source_notes": "Synthetic rule pack written for the demo. Placeholders mark details not supplied.",
      "letter_config": LETTER_CONFIG},

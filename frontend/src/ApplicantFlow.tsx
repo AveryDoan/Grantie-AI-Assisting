@@ -206,7 +206,7 @@ const EMPTY_FORM = {
   courseName: "", studyLoad: "", currentStudy: "", achievements: "", leadership: "", community: "",
   statement: "", arrival: "", contactName: "", contactPhone: "", contactEmail: "", studentContact: "",
   bioComment: "", otherComment: "", declarationName: "", declarationYes: false, declarationPlace: "",
-  declarationTitle: "Ms", declarationGiven: "", declarationFamily: "", dob: "", declarationDate: new Date().toISOString().slice(0, 10),
+  aiUseAck: false, declarationTitle: "Ms", declarationGiven: "", declarationFamily: "", dob: "", declarationDate: new Date().toISOString().slice(0, 10),
 };
 type Form = typeof EMPTY_FORM;
 
@@ -228,6 +228,7 @@ function payload(form: Form): { fields: Record<string, string>; answers: Record<
     contact_name: form.studentContact === "No" ? form.contactName : "", contact_phone: form.studentContact === "No" ? form.contactPhone : "",
     contact_email: form.studentContact === "No" ? form.contactEmail : "",
     declaration_agreed: form.declarationYes ? "Yes" : "", declaration_name: form.declarationName,
+    ai_use_acknowledged: form.aiUseAck ? "Yes" : "",
     declaration_place: form.declarationPlace, declaration_date: form.declarationDate,
   };
   const answers: Record<string, string> = {
@@ -248,7 +249,7 @@ function formFrom(fields: Record<string, string> = {}, answers: Record<string, s
     visa: fields.student_visa_500 ?? "", provider: fields.education_provider ?? EMPTY_FORM.provider, round: fields.higher_education_round_1 === "Yes",
     courseName: fields.course_name ?? "", studyLoad: fields.study_load ?? "", arrival: fields.arrival_date ?? "",
     studentContact: fields.primary_contact_is_student ?? "", contactName: fields.contact_name ?? "", contactPhone: fields.contact_phone ?? "",
-    contactEmail: fields.contact_email ?? "", declarationYes: fields.declaration_agreed === "Yes", declarationName: fields.declaration_name ?? "",
+    contactEmail: fields.contact_email ?? "", declarationYes: fields.declaration_agreed === "Yes", aiUseAck: fields.ai_use_acknowledged === "Yes", declarationName: fields.declaration_name ?? "",
     declarationPlace: fields.declaration_place ?? "", declarationDate: fields.declaration_date ?? EMPTY_FORM.declarationDate, dob: fields.date_of_birth ?? "",
     declarationGiven: fields.given_name ?? "", declarationFamily: fields.family_name ?? "",
     currentStudy: answers.current_study ?? "", achievements: answers.academic_achievements ?? "", leadership: answers.leadership ?? "",
@@ -275,6 +276,11 @@ function SignedInFlow({ onHome }: { onHome: () => void }) {
   const [personOnly, setPersonOnly] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Form>(EMPTY_FORM);
+  // The program's rule on AI use (from its rule pack). Shown on the declaration step with a required acknowledgement.
+  const [aiUsePolicy, setAiUsePolicy] = useState<string | null>(null);
+  useEffect(() => {
+    api.programs().then((ps) => setAiUsePolicy((ps.find((p) => /study/i.test(p.name)) ?? ps[0])?.ai_use_policy ?? null)).catch(() => setAiUsePolicy(null));
+  }, []);
   const [draftId, setDraftId] = useState<string | null>(() => { try { return sessionStorage.getItem(DRAFT_KEY); } catch { return null; } });
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -349,6 +355,7 @@ function SignedInFlow({ onHome }: { onHome: () => void }) {
       if (!form.studentContact) nextErrors.studentContact = "Tell us whether the primary contact is the student.";
     }
     if (step === 5 && !form.declarationYes) nextErrors.declarationYes = "You must confirm the declaration before continuing.";
+    if (step === 5 && aiUsePolicy && !form.aiUseAck) nextErrors.aiUseAck = "Please confirm you have followed the rules on using AI.";
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); window.setTimeout(() => document.querySelector(".has-error")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0); return; }
     if (step >= 2) {
       setBusy(true); setFailure(null);
@@ -412,7 +419,7 @@ function SignedInFlow({ onHome }: { onHome: () => void }) {
       {step === 2 && <IndividualStep form={form} update={update} errors={errors} residentialWarning={residentialWarning} />}
       {step === 3 && <StudyStep form={form} update={update} errors={errors} arrivalWarning={arrivalWarning} />}
       {step === 4 && <DocumentsStep uploads={uploads} onFile={(s, f) => void uploadFile(s, f)} onRemove={(s) => void removeFile(s)} form={form} update={update} extraUploads={extraUploads} setExtraUploads={setExtraUploads} setUploads={setUploads} />}
-      {step === 5 && <DeclarationStep form={form} update={update} errors={errors} />}
+      {step === 5 && <DeclarationStep form={form} update={update} errors={errors} aiUsePolicy={aiUsePolicy} />}
       {step === 6 && <CheckStep go={go} check={check} uploads={uploads} form={form} arrivalWarning={arrivalWarning} personOnly={personOnly} setPersonOnly={setPersonOnly} submit={() => void submit()} busy={busy} />}
       {step === 7 && <SubmittedStep onHome={onHome} name={`${form.given} ${form.family}`.trim()} reference={submitted?.reference ?? ""} personOnly={personOnly} />}
       {step < 7 && <div className="af-navigation">
@@ -516,8 +523,13 @@ function DocumentsStep({ uploads, onFile, onRemove, form, update, extraUploads, 
   </div>;
 }
 
-function DeclarationStep({ form, update, errors }: StepProps) {
-  return <div className="af-step"><header className="af-step-title"><p className="eyebrow">Step 5</p><h1>Unattested Declaration under the Oaths, Affidavits and Declarations Act</h1><p>Read every statement before you agree to the declaration.</p></header>
+function DeclarationStep({ form, update, errors, aiUsePolicy }: StepProps & { aiUsePolicy: string | null }) {
+  return <div className="af-step">
+    {aiUsePolicy && <section className="af-card af-ai-use"><div className="af-card-heading"><span><Icon name="info" /></span><div><h2>Using AI in your application</h2></div></div>
+      <p>{aiUsePolicy}</p>
+      <div className={errors.aiUseAck ? "af-check has-error" : "af-check"}><label><input type="checkbox" checked={form.aiUseAck} onChange={(e) => update("aiUseAck", e.target.checked)} /><span>I have followed these rules. <Required /></span></label>
+        {errors.aiUseAck && <span className="af-error"><Icon name="error" size={18} />{errors.aiUseAck}</span>}</div>
+    </section>}<header className="af-step-title"><p className="eyebrow">Step 5</p><h1>Unattested Declaration under the Oaths, Affidavits and Declarations Act</h1><p>Read every statement before you agree to the declaration.</p></header>
     <section className="af-card af-declaration"><p className="af-declaration-lead">I <label><span className="sr-only">Full name</span><input value={form.declarationName} onChange={(e) => update("declarationName", e.target.value)} aria-label="Full name" placeholder="Your full name" /></label> solemnly and sincerely declare that everything in this application form is true.</p><ol>{declarationStatements.map((item) => <li key={item}>{item}</li>)}</ol>
       <p><strong>This declaration is true and I know that it is an offence to make a declaration that is false in any material particular.</strong></p><div className={errors.declarationYes ? "af-check has-error" : "af-check"}><label><input type="checkbox" checked={form.declarationYes} onChange={(e) => update("declarationYes", e.target.checked)} /><span>Yes <Required /></span></label>{errors.declarationYes && <span className="af-error"><Icon name="error" size={18} />{errors.declarationYes}</span>}</div>
       <div className="af-form-grid af-declaration-fields"><Field label="This declaration is made at" required className="span-2"><input value={form.declarationPlace} onChange={(e) => update("declarationPlace", e.target.value)} /></Field><Field label="Title" required><select value={form.declarationTitle} onChange={(e) => update("declarationTitle", e.target.value)}>{["Ms", "Mr", "Mx", "Dr", "Other"].map((x) => <option key={x}>{x}</option>)}</select></Field><Field label="Given name" required><input value={form.declarationGiven || form.given} onChange={(e) => update("declarationGiven", e.target.value)} /></Field><Field label="Family name" required><input value={form.declarationFamily || form.family} onChange={(e) => update("declarationFamily", e.target.value)} /></Field><Field label="Date of birth" required><input type="date" value={form.dob} onChange={(e) => update("dob", e.target.value)} /></Field><Field label="Date of declaration" required><input type="date" value={form.declarationDate} onChange={(e) => update("declarationDate", e.target.value)} /></Field></div>

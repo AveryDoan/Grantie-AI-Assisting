@@ -1,0 +1,11 @@
+# AI-use check: the local detector and its thresholds. Written by the fairness evaluation (python -m eval.ai_use_check);
+# do not edit the thresholds or "enabled" by hand. See eval/reports/ai_use_check.md for how they were set.
+model: openai-community/roberta-base-openai-detector
+revision: 6cba99c003b711c7fe94f8a3aa2be35a792cb6fa
+licence: MIT
+window_tokens: 400
+thresholds:
+  weak: 0.95        # mean detector score at or above this: "Weak signal"
+  stronger: 0.99    # at or above this: "Stronger signal"
+enabled: false      # true only when the fairness gate passed
+gate: {}

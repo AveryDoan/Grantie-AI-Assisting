@@ -29,6 +29,7 @@ from app.api.schemas import (
     MeritMarkIn,
     ReopenIn,
     ReplyIn,
+    AiUseActionIn,
     EvidenceDraftIn,
     RequestDraftIn,
     RequestEditIn,
@@ -51,7 +52,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
+from app.services import ai_use, audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import ServiceError
 from app.store.base import Store, StoreError, one
@@ -316,6 +317,15 @@ def create_app(
                                s: Store = Depends(get_store)) -> dict[str, Any]:
         """A draft only. Nothing is sent until the officer approves and sends it."""
         return doc_step.draft_request(s, actor, application_id, [i.model_dump() for i in body.items])
+
+    @r.post("/applications/{application_id}/ai-use-check")
+    def run_ai_use_check(application_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Run the local AI-use detector now (officer only). A weak signal; it decides nothing and is logged."""
+        return ai_use.run_check(s, actor, application_id)
+
+    @r.post("/applications/{application_id}/ai-use-check/actions")
+    def ai_use_action(application_id: str, body: AiUseActionIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return ai_use.record_action(s, actor, application_id, body.field, body.action, body.note)
 
     @r.post("/applications/{application_id}/substeps/{key}/opened")
     def substep_opened(application_id: str, key: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:

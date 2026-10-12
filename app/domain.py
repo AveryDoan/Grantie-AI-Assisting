@@ -64,6 +64,22 @@ class Rule(BaseModel):
         return self.rule_type == "judgement" or self.check_method == "human_only"
 
 
+class AiCheckFields(BaseModel):
+    fields: list[str] = Field(default_factory=list, description="Free-text answer fields the AI-use check reads")
+    min_words: int = Field(default=80, ge=1)
+
+
+class AiUsePolicy(BaseModel):
+    """The optional AI-use part of a rule pack (inside letter_config). Data, not code. The check is a weak signal only."""
+    ai_use_policy: str | None = None
+    ai_check_fields: AiCheckFields = Field(default_factory=AiCheckFields)
+    ai_check: dict[str, Any] = Field(default_factory=dict)   # {"enabled": bool}, set by the fairness gate
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.ai_use_policy) and bool(self.ai_check.get("enabled"))
+
+
 class RulePack(BaseModel):
     id: str
     grant_program_id: str

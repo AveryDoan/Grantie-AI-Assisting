@@ -148,6 +148,16 @@ export interface TextSpan { source: string; start: number; end: number; text: st
 
 export interface RuleSource { typed: string | null; document_type: string | null; document_field: string | null }
 
+export type AiUseResult = "Too short to check" | "No signal" | "Weak signal" | "Stronger signal";
+export interface AiUseField {
+  field: string; label: string; text: string; words: number; result: AiUseResult | null;
+  action: { action: "no_action" | "note" | "ask"; label: string; note: string | null; request_id: string | null } | null;
+}
+export interface AiUseView {
+  enabled: boolean; policy: string | null; acknowledged: boolean; acknowledged_at: string | null; min_words: number;
+  fields: AiUseField[]; model: string | null; revision: string | null; thresholds: { weak: number; stronger: number } | null; checked_at: string | null;
+}
+
 export interface MeritDoc { source: string; name: string; file_name: string | null }
 export interface MeritQuote extends MeritDoc { text: string | null; span: TextSpan | null; claim_id?: string; passage_id?: string }
 export interface MeritItem { item_id: string; text: string | null; differs: boolean; quotes: MeritQuote[] }
@@ -310,6 +320,7 @@ export interface Detail {
   source_texts?: Record<string, { label: string; text: string }>;
   linked_applications?: LinkedApplication[];
   merit_summaries?: Record<string, MeritSummary>;
+  ai_use?: AiUseView;
   latest_run: Run | null;
   consistency: ConsistencyView;
   facts: Fact[];
@@ -390,7 +401,7 @@ export interface OriginalView {
   documents: { document_id: string; text: string }[];
 }
 
-export interface Program { id: string; name: string; description: string | null }
+export interface Program { id: string; name: string; description: string | null; ai_use_policy?: string | null }
 
 export interface UploadResult {
   id: string;
@@ -548,6 +559,9 @@ export const api = {
   draftEvidenceRequest: (id: string, finding_ids?: string[]) =>
     request<EvidenceDraft>(`/applications/${id}/evidence-request`, { method: "POST", body: { finding_ids: finding_ids ?? null } }),
   regenerateMeritSummary: (id: string, code: string) => request<{ status: string; version: number }>(`/applications/${id}/merit/${code}/summary`, { method: "POST" }),
+  runAiUseCheck: (id: string) => request<AiUseView>(`/applications/${id}/ai-use-check`, { method: "POST" }),
+  aiUseAction: (id: string, body: { field: string; action: "no_action" | "note" | "ask"; note?: string }) =>
+    request<{ action: string; draft: { id: string; message_text: string; status: string; sent_at: string | null } | null; check: AiUseView }>(`/applications/${id}/ai-use-check/actions`, { method: "POST", body }),
   openSubstep: (id: string, key: SubStepKey) => request<{ key: string; opened: boolean }>(`/applications/${id}/substeps/${key}/opened`, { method: "POST" }),
   signoffStatement: () => request<{ statement: string }>("/signoff-statement"),
   signoff: (id: string) =>

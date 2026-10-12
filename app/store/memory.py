@@ -18,6 +18,8 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "applications": {
         "status": "draft",
         "manual_assessment_requested": False,
+        "ai_use_acknowledged": False,
+        "ai_use_acknowledged_at": None,
         "application_text": {},
         "redacted_text": None,
         "language_style_tag": None,
@@ -50,6 +52,8 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "redaction_edits": {"reason": None},
     "sign_off_history": {},
     "merit_marks": {"mark": None, "not_assessed": False, "reason": None},
+    "ai_use_checks": {"fields": [], "thresholds": {}},
+    "ai_use_actions": {"note": None, "request_id": None},
     "merit_runs": {"error": None, "coverage": [], "dropped": [], "overview": []},
     "merit_claims": {"document_id": None, "verified": True, "subject": "", "attribute": ""},
     "merit_summary_items": {"claim_ids": [], "documents_also": [], "differs": False},

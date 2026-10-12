@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.domain import Rule, RulePack
+from app.domain import AiUsePolicy, Rule, RulePack
 from app.store.base import Store
 
 PLACEHOLDER = re.compile(r"^\[[^\]]+\]$")
@@ -41,6 +41,10 @@ def load_rule_pack(store: Store, rule_pack_id: str, *, require_approved: bool = 
     if not rule_rows:
         raise RulePackError(f"rule pack {pack['version']} has no rules")
     rules = [Rule.model_validate(r) for r in rule_rows]
+    try:
+        AiUsePolicy.model_validate(pack.get("letter_config") or {})   # the AI-use part of the pack must be well formed
+    except Exception as exc:
+        raise RulePackError(f"rule pack {pack['version']} has a malformed AI-use policy") from exc
     return RulePack(
         id=pack["id"],
         grant_program_id=pack["grant_program_id"],

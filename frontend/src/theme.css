@@ -413,3 +413,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .rv-two-signals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; }
 .rv-mcards-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 @media (max-width: 900px) { .rv-two-signals { grid-template-columns: 1fr; } .ss-foot { flex-wrap: wrap; } }
+
+/* ---- 3.3 AI-use check: sky blue and neutral grey, never red */
+.ai-use { display: grid; gap: var(--sp-3); }
+.ai-info { padding: var(--sp-4); background: var(--sec-ai-tint); border-left: 4px solid var(--sec-ai); border-radius: var(--r-card); display: grid; gap: var(--sp-2); }
+.ai-info h3 { margin: 0; font-size: 15px; }
+.ai-info blockquote { margin: 0; padding-left: var(--sp-3); border-left: 3px solid var(--sec-ai); color: var(--brand-navy); font-style: italic; }
+.ai-info p { margin: 0; color: var(--ink-soft); }
+.ai-ack { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); }
+.ai-run { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.ai-run small { color: var(--muted-ink); }
+.ai-chip { display: inline-block; padding: 2px 10px; border-radius: var(--r-chip); background: var(--sec-consistency-tint); color: var(--sec-consistency); font-size: 13px; font-weight: 600; }
+.ai-text { margin: var(--sp-2) 0; padding: var(--sp-3); max-height: 260px; overflow-y: auto; background: var(--page); border-radius: var(--r-control); white-space: pre-wrap; }
+.ai-actions { display: grid; gap: var(--sp-2); justify-items: start; }
+.ai-note { display: grid; gap: var(--sp-2); width: 100%; }
