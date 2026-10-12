@@ -292,11 +292,11 @@
 .dr-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
 .dr-header h2 { margin: 0; font-size: 1.2rem; }
 .dr-header p { margin: 3px 0 0; }
-.dr-content { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); min-height: 0; flex: 1; }
+.dr-content { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); gap: 1px; background: var(--line); min-height: 0; flex: 1; }  /* the 1px gap is the divider */
 .dr-viewer { min-width: 0; padding: 12px; background: var(--surface-subtle); overflow: hidden; }
 .dr-file-heading { display: flex; justify-content: space-between; gap: 12px; margin: 0 4px 8px; }
 .dr-file-heading small { color: var(--muted-ink); }
-.dr-info { padding: 18px 20px; overflow-y: auto; border-left: 1px solid var(--line); }
+.dr-info { padding: 18px 20px; overflow-y: auto; background: var(--white); }
 .dr-info section { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .dr-info h3 { margin: 0 0 10px; font-size: .95rem; }
 .dr-info dl { display: grid; grid-template-columns: 90px 1fr; gap: 7px 12px; margin: 0; font-size: 14px; }
@@ -318,7 +318,7 @@
   .dr-panel { inset: 8px; }
   .dr-content { display: flex; flex-direction: column; overflow-y: auto; }
   .dr-viewer { flex: none; }
-  .dr-info { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .dr-info { overflow: visible; }
 }
 
 @media (max-width: 640px) {

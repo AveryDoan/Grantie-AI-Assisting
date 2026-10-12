@@ -45,8 +45,8 @@ function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
   const status = reviewStatus(slot);
   const hasPdf = Boolean(slot.document_id && slot.file_name?.toLowerCase().endsWith(".pdf"));
   const decide = async (decision: string) => {
-    if (decision === "request_again" && !reason.trim()) {
-      setError(new Error("Enter a reason before requesting a replacement document."));
+    if ((decision === "request_again" || decision === "not_needed") && !reason.trim()) {
+      setError(new Error(decision === "not_needed" ? "Enter why this document is not required." : "Enter a reason before requesting a replacement document."));
       return;
     }
     setSaving(true);
@@ -80,7 +80,7 @@ function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
               <section><h3>Document information</h3><dl><dt>Type</dt><dd>{slot.label}</dd><dt>File</dt><dd className="dr-filename" title={slot.file_name ?? undefined}>{slot.file_name ?? "Not uploaded"}</dd><dt>Requirement</dt><dd>{slot.required ? "Mandatory" : "Optional"}</dd></dl></section>
               <section><h3>Automated check</h3><p className={slot.issue ? "dr-warning" : "dr-success"}><Icon name={slot.issue ? "info" : "check"} size={15} />{slot.issue ? slot.issue.reason : slot.document_id ? "The uploaded file looks like the expected document type." : "No automated check is available yet."}</p></section>
               {slot.replaces && <details><summary>Compare with earlier upload</summary><Compare slot={slot} /></details>}
-              <label className="field dr-reason"><span>Decision note <small>(optional, required for replacement requests)</small></span><textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a short explanation for the record" /></label>
+              <label className="field dr-reason"><span>Decision note <small>(required for "Request new document" and "Not required")</small></span><textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a short explanation for the record" /></label>
               <ErrorNotice error={error} />
               <div className="dr-actions">
                 <Button icon="check" disabled={saving || busy || !slot.document_id} onClick={() => void decide("confirmed")}>Confirm document</Button>
@@ -195,11 +195,11 @@ export default function Step1Documents({ id, info, onChanged, onAdvance }: { id:
             <thead><tr><th>Document type</th><th>File name</th><th>Review status</th><th aria-label="Open document" /></tr></thead>
             <tbody>{slots.map((s) => {
               const status = reviewStatus(s);
-              return <tr key={s.slot} className={`rv-row need-${status.tone}`} onClick={() => s.document_id && setOpenSlot(s)}>
+              return <tr key={s.slot} className={`rv-row need-${status.tone}`} onClick={() => setOpenSlot(s)}>
                 <td><strong>{s.label}</strong>{!s.required && <small className="rv-sub">Optional</small>}</td>
                 <td className="rv-file" title={s.file_name ?? undefined}>{s.file_name ?? "Not uploaded"}</td>
                 <td><span className={`dr-badge ${status.tone}`}><Icon name={status.tone === "ok" ? "check" : status.tone === "attention" ? "info" : "clock"} size={14} />{status.label}</span></td>
-                <td><Button variant="quiet" icon="file" disabled={busy || waiting || !s.document_id} onClick={() => setOpenSlot(s)}>Open document</Button></td>
+                <td><Button variant="quiet" icon="file" disabled={busy || waiting} onClick={() => setOpenSlot(s)}>{s.document_id ? "Open document" : "Review"}</Button></td>
               </tr>;
             })}</tbody>
           </table>

@@ -10,7 +10,9 @@ from __future__ import annotations
 import base64
 import copy
 import itertools
+import functools
 import json
+import threading
 import uuid
 from pathlib import Path
 from typing import Any
@@ -70,7 +72,20 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
 }
 
 
+def _locked(fn):
+    """Writes and snapshot saves run one at a time: the API serves requests from a thread pool."""
+
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return fn(self, *args, **kwargs)
+
+    return wrapper
+
+
 class MemoryStore:
+    _lock = threading.RLock()
+
     def __init__(self, path: str | Path | None = None) -> None:
         self.tables: dict[str, list[dict[str, Any]]] = {}
         self._seq = itertools.count(1)
@@ -98,6 +113,7 @@ class MemoryStore:
             raise StoreError(f"could not load local demo data from {store.path}: {exc}") from exc
         return store
 
+    @_locked
     def persist(self) -> None:
         if not self.path:
             return
@@ -111,6 +127,7 @@ class MemoryStore:
         temporary.replace(self.path)
 
     # -- Storage -----------------------------------------------------------
+    @_locked
     def upload(self, bucket: str, path: str, data: bytes, content_type: str) -> None:
         if (bucket, path) in self.files:
             raise StoreError("file already exists")
@@ -120,6 +137,7 @@ class MemoryStore:
     def download(self, bucket: str, path: str) -> bytes | None:
         return self.files.get((bucket, path))
 
+    @_locked
     def remove(self, bucket: str, path: str) -> None:
         self.files.pop((bucket, path), None)
         self.persist()
@@ -153,6 +171,7 @@ class MemoryStore:
             rows = rows[:limit]
         return copy.deepcopy(rows)
 
+    @_locked
     def insert(self, table: str, rows: dict[str, Any] | list[dict[str, Any]]) -> list[dict[str, Any]]:
         batch = [rows] if isinstance(rows, dict) else rows
         out = []
@@ -175,6 +194,7 @@ class MemoryStore:
         self.persist()
         return out
 
+    @_locked
     def update(self, table: str, values: dict[str, Any], *, eq: dict[str, Any]) -> list[dict[str, Any]]:
         if table in ("audit_log",):
             raise StoreError("audit_log is append-only: UPDATE is not allowed")
@@ -189,6 +209,7 @@ class MemoryStore:
         self.persist()
         return out
 
+    @_locked
     def delete(self, table: str, *, eq: dict[str, Any]) -> list[dict[str, Any]]:
         if table == "audit_log":
             raise StoreError("audit_log is append-only: DELETE is not allowed")

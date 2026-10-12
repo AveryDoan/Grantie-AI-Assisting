@@ -36,6 +36,27 @@ DEMO_USERS = {
 }
 
 
+def _demo_keys(snapshot: str):
+    """`get(name, make)`: a demo key that lasts as long as the snapshot. Stored in <snapshot>.keys.json (local, gitignored)."""
+    import json
+    from pathlib import Path
+
+    if not snapshot:
+        return lambda _name, make: make()
+    path = Path(f"{snapshot}.keys.json")
+    saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+    def get(name: str, make) -> str:
+        if name not in saved:
+            saved[name] = make()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(saved), encoding="utf-8")
+            path.chmod(0o600)
+        return saved[name]
+
+    return get
+
+
 def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dict]]:
     store = MemoryStore.load(settings.demo_data_path) if settings.demo_data_path else MemoryStore()
     if not store.tables:
@@ -47,10 +68,13 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
     from redaction.crypto import generate_key
 
     update = {"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48)), "consistency_layer": True}
-    if not settings.identifier_hash_key.get_secret_value():  # keyed hashes that link applications; ephemeral in demo
-        update["identifier_hash_key"] = SecretStr(secrets.token_urlsafe(32))
-    if not settings.redaction_key.get_secret_value():  # demo data is in memory: an ephemeral key is fine
-        update["redaction_key"] = SecretStr(generate_key())
+    # Without a snapshot the keys can be ephemeral. With one, the saved rows hold ciphertexts and keyed hashes made with these
+    # keys, so a new key on restart would make them unreadable: keep them in a file beside the snapshot (never in it).
+    keys = _demo_keys(settings.demo_data_path)
+    if not settings.identifier_hash_key.get_secret_value():  # keyed hashes that link applications
+        update["identifier_hash_key"] = SecretStr(keys("identifier_hash_key", lambda: secrets.token_urlsafe(32)))
+    if not settings.redaction_key.get_secret_value():
+        update["redaction_key"] = SecretStr(keys("redaction_key", generate_key))
     demo_settings = settings.model_copy(update=update)
 
     if not store.tables.get("evaluation_runs"):
