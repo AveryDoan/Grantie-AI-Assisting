@@ -7,9 +7,12 @@ append-only audit log.
 
 from __future__ import annotations
 
+import base64
 import copy
 import itertools
+import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 from app.store.base import StoreError, now_iso
@@ -68,22 +71,58 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
 
 
 class MemoryStore:
-    def __init__(self) -> None:
+    def __init__(self, path: str | Path | None = None) -> None:
         self.tables: dict[str, list[dict[str, Any]]] = {}
         self._seq = itertools.count(1)
         self.files: dict[tuple[str, str], bytes] = {}  # (bucket, path) -> bytes (in-memory Storage)
+        self.path = Path(path) if path else None
+
+    @classmethod
+    def load(cls, path: str | Path) -> "MemoryStore":
+        store = cls(path)
+        if not store.path or not store.path.exists():
+            return store
+        try:
+            payload = json.loads(store.path.read_text(encoding="utf-8"))
+            store.tables = payload.get("tables", {})
+            store.files = {
+                tuple(key.split("\0", 1)): base64.b64decode(value)
+                for key, value in (payload.get("files") or {}).items()
+            }
+            seq = max(
+                (int(r["seq"]) for r in store.tables.get("officer_reviews", []) if r.get("seq") is not None),
+                default=0,
+            )
+            store._seq = itertools.count(seq + 1)
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError, base64.binascii.Error) as exc:
+            raise StoreError(f"could not load local demo data from {store.path}: {exc}") from exc
+        return store
+
+    def persist(self) -> None:
+        if not self.path:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "tables": self.tables,
+            "files": {"\0".join(key): base64.b64encode(value).decode("ascii") for key, value in self.files.items()},
+        }
+        temporary = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.tmp")
+        temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(self.path)
 
     # -- Storage -----------------------------------------------------------
     def upload(self, bucket: str, path: str, data: bytes, content_type: str) -> None:
         if (bucket, path) in self.files:
             raise StoreError("file already exists")
         self.files[(bucket, path)] = bytes(data)
+        self.persist()
 
     def download(self, bucket: str, path: str) -> bytes | None:
         return self.files.get((bucket, path))
 
     def remove(self, bucket: str, path: str) -> None:
         self.files.pop((bucket, path), None)
+        self.persist()
 
     # -- helpers -----------------------------------------------------------
     @staticmethod
@@ -133,6 +172,7 @@ class MemoryStore:
                 raise StoreError(f"duplicate key in {table}")
             self.tables.setdefault(table, []).append(full)
             out.append(copy.deepcopy(full))
+        self.persist()
         return out
 
     def update(self, table: str, values: dict[str, Any], *, eq: dict[str, Any]) -> list[dict[str, Any]]:
@@ -146,6 +186,7 @@ class MemoryStore:
                 row.update(copy.deepcopy(values))
                 row["updated_at"] = now_iso()
                 out.append(copy.deepcopy(row))
+        self.persist()
         return out
 
     def delete(self, table: str, *, eq: dict[str, Any]) -> list[dict[str, Any]]:
@@ -155,6 +196,7 @@ class MemoryStore:
         for row in self.tables.get(table, []):
             (gone if self._matches(row, eq, None) else keep).append(row)
         self.tables[table] = keep
+        self.persist()
         return gone
 
     def rpc(self, fn: str, params: dict[str, Any]) -> Any:

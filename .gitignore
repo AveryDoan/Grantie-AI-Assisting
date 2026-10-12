@@ -52,6 +52,7 @@ sandbox/output/
 **/.env
 **/.env.local
 **/.env.*.local
+.local/
 !.env.example
 
 # Operating-system files

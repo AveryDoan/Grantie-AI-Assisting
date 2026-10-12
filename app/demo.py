@@ -1,6 +1,6 @@
 """DEMO MODE (APP_MODE=demo): run the whole product without Supabase.
 
-- Data: the synthetic seed in an in-memory store (lost on restart).
+- Data: synthetic seed in an in-memory store, optionally persisted to a local JSON snapshot.
 - Login: POST /demo/login issues a short-lived token for a demo user, signed
   with a random secret generated at startup.
 - LLM: the configured provider if it has a key, otherwise the offline keyword
@@ -37,10 +37,12 @@ DEMO_USERS = {
 
 
 def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dict]]:
-    store = MemoryStore()
-    seed(store)
+    store = MemoryStore.load(settings.demo_data_path) if settings.demo_data_path else MemoryStore()
+    if not store.tables:
+        seed(store)
     for role, u in DEMO_USERS.items():
-        store.insert("profiles", {"id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
+        if not store.select("profiles", eq={"id": u["id"]}):
+            store.insert("profiles", {"id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
     store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
     from redaction.crypto import generate_key
 
@@ -51,13 +53,15 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
         update["redaction_key"] = SecretStr(generate_key())
     demo_settings = settings.model_copy(update=update)
 
-    _seed_consistency_cases(store, demo_settings, DEMO_USERS["officer"])
+    if not store.tables.get("evaluation_runs"):
+        _seed_consistency_cases(store, demo_settings, DEMO_USERS["officer"])
 
-    # Populate the evaluation dashboard (clearly labelled as the offline stub).
-    from eval.harness import run_evaluation
+        # Populate the evaluation dashboard (clearly labelled as the offline stub).
+        from eval.harness import run_evaluation
 
-    run_evaluation(store, LLMClient(OfflineStubProvider(), temperature=0.0), demo_settings,
-                   provider_label="offline keyword stub (NOT an LLM)")
+        run_evaluation(store, LLMClient(OfflineStubProvider(), temperature=0.0), demo_settings,
+                       provider_label="offline keyword stub (NOT an LLM)")
+    store.persist()
     return store, demo_settings, DEMO_USERS
 
 

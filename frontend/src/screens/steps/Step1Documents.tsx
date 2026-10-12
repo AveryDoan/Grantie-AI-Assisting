@@ -1,13 +1,14 @@
-// Step 1: Documents. The documents overview (needs-attention first, a plain reason for each), the officer's decision for each
-// slot, and "Ask the applicant for more": the officer picks what is missing or unclear, the system DRAFTS a plain-English request,
-// the officer edits it and approves it. Nothing is sent until they approve and send it.
+// Step 1: Documents. The overview keeps the list compact; detailed checks and decisions live in the document review panel.
+// "Ask the applicant for more" drafts a plain-English request which the officer edits and approves before sending.
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, type DocRequest, type DocSlot, type DocumentsStep, type StepInfo } from "../../api";
 import { Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../../ui";
 import { NextStep } from "./parts";
 
-const DECISION_LABEL: Record<string, string> = { confirmed: "Confirmed", wrong_slot: "Marked as wrong slot", request_again: "To request again", not_needed: "Not needed" };
-const KIND_WORDS: Record<string, string> = { missing: "Not uploaded", wrong_slot: "Wrong kind of document", unreadable: "Could not be read", differs: "Does not match the form", other: "Needs another look" };
+import { PdfViewer } from "../review/PdfViewer";
+
+const DECISION_LABEL: Record<string, string> = { confirmed: "Confirmed", wrong_slot: "Marked as wrong document", request_again: "Replacement requested", not_needed: "Not required" };
 
 function Compare({ slot }: { slot: DocSlot }) {
   if (!slot.replaces) return null;
@@ -28,37 +29,72 @@ function Compare({ slot }: { slot: DocSlot }) {
   );
 }
 
-function SlotRow({ slot, busy, onDecide }: { slot: DocSlot; busy: boolean; onDecide: (decision: string, reason?: string) => void }) {
-  const [why, setWhy] = useState<string | null>(null);
-  const need = slot.issue ? "attention" : slot.document_id ? "ok" : slot.required ? "attention" : "ok";
+function reviewStatus(slot: DocSlot) {
+  if (slot.decision) return slot.decision === "confirmed" ? { tone: "ok", label: "Reviewed" } : { tone: "attention", label: DECISION_LABEL[slot.decision] };
+  if (slot.issue || (slot.required && !slot.document_id)) return { tone: "attention", label: "Needs attention" };
+  if (slot.document_id) return { tone: "neutral", label: "Not reviewed" };
+  return { tone: "neutral", label: "Optional" };
+}
+
+function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
+  appId: string; slot: DocSlot; busy: boolean; onClose: () => void; onDecide: (decision: string, reason?: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState(slot.reason ?? "");
+  const [error, setError] = useState<unknown>(null);
+  const [saving, setSaving] = useState(false);
+  const status = reviewStatus(slot);
+  const hasPdf = Boolean(slot.document_id && slot.file_name?.toLowerCase().endsWith(".pdf"));
+  const decide = async (decision: string) => {
+    if (decision === "request_again" && !reason.trim()) {
+      setError(new Error("Enter a reason before requesting a replacement document."));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onDecide(decision, reason.trim() || undefined);
+      onClose();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <>
-      <tr className={`rv-row need-${need}`}>
-        <td><strong>{slot.label}</strong>{!slot.required && <small className="rv-sub">Optional</small>}
-          {slot.issue && <small className="rv-reasonline">{slot.issue.reason}</small>}</td>
-        <td className="col-low rv-file">{slot.file_name ?? "–"}</td>
-        <td><span className={`rv-need lvl-${need}`}><Icon name={need === "ok" ? "check" : "info"} size={14} />{slot.issue ? KIND_WORDS[slot.issue.kind] : need === "ok" ? "Looks right" : "Not uploaded"}</span></td>
-        <td>{slot.decision
-          ? <span className={`rv-decision ${slot.decision === "confirmed" ? "done" : ""}`}><Icon name={slot.decision === "confirmed" ? "check" : "clock"} size={14} />{DECISION_LABEL[slot.decision]}{slot.reason ? `: ${slot.reason}` : ""}</span>
-          : <span className="rv-decision"><Icon name="clock" size={14} />Not decided</span>}</td>
-        <td>
-          <div className="gf-actions">
-            <Button variant={slot.decision === "confirmed" ? "secondary" : "primary"} icon="check" disabled={busy || !slot.document_id || slot.decision === "confirmed"} onClick={() => onDecide("confirmed")}>Confirm</Button>
-            <Button variant="secondary" disabled={busy || !slot.document_id || slot.decision === "wrong_slot"} onClick={() => onDecide("wrong_slot")}>Mark as wrong slot</Button>
-            <Button variant="secondary" disabled={busy || slot.decision === "request_again"} onClick={() => onDecide("request_again")}>Request again</Button>
-            <Button variant="quiet" disabled={busy} onClick={() => setWhy(why === null ? "" : null)}>Not needed</Button>
+    createPortal(
+      <div className="dr-wrap" role="dialog" aria-modal="true" aria-label={`Review ${slot.label}`}>
+        <div className="dr-backdrop" onClick={onClose} aria-hidden="true" />
+        <section className="dr-panel">
+          <header className="dr-header">
+            <div><p className="eyebrow">Document review</p><h2>{slot.label}</h2><p className="muted">{slot.required ? "Required document" : "Optional document"}</p></div>
+            <Button variant="secondary" icon="close" onClick={onClose}>Close</Button>
+          </header>
+          <div className="dr-content">
+            <div className="dr-viewer">
+              <div className="dr-file-heading"><strong>{slot.file_name ?? "No file uploaded"}</strong>{hasPdf && <small>PDF document</small>}</div>
+              {hasPdf ? <PdfViewer docId={slot.document_id!} appId={appId} blur={false} height="min(66vh, 720px)" /> : <div className="dr-empty"><Icon name="file" size={28} /><p>{slot.document_id ? "This document is not a PDF and cannot be previewed here." : "No document has been uploaded for this slot."}</p></div>}
+            </div>
+            <aside className="dr-info">
+              <div className="dr-status"><span className={`dr-badge ${status.tone}`}><Icon name={status.tone === "ok" ? "check" : status.tone === "attention" ? "info" : "clock"} size={14} />{status.label}</span></div>
+              <section><h3>Document information</h3><dl><dt>Type</dt><dd>{slot.label}</dd><dt>File</dt><dd className="dr-filename" title={slot.file_name ?? undefined}>{slot.file_name ?? "Not uploaded"}</dd><dt>Requirement</dt><dd>{slot.required ? "Mandatory" : "Optional"}</dd></dl></section>
+              <section><h3>Automated check</h3><p className={slot.issue ? "dr-warning" : "dr-success"}><Icon name={slot.issue ? "info" : "check"} size={15} />{slot.issue ? slot.issue.reason : slot.document_id ? "The uploaded file looks like the expected document type." : "No automated check is available yet."}</p></section>
+              {slot.replaces && <details><summary>Compare with earlier upload</summary><Compare slot={slot} /></details>}
+              <label className="field dr-reason"><span>Decision note <small>(optional, required for replacement requests)</small></span><textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a short explanation for the record" /></label>
+              <ErrorNotice error={error} />
+              <div className="dr-actions">
+                <Button icon="check" disabled={saving || busy || !slot.document_id} onClick={() => void decide("confirmed")}>Confirm document</Button>
+                <Button variant="secondary" disabled={saving || busy || !slot.document_id} onClick={() => void decide("wrong_slot")}>Mark as wrong document</Button>
+                <Button variant="secondary" disabled={saving || busy} onClick={() => void decide("request_again")}>Request new document</Button>
+                <Button variant="quiet" disabled={saving || busy} onClick={() => void decide("not_needed")}>Not required</Button>
+              </div>
+              {slot.decision && <p className="muted dr-existing"><Icon name="check" size={14} />Existing decision: {DECISION_LABEL[slot.decision]}{slot.reason ? ` — ${slot.reason}` : ""}</p>}
+            </aside>
           </div>
-        </td>
-      </tr>
-      {why !== null && (
-        <tr><td colSpan={5} className="gf-inline">
-          <label className="field"><span>Why is this not needed? <b>*</b></span>
-            <input value={why} onChange={(e) => setWhy(e.target.value)} placeholder="For example: the applicant has no photo to give" /></label>
-          <Button disabled={busy || !why.trim()} onClick={() => { onDecide("not_needed", why.trim()); setWhy(null); }}>Record</Button>
-        </td></tr>
-      )}
-      {slot.replaces && <tr><td colSpan={5}><Compare slot={slot} /></td></tr>}
-    </>
+        </section>
+      </div>,
+      document.body,
+    )
   );
 }
 
@@ -132,6 +168,7 @@ export default function Step1Documents({ id, info, onChanged, onAdvance }: { id:
   const { data: health } = useLoad(api.health, []);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
+  const [openSlot, setOpenSlot] = useState<DocSlot | null>(null);
   if (error) return <ErrorNotice error={error} />;
   if (!data) return <Loading />;
 
@@ -154,16 +191,25 @@ export default function Step1Documents({ id, info, onChanged, onAdvance }: { id:
         <p className={`rv-counter ${needs ? "on" : ""}`} role="status"><Icon name={needs ? "info" : "check"} size={16} />{needs === 0 ? "No documents need attention" : `${needs} ${needs === 1 ? "document needs" : "documents need"} attention`}</p>
         <ErrorNotice error={failure} />
         <div className="rv-table-wrap" role="region" aria-label="Documents" tabIndex={-1}>
-          <table className="rv-table">
-            <thead><tr><th>Document</th><th className="col-low">File name</th><th>Check</th><th>Your decision</th><th>Actions</th></tr></thead>
-            <tbody>{slots.map((s) => <SlotRow key={s.slot} slot={s} busy={busy || waiting}
-              onDecide={(decision, reason) => void act(() => api.documentDecision(id, { slot: s.slot, decision, reason }))} />)}</tbody>
+          <table className="rv-table rv-documents-clean">
+            <thead><tr><th>Document type</th><th>File name</th><th>Review status</th><th aria-label="Open document" /></tr></thead>
+            <tbody>{slots.map((s) => {
+              const status = reviewStatus(s);
+              return <tr key={s.slot} className={`rv-row need-${status.tone}`} onClick={() => s.document_id && setOpenSlot(s)}>
+                <td><strong>{s.label}</strong>{!s.required && <small className="rv-sub">Optional</small>}</td>
+                <td className="rv-file" title={s.file_name ?? undefined}>{s.file_name ?? "Not uploaded"}</td>
+                <td><span className={`dr-badge ${status.tone}`}><Icon name={status.tone === "ok" ? "check" : status.tone === "attention" ? "info" : "clock"} size={14} />{status.label}</span></td>
+                <td><Button variant="quiet" icon="file" disabled={busy || waiting || !s.document_id} onClick={() => setOpenSlot(s)}>Open document</Button></td>
+              </tr>;
+            })}</tbody>
           </table>
         </div>
       </section>
       <RequestPanel id={id} data={data} onChanged={both} />
       <NextStep label="Next step: Redaction check" missing={waiting ? ["Waiting for the applicant to reply to your request", ...data.missing] : data.missing} busy={busy}
         note="Every required document is confirmed or has a reason. Next, the personal details are hidden and you check them." onClick={() => void (async () => { setBusy(true); setFailure(null); try { await api.completeDocuments(id); onChanged(); onAdvance(); } catch (e) { setFailure(e); } setBusy(false); })()} />
+      {openSlot && <DocumentReviewPanel appId={id} slot={openSlot} busy={busy || waiting} onClose={() => setOpenSlot(null)}
+        onDecide={async (decision, reason) => { await act(() => api.documentDecision(id, { slot: openSlot.slot, decision, reason })); }} />}
     </>
   );
 }

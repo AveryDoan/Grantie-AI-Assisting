@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     # "supabase" (default) or "demo": in-memory synthetic data + demo login, no Supabase needed.
     app_mode: Literal["supabase", "demo"] = "supabase"
+    # Optional local JSON snapshot for demo rows and uploaded files. Leave blank for ephemeral demo data.
+    demo_data_path: str = ""
 
     # --- Supabase -----------------------------------------------------------
     supabase_url: str = ""

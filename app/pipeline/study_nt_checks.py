@@ -324,21 +324,31 @@ def referee_dates(ctx: CodeContext) -> Finding:
 
 
 def days_before(ctx: CodeContext) -> Finding:
-    """S5: the application was submitted at least N days before arrival."""
+    """S5: the application was submitted at least N days before the verified arrival date."""
     p = ctx.rule.params
     value, early = _fact(ctx, p["fact"])
-    if early:
+    source = "the application"
+    booking = next(
+        (b for b in ctx.documents.by_type("travel_booking") if b.extracted_fields.get("arrival_date_iso")),
+        None,
+    )
+    if booking:
+        value = booking.extracted_fields["arrival_date_iso"]
+        source = "the travel booking"
+    elif early:
         return early
     arrival, submitted = parse_date(value), _submitted(ctx)
     if arrival is None:
-        return _f(ctx, "Unclear", f"The arrival date given ({value}) could not be read as a date.", confidence="low", **_quote_kw(ctx, p["fact"]))
+        return _f(ctx, "Unclear", f"The arrival date given ({value}) could not be read as a date.", confidence="low",
+                 **_quote_kw(ctx, p["fact"]))
     if submitted is None:
         return _f(ctx, "Unclear", "The application has no submission date.", confidence="low")
     gap = (arrival - submitted).days
     ok = gap >= p["min_days"]
     return _f(ctx, "Met" if ok else "Not met",
-              f"Submitted {submitted:%d %B %Y}; arrival {arrival:%d %B %Y} is {gap} days later (at least {p['min_days']} needed).",
-              **_quote_kw(ctx, p["fact"]))
+              f"Submitted {submitted:%d %B %Y}; arrival {arrival:%d %B %Y} from {source} is {gap} days later "
+              f"(at least {p['min_days']} needed).",
+              **({} if source != "the application" else _quote_kw(ctx, p["fact"])))
 
 
 def country_not_in(ctx: CodeContext) -> Finding:

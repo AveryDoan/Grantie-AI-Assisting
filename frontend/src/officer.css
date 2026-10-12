@@ -279,6 +279,56 @@
 .rv-need.lvl-attention { color: var(--amber); }
 .rv-need.lvl-check { color: var(--verify); }
 .rv-need.lvl-ok { color: var(--green); }
+
+.rv-documents-clean th:last-child, .rv-documents-clean td:last-child { width: 150px; text-align: right; }
+.rv-documents-clean .rv-file { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; font-size: 13px; font-weight: 650; white-space: nowrap; }
+.dr-badge.ok { color: var(--green); background: color-mix(in srgb, var(--green) 12%, white); }
+.dr-badge.attention { color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, white); }
+.dr-badge.neutral { color: var(--muted-ink); background: var(--surface-subtle); }
+.dr-wrap { position: fixed; inset: 0; z-index: 80; }
+.dr-backdrop { position: absolute; inset: 0; background: rgba(20,33,61,.5); }
+.dr-panel { position: absolute; inset: 20px; max-width: 1380px; margin: 0 auto; display: flex; flex-direction: column; background: var(--white); border-radius: 12px; box-shadow: var(--shadow-large); overflow: hidden; }
+.dr-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.dr-header h2 { margin: 0; font-size: 1.2rem; }
+.dr-header p { margin: 3px 0 0; }
+.dr-content { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); min-height: 0; flex: 1; }
+.dr-viewer { min-width: 0; padding: 12px; background: var(--surface-subtle); overflow: hidden; }
+.dr-file-heading { display: flex; justify-content: space-between; gap: 12px; margin: 0 4px 8px; }
+.dr-file-heading small { color: var(--muted-ink); }
+.dr-info { padding: 18px 20px; overflow-y: auto; border-left: 1px solid var(--line); }
+.dr-info section { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.dr-info h3 { margin: 0 0 10px; font-size: .95rem; }
+.dr-info dl { display: grid; grid-template-columns: 90px 1fr; gap: 7px 12px; margin: 0; font-size: 14px; }
+.dr-info dt { color: var(--muted-ink); }
+.dr-info dd { margin: 0; overflow-wrap: anywhere; }
+.dr-warning, .dr-success { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 14px; }
+.dr-warning { color: var(--amber); }
+.dr-success { color: var(--green); }
+.dr-empty { height: min(66vh, 720px); display: grid; place-content: center; justify-items: center; text-align: center; color: var(--muted-ink); }
+.dr-reason { margin-top: 16px; }
+.dr-reason small { color: var(--muted-ink); font-weight: 400; }
+.dr-actions { display: grid; gap: 8px; margin-top: 16px; }
+.dr-actions .button { justify-content: center; }
+.dr-existing { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; font-size: 13px; }
+.dr-info details { margin-top: 14px; }
+.dr-info details .gf-compare { margin-top: 10px; max-height: 250px; overflow: auto; }
+
+@media (max-width: 900px) {
+  .dr-panel { inset: 8px; }
+  .dr-content { display: flex; flex-direction: column; overflow-y: auto; }
+  .dr-viewer { flex: none; }
+  .dr-info { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+}
+
+@media (max-width: 640px) {
+  .rv-documents-clean th:last-child, .rv-documents-clean td:last-child { width: auto; }
+  .rv-documents-clean th:last-child { font-size: 0; }
+  .rv-documents-clean td:last-child .button { font-size: 0; padding: 8px; }
+  .rv-documents-clean td:last-child .button svg { margin: 0; }
+  .dr-header { padding: 14px; }
+  .dr-info { padding: 14px; }
+}
 .rv-table td:first-child { min-width: 240px; }
 
 /* ---------------------------------------------------------------- Why this result, and where it came from */

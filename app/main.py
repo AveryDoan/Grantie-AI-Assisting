@@ -77,7 +77,7 @@ def create_app(
 
         store, settings, demo_users = build_demo(settings)
         llm_factory = llm_factory or demo_llm_factory(MemoryCache())
-        log.warning("DEMO MODE: in-memory synthetic data and demo logins. Never use with real data.")
+        log.warning("DEMO MODE: synthetic data and demo logins; persistence=%s. Never use with real data.", bool(settings.demo_data_path))
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
