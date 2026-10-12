@@ -29,6 +29,8 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
         "redacted_text": None,
         "language_style_tag": None,
         "submitted_at": None,
+        "outcome_status": "in_progress",
+        "eligibility_result": None,
     },
     "assessment_runs": {
         "status": "running",
@@ -63,7 +65,10 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "merit_claims": {"document_id": None, "verified": True, "subject": "", "attribute": ""},
     "merit_summary_items": {"claim_ids": [], "documents_also": [], "differs": False},
     "merit_coverage": {"used": False, "document_id": None, "page": 1},
-    "letters": {"kind": "decline", "status": "draft", "quality_checks": {}, "source_finding_ids": []},
+    "letters": {"kind": "decline", "status": "draft", "quality_checks": {}, "source_finding_ids": [], "letter_viewed_at": None, "viewed_by": None,
+                "checks_passed": False, "template": False, "signed_off_by": None, "signed_off_at": None, "released_at": None, "released_by": None},
+    "steps_not_assessed": {"cleared_at": None, "cleared_by": None},
+    "round_decisions": {"reason_note": None, "version": 1},
     "clarification_requests": {"status": "draft", "sent_at": None, "kind": "finding", "items": [], "approved_by": None, "approved_at": None, "resubmitted_at": None},
     "audit_log": {"overridden": False, "details": {}},
     "rule_packs": {"status": "draft", "letter_config": {}},
@@ -200,6 +205,10 @@ class MemoryStore:
             raise StoreError("audit_log is append-only: UPDATE is not allowed")
         if table == "officer_reviews":
             raise StoreError("Officer reviews are append-only")
+        if table == "round_decisions":
+            raise StoreError("Round decisions are append-only: record a new version instead")
+        if table == "letters" and any(r.get("released_at") for r in self.tables.get(table, []) if self._matches(r, eq, None)):
+            raise StoreError("A released letter cannot be changed; a change needs a reconsideration and a new version")
         out = []
         for row in self.tables.get(table, []):
             if self._matches(row, eq, None):
@@ -213,6 +222,8 @@ class MemoryStore:
     def delete(self, table: str, *, eq: dict[str, Any]) -> list[dict[str, Any]]:
         if table == "audit_log":
             raise StoreError("audit_log is append-only: DELETE is not allowed")
+        if table in ("round_decisions", "steps_not_assessed"):
+            raise StoreError(f"{table} is a record: rows are never deleted")
         keep, gone = [], []
         for row in self.tables.get(table, []):
             (gone if self._matches(row, eq, None) else keep).append(row)

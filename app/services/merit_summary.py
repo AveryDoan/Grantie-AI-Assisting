@@ -128,6 +128,9 @@ def regenerate(store: Store, actor: Actor, application_id: str, rule_code: str, 
 
     require_role(actor, "officer", "admin")
     app = application_for_staff(store, actor, application_id)
+    from app.services import outcome_flow
+
+    outcome_flow.require_assessable(store, application_id, "merit")
     pack = load_rule_pack(store, app["rule_pack_id"])
     if rule_code not in {r.rule_code for r in pack.rules if (r.params or {}).get("section") == "merit"}:
         raise NotFound("That is not a merit criterion")

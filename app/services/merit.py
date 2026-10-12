@@ -49,6 +49,9 @@ def set_mark(store: Store, actor: Actor, application_id: str, rule_code: str, *,
     app = application_for_staff(store, actor, application_id)
     if app["status"] == "signed_off":
         raise Conflict("This application has been signed off; marks can no longer be changed")
+    from app.services import outcome_flow
+
+    outcome_flow.require_assessable(store, application_id, "merit")
     if rule_code not in merit_codes(store, app):
         raise NotFound("That merit criterion does not exist for this application")
     reason = (reason or "").strip()

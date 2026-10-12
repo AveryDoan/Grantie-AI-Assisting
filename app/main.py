@@ -21,6 +21,11 @@ from app.api.auth import current_actor, get_store_dep
 from app.api.ratelimit import rate_limit
 from app.api.schemas import (
     AssessRequest,
+    GoToOutcomeIn,
+    NotSelectedLetterIn,
+    ReleaseManyIn,
+    RoundDecisionIn,
+    SignOffReleaseIn,
     ClarificationRequestIn,
     DemoLogin,
     AddMissedIn,
@@ -52,7 +57,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import ai_use, audit, consistency, dashboard, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
+from app.services import ai_use, audit, consistency, dashboard, doc_step, outcome_flow, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import NotFound, ServiceError, ValidationFailed
 from app.store.base import Store, StoreError, one
@@ -422,6 +427,51 @@ def create_app(
     @r.post("/applications/{application_id}/reopen")
     def reopen_application(application_id: str, body: ReopenIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
         return review.reopen(s, actor, application_id, body.reason)
+
+    # ------------------------------------------ outcomes: ineligible path, round decisions, sign-off and release
+    @r.post("/applications/{application_id}/outcome/go-now")
+    def go_to_outcome(application_id: str, body: GoToOutcomeIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The officer's own click after a confirmed Not met. Records the checks not needed for the decline."""
+        return outcome_flow.go_to_outcome(s, actor, application_id, continue_anyway=body.continue_anyway, settings=settings)
+
+    @r.post("/letters/{letter_id}/viewed")
+    def letter_viewed(letter_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The officer read the letter to the end."""
+        return letters.mark_viewed(s, actor, letter_id)
+
+    @r.post("/applications/{application_id}/letter/not-selected")
+    def not_selected_letter(application_id: str, body: NotSelectedLetterIn, actor: Actor = Depends(current_actor),
+                            s: Store = Depends(get_store)) -> dict[str, Any]:
+        return letters.generate_not_selected(s, actor, application_id, body.criteria, settings)
+
+    @r.post("/applications/{application_id}/signoff-release")
+    def signoff_release(application_id: str, body: SignOffReleaseIn, actor: Actor = Depends(current_actor),
+                        s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Sign off and release the letter: one deliberate action for one application. No bulk sign-off."""
+        return outcome_flow.sign_off_and_release(s, actor, application_id, statement_acknowledged=body.statement_acknowledged,
+                                                 release_now=body.release_now, settings=settings)
+
+    @r.get("/letters/held")
+    def held_letters(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        require_role(actor, "officer", "admin")
+        return outcome_flow.held_letters(s, actor)
+
+    @r.post("/letters/release")
+    def release_letters(body: ReleaseManyIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        """Release signed-off letters this officer opened. The officer types the count."""
+        return outcome_flow.release_many(s, actor, body.letter_ids, typed_count=body.typed_count, settings=settings)
+
+    @r.get("/round-decisions")
+    def round_decisions(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Eligible applications with complete merit, by reference. No marks, totals or order by merit."""
+        return outcome_flow.round_list(s, actor, settings)
+
+    @r.post("/round-decisions")
+    def record_round_decisions(body: RoundDecisionIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        """Record the people's decision. Nothing is released: draft letters are made for the officer to review."""
+        return outcome_flow.record_decisions(s, actor, body.application_ids, decision=body.decision, decided_by=body.decided_by,
+                                             authority=body.authority, decided_at=body.decided_at, reference=body.reference,
+                                             reason_note=body.reason_note, typed_count=body.typed_count, settings=settings)
 
     # ------------------------------------------ merit summaries (AI, from verified quotes)
     @r.post("/applications/{application_id}/merit/{rule_code}/summary",

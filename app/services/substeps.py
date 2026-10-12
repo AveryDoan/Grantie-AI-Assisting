@@ -82,9 +82,21 @@ def substeps(store: Store, app: dict[str, Any], run: dict[str, Any] | None, pend
     counts = _counts(store, app, run, pending)
     seen = opened(store, app["id"])
     has_run = run is not None
+    from app.services import outcome_flow
+
+    not_assessed = outcome_flow.skipped_steps(store, app["id"])   # the officer went to Outcome after a confirmed Not met
     out = []
     for n, key in enumerate(keys, start=1):
         c = counts[key]
+        if not_assessed and key != ELIGIBILITY:
+            out.append({"key": key, "number": f"3.{n}", "title": TITLES[key], "count": 0, "total": c["total"], "status": "not_assessed",
+                        "blocking": False, "unlocked": unlocked, "missing": None, "label": outcome_flow.NOT_ASSESSED})
+            continue
+        if not_assessed:
+            out.append({"key": key, "number": f"3.{n}", "title": TITLES[key], "count": 0, "total": c["total"], "status": "done",
+                        "blocking": True, "unlocked": unlocked, "missing": None,
+                        "label": "Not eligible (officer decision)"})
+            continue
         if key in OPTIONAL:
             status = "reviewed" if key in seen else "not_started"
             missing = None

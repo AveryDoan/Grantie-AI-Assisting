@@ -22,6 +22,7 @@ from tests.test_merit_review import mark
 from tests.test_substeps import CODES, decide_every_rule
 
 TILES = ("received", "need_action", "waiting_applicant", "ready_signoff", "signed_off", "not_started")
+OUTCOME_TILES = ("ineligible_to_sign", "round_ready", "not_selected_to_release")
 BANNED_KEYS = {"score", "rank", "ranking", "total_mark", "average_mark", "avg_mark", "mark", "marks", "top", "best",
                "competitiveness", "officer_id", "actor_id", "by_officer"}
 
@@ -84,9 +85,9 @@ def test_tiles_equal_the_rows_their_queue_link_shows(client, settings, officer, 
     h = token(settings, officer.user_id)
     d = client.get("/dashboard", headers=h).json()
     assert d["round"]["id"] == SNT_PACK
-    for k in TILES:
+    for k in TILES + OUTCOME_TILES:
         rows = client.get(f"/applications?filter={k}&rule_pack={SNT_PACK}", headers=h)
-        assert rows.status_code == 200 and len(rows.json()) == d["tiles"][k], k
+        assert rows.status_code == 200 and len(rows.json()) == {**d["tiles"], **d["outcome_tiles"]}[k], k
     for card in d["pipeline"]:
         if card["enabled"]:
             rows = client.get(f"/applications?filter=stage:{card['stage']}&rule_pack={SNT_PACK}", headers=h).json()

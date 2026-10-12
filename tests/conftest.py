@@ -94,3 +94,20 @@ def scripted() -> Callable[..., tuple[LLMClient, ScriptedProvider]]:
         return LLMClient(p, temperature=0.0, sleep=lambda _s: None, **kw), p
 
     return make
+
+
+def fill_placeholders(body: str) -> str:
+    """An officer replaces each [placeholder] (agency details not in the settings) with real wording. Quoted lines are left alone."""
+    import re
+
+    return "\n".join(line if line.startswith("What you wrote:") else re.sub(r"\[[^\[\]\n]{2,80}\]", "the details on our website", line)
+                     for line in body.split("\n"))
+
+
+def fill_and_read(store, officer, letter_id: str) -> dict:
+    """Before any release the officer fills every placeholder and reads the letter to the end (migration 0019, outcomes brief)."""
+    from app.services import letters
+
+    letter = store.select("letters", eq={"id": letter_id})[0]
+    letters.update_letter(store, officer, letter_id, body_text=fill_placeholders(letter["body_text"]))
+    return letters.mark_viewed(store, officer, letter_id)

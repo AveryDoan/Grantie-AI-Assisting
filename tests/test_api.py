@@ -87,6 +87,11 @@ def test_full_officer_flow_has_no_scores(client, settings, officer, applicant_ac
     responses.append(letter.json())
     signed = client.post(f"/applications/{app_id('N04')}/signoff", headers=h, json={"statement_acknowledged": True})
     assert signed.status_code == 200
+    # the officer fills the placeholders and reads the letter to the end before releasing it
+    from tests.conftest import fill_placeholders
+
+    client.patch(f"/letters/{letter.json()['id']}", headers=h, json={"body_text": fill_placeholders(letter.json()["body_text"])})
+    assert client.post(f"/letters/{letter.json()['id']}/viewed", headers=h).status_code == 200
     approved = client.patch(f"/letters/{letter.json()['id']}", headers=h, json={"approve": True})
     assert approved.status_code == 200 and approved.json()["status"] == "approved"
     responses.append(approved.json())

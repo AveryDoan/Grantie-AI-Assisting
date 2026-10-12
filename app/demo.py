@@ -65,6 +65,15 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
         if not store.select("profiles", eq={"id": u["id"]}):
             store.insert("profiles", {"id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
     store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
+    # The Study NT demo round is competitive: eligible applications wait for the panel's round decision (recorded by an officer).
+    # Marks stay out of letters, and the number of places is left as a placeholder for the agency to fill.
+    from seed.data import SNT_PACK
+
+    for pack in store.select("rule_packs", eq={"id": SNT_PACK}):
+        cfg = pack.get("letter_config") or {}
+        if "competitive_round" not in cfg:
+            store.update("rule_packs", {"letter_config": {**cfg, "competitive_round": True, "include_marks_in_letter": False}},
+                         eq={"id": SNT_PACK})
     from redaction.crypto import generate_key
 
     update = {"supabase_jwt_secret": SecretStr(secrets.token_urlsafe(48)), "consistency_layer": True}

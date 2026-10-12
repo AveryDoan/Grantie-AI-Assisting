@@ -119,7 +119,11 @@ def state(store: Store, app: dict[str, Any], settings: Any = None) -> dict[str, 
     pending: list[str] = []
     if unlocked3 and run is not None:
         _, pending = undecided_rules(store, app["id"])
-    if not unlocked3 or (run is None and not app.get("manual_assessment_requested")):
+    from app.services import outcome_flow
+
+    if unlocked3 and run is not None and outcome_flow.on_ineligible_path(store, app["id"]):
+        s3 = "done"   # a confirmed Not met; the officer recorded the remaining checks as not assessed (ineligible)
+    elif not unlocked3 or (run is None and not app.get("manual_assessment_requested")):
         s3 = "not_started"
     else:
         s3 = "done" if (run is not None and not pending) or (run is None and app.get("manual_assessment_requested")) else "in_progress"

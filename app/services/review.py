@@ -64,6 +64,10 @@ def undecided_rules(store: Store, application_id: str) -> tuple[dict[str, Any] |
     run = latest_run(store, application_id)
     if run is None:
         return None, []
+    from app.services import outcome_flow
+
+    if outcome_flow.on_ineligible_path(store, application_id):
+        return run, []   # an officer confirmed a Not met and recorded the remaining checks as not assessed (ineligible)
     rules = store.select("rules", eq={"rule_pack_id": run["rule_pack_id"]})
     findings = store.select("findings", eq={"run_id": run["id"]})
     by_rule = {f["rule_id"]: f for f in findings}
@@ -159,15 +163,17 @@ def review_finding(
         rule_pack_version=run["rule_pack_version"],
         details={"finding_id": finding_id, "review_id": review["id"], "action": action, "ai_valid": finding["is_valid"]},
     )
-    if final_status == "Not met" and _in_guided_flow(store, app):
-        # Confirming a rule as Not met drafts the decline letter at once. It is only a draft: nothing is released
-        # until the officer approves it, and approval needs sign-off.
-        from app.services import letters
+    # The eligibility result follows the officer's decisions, and (in the guided flow) the decline letter is drafted at the first
+    # Not met and redrafted as decisions change. Only drafts: nothing is released until the officer signs off and releases it.
+    from app.services import outcome_flow
 
-        try:
-            letters.draft_on_confirmation(store, actor, app["id"])
-        except Exception:   # a letter problem must never undo the officer's decision
-            log.warning("could not draft the decline letter for an application after a Not met decision")
+    try:
+        if _in_guided_flow(store, app):
+            outcome_flow.after_decision(store, actor, app["id"])
+        else:
+            outcome_flow.refresh_eligibility(store, one(store.select("applications", eq={"id": app["id"]}, limit=1)))
+    except Exception:   # a letter problem must never undo the officer's decision
+        log.warning("could not update the outcome after an officer decision")
     return review
 
 
@@ -313,7 +319,8 @@ def reopen(store: Store, actor: Actor, application_id: str, reason: str | None) 
     store.insert("sign_off_history", {"application_id": application_id, "version": version, "officer_id": row["officer_id"],
                                       "signed_at": row["signed_at"], "reopened_by": actor.user_id, "reopened_at": now_iso(), "reason": reason})
     store.delete("sign_offs", eq={"id": row["id"]})
-    store.update("applications", {"status": "in_review"}, eq={"id": application_id})
+    store.update("applications", {"status": "in_review", "outcome_status": "in_progress"}, eq={"id": application_id})
+    # A reconsideration: the only way to change a signed-off outcome. Released letters stay as they were; a new version follows.
     write_audit(store, actor, "application.reopened", application_id=application_id, reason=reason,
-                details={"version_reopened": version, "sign_off_id": row["id"]})
+                details={"version_reopened": version, "sign_off_id": row["id"], "reconsideration": True})
     return {"reopened_version": version, "status": "in_review"}

@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from app.config import Settings, get_settings
-from app.services import ai_use, doc_step, queue, steps as steps_service, substeps as substeps_service
+from app.services import ai_use, doc_step, letters as letters_service, outcome_flow, queue, steps as steps_service, substeps as substeps_service
 from app.services.access import Actor
 from app.services.errors import Forbidden, ValidationFailed
 from app.services.review import latest_reviews
@@ -141,6 +141,15 @@ def with_facts(store: Store, actor: Actor, settings: Settings | None = None) -> 
         r["waiting_since_any"] = max((m for m in moved if m), default=None)
         r["deep_link"] = _deep_link(r)
         r["needed"] = _needed(r)
+        # Outcome letters (counts only): the letter the officer's decisions call for, and whether a round decision is due.
+        signed = app["status"] == "signed_off"
+        kind = outcome_flow.letter_kind(store, app) if r["has_run"] else None
+        comp = outcome_flow.competitive(outcome_flow.pack_config(store, app))
+        r["ineligible_to_sign"] = not signed and kind == "decline" and r["stage"] == "outcome"
+        r["round_ready"] = (not signed and comp and r["has_run"] and outcome_flow.latest_decision(store, app["id"]) is None
+                            and outcome_flow.readiness(store, app)[0])
+        held = letters_service.latest_of(store, app["id"], "not_selected")
+        r["not_selected_to_release"] = bool(held and not held.get("released_at"))
     return out
 
 
@@ -194,6 +203,9 @@ FILTERS: dict[str, Callable[[dict[str, Any]], bool]] = {
     **{f"stage:{s}": _stage_filter(s) for s in STAGES},
     "signal:consistency": lambda r: r["signals"]["consistency"] > 0,
     "signal:ai_use": lambda r: r["signals"]["ai_use"] > 0,
+    "ineligible_to_sign": lambda r: r["ineligible_to_sign"],
+    "round_ready": lambda r: r["round_ready"],
+    "not_selected_to_release": lambda r: r["not_selected_to_release"],
 }
 
 def matches(row: dict[str, Any], key: str) -> bool:
@@ -416,6 +428,7 @@ def _build(store: Store, actor: Actor, settings: Settings, *, rule_pack: str | N
         "rule_packs": [{"id": p["id"], "label": f"{programs.get(p['grant_program_id'], {}).get('name', '')} · {p.get('version')}",
                         "applications": pack_count[p["id"]]} for p in sorted(packs, key=lambda p: p["id"] != pack_id)],
         "tiles": {k: count(k) for k in ("received", "need_action", "waiting_applicant", "ready_signoff", "signed_off", "not_started")},
+        "outcome_tiles": {k: count(k) for k in ("ineligible_to_sign", "round_ready", "not_selected_to_release")},
         "pipeline": pipeline,
         "attention": attention[:8],
         "attention_total": len(attention),

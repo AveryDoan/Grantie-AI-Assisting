@@ -82,6 +82,9 @@ def run_check(store: Store, actor: Actor, application_id: str, *, scorer: Any = 
     """Run the check now (officer only, on request). `scorer`/`count_tokens` are for tests; by default the local model."""
     require_role(actor, "officer", "admin")
     app = application_for_staff(store, actor, application_id)
+    from app.services import outcome_flow
+
+    outcome_flow.require_assessable(store, application_id, "ai_use")   # not run once the outcome is ineligible
     pol = policy(store, app)
     on, preview = active(store, app)
     if not on:

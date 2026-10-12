@@ -7,7 +7,7 @@ from app.services import letters, merit, precheck, review
 from app.services.errors import Conflict, NotFound, SignOffBlocked, ValidationFailed
 from app.store.base import StoreError
 from seed import data
-from tests.conftest import app_id
+from tests.conftest import fill_and_read, app_id
 
 
 def assess(store, officer, stub_llm, settings, code="N04"):
@@ -192,6 +192,9 @@ def test_letter_approval_requires_signoff_then_freezes(store, officer, stub_llm,
     with pytest.raises(Conflict, match="Sign off"):
         letters.update_letter(store, officer, letter["id"], approve=True)
     review.sign_off(store, officer, app_id("N04"), statement_acknowledged=True)
+    with pytest.raises(Conflict, match="Review the letter first"):        # read it to the end before release
+        letters.update_letter(store, officer, letter["id"], approve=True)
+    fill_and_read(store, officer, letter["id"])
     approved = letters.update_letter(store, officer, letter["id"], approve=True)
     assert approved["status"] == "approved" and approved["approved_by"] == officer.user_id
     with pytest.raises(Conflict):
@@ -208,6 +211,7 @@ def test_applicant_sees_letter_only_after_approval(store, officer, applicant_act
     view = application_detail(store, applicant_actor, app_id("N01"))
     assert view["letters"] == [] and "findings" not in view
     review.sign_off(store, officer, app_id("N01"), statement_acknowledged=True)
+    fill_and_read(store, officer, letter["id"])
     letters.update_letter(store, officer, letter["id"], approve=True)
     assert len(application_detail(store, applicant_actor, app_id("N01"))["letters"]) == 1
 

@@ -39,7 +39,11 @@ def build(store: Store, actor: Actor, application_id: str, settings: Settings | 
     unmet, more = [], []
     for r in letters._decline_reasons(ctx):
         rv = reviews[r["finding"]["id"]]
+        params = r["rule"].get("params") or {}
         item = {"rule_code": r["rule"]["rule_code"], "rule_text": r["rule"]["rule_text"], "final_status": rv["final_status"],
+                "finding_id": r["finding"]["id"],
+                # a missing or wrong document the applicant could send: the officer may ask instead of declining
+                "fixable_by_document": r["rule"].get("rule_type") == "document_based" or bool(params.get("required_documents")),
                 "reason": r["why"], "quote": r["quote"], "what_would_change": letters._what_would_change(r["rule"])}
         (unmet if rv["final_status"] == "Not met" else more).append(item)
     # Anything the officer settled as Unclear also needs a person to go back to the applicant.
@@ -48,8 +52,14 @@ def build(store: Store, actor: Actor, application_id: str, settings: Settings | 
         if rv and rv["final_status"] == "Unclear" and f["rule_id"] not in merit_ids:
             rule = ctx["rules"][f["rule_id"]]
             more.append({"rule_code": rule["rule_code"], "rule_text": rule["rule_text"], "final_status": "Unclear", "reason": rv.get("reason") or "", "quote": None, "what_would_change": ""})
-    result = "undecided" if pending else "decline" if unmet else "needs_information" if more else "eligible"
-    kind = "decline" if result == "decline" else "next_steps" if result == "eligible" else None
+    from app.services import outcome_flow
+
+    result = "decline" if unmet else "undecided" if pending else "needs_information" if more else "eligible"
+    if result == "decline" and pending:
+        result = "undecided"          # keep checking, or go to Outcome now: the officer chooses
+    kind = outcome_flow.letter_kind(store, app) if result in ("decline", "eligible") else None
+    decision = outcome_flow.latest_decision(store, application_id)
+    awaiting_round = result == "eligible" and outcome_flow.competitive(outcome_flow.pack_config(store, app)) and decision is None
     all_letters = sorted(store.select("letters", eq={"application_id": application_id}), key=lambda l: l["version"])
     mine = [l for l in all_letters if l.get("kind", "decline") == kind] if kind else []
     summary = None
@@ -83,5 +93,26 @@ def build(store: Store, actor: Actor, application_id: str, settings: Settings | 
                   "version": len(history) + 1, "letter_version": mine[-1]["version"] if mine else None,
                   "letter_status": mine[-1]["status"] if mine else None, "decisions": sorted(decisions, key=lambda d: d["rule_code"]),
                   "reopened": [{"version": h["version"], "reopened_at": h["reopened_at"], "reason": h["reason"]} for h in sorted(history, key=lambda h: h["version"])]}
-    return out | {"result": result, "unmet": unmet, "needs_information": more, "letter": mine[-1] if mine else None,
-                  "letter_kind": kind, "summary": summary, "record": record, "pending_rules": pending}
+    letter = mine[-1] if mine else None
+    cond = outcome_flow.sign_off_conditions(store, actor, app, settings) if result in ("decline", "eligible") else None
+    merit_reasons = []
+    if kind == "not_selected":
+        for m in store.select("merit_marks", eq={"application_id": application_id}):
+            rule = next((r for r in ctx["rules"].values() if r["rule_code"] == m["rule_code"]), {})
+            if (m.get("reason") or "").strip():
+                merit_reasons.append({"rule_code": m["rule_code"], "criterion": letters.criterion_title(rule) if rule else m["rule_code"],
+                                      "reason": m["reason"]})
+    return out | {"result": result, "unmet": unmet, "needs_information": more, "letter": letter,
+                  "letter_kind": kind, "summary": summary, "record": record, "pending_rules": pending,
+                  "outcome_status": app.get("outcome_status") or "in_progress",
+                  "not_assessed": sorted(outcome_flow.skipped_steps(store, application_id)),
+                  "not_assessed_label": outcome_flow.NOT_ASSESSED,
+                  "could_change": outcome_flow.could_change(store, application_id) if unmet else [],
+                  "awaiting_round_decision": awaiting_round,
+                  "round_decision": {k: decision[k] for k in ("decision", "decided_by", "authority", "decided_at", "reference", "reason_note", "version")}
+                                    if decision else None,
+                  "include_marks_in_letter": bool(outcome_flow.pack_config(store, app).get("include_marks_in_letter", False)),
+                  "feedback_options": sorted(merit_reasons, key=lambda m: m["rule_code"]),
+                  "feedback_chosen": ((letter or {}).get("quality_checks") or {}).get("feedback_criteria", []) if kind == "not_selected" else [],
+                  "letter_matches_findings": letters.matches_findings(store, letter, settings) if letter else None,
+                  "conditions": cond}

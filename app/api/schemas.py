@@ -162,3 +162,32 @@ class AiUseActionIn(BaseModel):
     field: str
     action: str          # no_action | note | ask
     note: str | None = None
+
+
+class GoToOutcomeIn(BaseModel):
+    continue_anyway: bool = False   # the officer saw "n findings could change this" and chose to continue
+
+
+class SignOffReleaseIn(BaseModel):
+    statement_acknowledged: bool
+    release_now: bool = True        # False: signed off, held for a batch release
+
+
+class ReleaseManyIn(BaseModel):
+    letter_ids: list[str] = Field(..., min_length=1, max_length=500)
+    typed_count: int | None = None
+
+
+class RoundDecisionIn(BaseModel):
+    application_ids: list[str] = Field(..., min_length=1, max_length=500)
+    decision: str
+    decided_by: str = Field(..., max_length=200)
+    authority: str = Field(..., max_length=200)
+    decided_at: str
+    reference: str = Field(..., max_length=500)
+    reason_note: str | None = Field(None, max_length=2000)
+    typed_count: int | None = None
+
+
+class NotSelectedLetterIn(BaseModel):
+    criteria: list[str] = Field(default_factory=list, max_length=20)   # merit criteria whose officer reason goes in as feedback
