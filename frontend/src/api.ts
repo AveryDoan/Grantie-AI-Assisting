@@ -545,6 +545,29 @@ export interface RoundDecision { decision: "selected" | "not_selected_competitiv
 export interface RoundRow { application_id: string; reference: string; program_name: string | null; deep_link: string; why?: string[];
   decision?: RoundDecision["decision"]; decided_at?: string; reference_minute?: string; signed_off?: boolean }
 export interface RoundList { ready: RoundRow[]; decided: RoundRow[]; not_ready: RoundRow[]; note: string }
+// ---- Outcomes page: weighted totals (people with can_view_round_scores only). References by default; no rank, no label on a total.
+export interface ScoreCriterion { code: string; title: string; weight: string | null }
+export interface ScoreRow {
+  application_id: string; reference: string; name: string | null; marks: Record<string, number | "NA" | null>; total: string | null; total_exact: string | null;
+  status: "complete" | "waiting" | "cannot"; reason: string | null; marked: number; of: number; decision: RoundDecision["decision"] | null;
+  ready: boolean; why_not_ready: string | null; deep_link: string;
+}
+export interface ScoreTable {
+  criteria: ScoreCriterion[]; weights_error: string | null; normalised: boolean; weight_sum: string; policy: "block" | "zero" | "reweight"; decimals: number;
+  places_available: number | null; names_shown: boolean; rows: ScoreRow[]; can_record: boolean; formula: string;
+}
+export interface ScoreBreakdown {
+  application_id: string; reference: string; name: string | null; status: ScoreRow["status"]; reason: string | null; total: string | null; marked: number; of: number;
+  policy: string; worked_example: string | null; eligibility: string; can_edit_marks: boolean; can_record: boolean; deep_link: string;
+  rows: { code: string; title: string; weight: string | null; mark: number | null; not_assessed: boolean; points: string | null; reason: string | null; by: string | null; at: string | null; evidence: string }[];
+  history: { rule_code: string; old_mark: number | null; new_mark: number | null; not_assessed: boolean | null; reason: string | null; by: string; at: string }[];
+  decision: (RoundDecision & { stands: boolean; score_snapshot: { total_shown: string | null; rule_pack_version: string | null; at: string } | null }) | null;
+}
+export interface OutcomeLists {
+  ineligible: { application_id: string; reference: string; signed_off: boolean; letter: { status: string; viewed: boolean; released: boolean } | null; deep_link: string }[];
+  released: { application_id: string; reference: string; kind: string; released_at: string; delivery: string; deep_link: string }[];
+  held: HeldLetter[];
+}
 export interface HeldLetter { letter_id: string; application_id: string; reference: string; kind: string; viewed_by_me: boolean }
 export interface Outcome {
   application_id: string; statement: string; signed_off: boolean;
@@ -681,6 +704,11 @@ export const api = {
   heldLetters: () => request<HeldLetter[]>("/letters/held"),
   releaseLetters: (letterIds: string[], typedCount: number) =>
     request<Letter[]>("/letters/release", { method: "POST", body: { letter_ids: letterIds, typed_count: typedCount } }),
+  outcomeScores: (names = false) => request<ScoreTable>(`/outcomes/scores?names=${names}`),
+  outcomeBreakdown: (id: string, names = false) => request<ScoreBreakdown>(`/outcomes/scores/${id}?names=${names}`),
+  outcomeCsv: () => request<string>("/outcomes/scores.csv", { raw: true }),
+  outcomeLists: () => request<OutcomeLists>("/outcomes/lists"),
+  reconsider: (id: string, reason: string) => request<{ reconsidering: boolean }>(`/outcomes/reconsider/${id}`, { method: "POST", body: { reason } }),
   roundDecisions: () => request<RoundList>("/round-decisions"),
   recordRoundDecisions: (body: { application_ids: string[]; decision: RoundDecision["decision"]; decided_by: string; authority: string;
     decided_at: string; reference: string; reason_note: string | null; typed_count: number | null }) =>

@@ -21,6 +21,7 @@ from app.api.auth import current_actor, get_store_dep
 from app.api.ratelimit import rate_limit
 from app.api.schemas import (
     AssessRequest,
+    ReconsiderIn,
     ComposerDraftIn,
     ComposerSaveIn,
     GoToOutcomeIn,
@@ -59,7 +60,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import ai_use, audit, composer, consistency, dashboard, doc_step, outcome_flow, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
+from app.services import ai_use, audit, composer, consistency, dashboard, outcomes_page, doc_step, outcome_flow, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import NotFound, ServiceError, ValidationFailed
 from app.store.base import Store, StoreError, one
@@ -513,6 +514,27 @@ def create_app(
     def release_letters(body: ReleaseManyIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
         """Release signed-off letters this officer opened. The officer types the count."""
         return outcome_flow.release_many(s, actor, body.letter_ids, typed_count=body.typed_count, settings=settings)
+
+    # ------------------------------------------ the Outcomes page: scores (people with can_view_round_scores only), lists, export
+    @r.get("/outcomes/scores")
+    def outcomes_scores(names: bool = False, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return outcomes_page.table(s, actor, settings, names=names)
+
+    @r.get("/outcomes/scores/{application_id}")
+    def outcomes_breakdown(application_id: str, names: bool = False, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return outcomes_page.breakdown(s, actor, application_id, settings, names=names)
+
+    @r.get("/outcomes/scores.csv", response_class=PlainTextResponse)
+    def outcomes_csv(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> str:
+        return outcomes_page.csv_export(s, actor, settings)
+
+    @r.post("/outcomes/reconsider/{application_id}")
+    def outcomes_reconsider(application_id: str, body: ReconsiderIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return outcomes_page.reconsider(s, actor, application_id, body.reason)
+
+    @r.get("/outcomes/lists")
+    def outcomes_lists(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return outcomes_page.lists(s, actor, settings)
 
     @r.get("/round-decisions")
     def round_decisions(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:

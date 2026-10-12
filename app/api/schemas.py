@@ -192,6 +192,10 @@ class RoundDecisionIn(BaseModel):
     typed_count: int | None = None
 
 
+class ReconsiderIn(BaseModel):
+    reason: str = Field(..., max_length=2000)
+
+
 class NotSelectedLetterIn(BaseModel):
     criteria: list[str] = Field(default_factory=list, max_length=20)   # merit criteria whose officer reason goes in as feedback
 

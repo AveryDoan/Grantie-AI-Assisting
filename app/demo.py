@@ -63,7 +63,7 @@ def build_demo(settings: Settings) -> tuple[MemoryStore, Settings, dict[str, dic
         seed(store)
     for role, u in DEMO_USERS.items():
         if not store.select("profiles", eq={"id": u["id"]}):
-            store.insert("profiles", {"id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
+            store.insert("profiles", {"permissions": ["can_view_round_scores", "can_record_round_decisions"] if role == "officer" else None, "id": u["id"], "role": "applicant" if role == "sita" else role, "organisation_id": u["org"], "display_name": u["display_name"]})
     store.update("applicants", {"user_id": DEMO_USERS["applicant"]["id"]}, eq={"id": sid("applicant:N01")})
     # The Study NT demo round is competitive: eligible applications wait for the panel's round decision (recorded by an officer).
     # Marks stay out of letters, and the number of places is left as a placeholder for the agency to fill.

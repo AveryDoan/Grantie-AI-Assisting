@@ -52,6 +52,10 @@ def set_mark(store: Store, actor: Actor, application_id: str, rule_code: str, *,
     from app.services import outcome_flow
 
     outcome_flow.require_assessable(store, application_id, "merit")
+    from app.services import outcomes_page
+
+    if outcomes_page.decision_stands(store, application_id):
+        raise Conflict("A round decision is recorded for this application. Start a reconsideration (with a reason) before changing a mark.")
     if rule_code not in merit_codes(store, app):
         raise NotFound("That merit criterion does not exist for this application")
     reason = (reason or "").strip()

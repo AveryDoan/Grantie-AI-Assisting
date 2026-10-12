@@ -219,7 +219,10 @@ def record_decisions(store: Store, actor: Actor, application_ids: list[str], *, 
                      settings: Settings | None = None) -> list[dict[str, Any]]:
     """Record the people's decision for the chosen applications. Each one is checked; nothing is released here: Not selected
     gets a draft letter (no feedback until the officer ticks some), Selected gets the next-steps draft."""
+    from app.services import scores
+
     require_role(actor, "officer")
+    scores.require(store, actor, scores.RECORD)     # can_record_round_decisions (the panel and the lead officer by default)
     ids = list(dict.fromkeys(application_ids))
     if not ids:
         raise ValidationFailed("Choose at least one application")
@@ -257,9 +260,12 @@ def record_decisions(store: Store, actor: Actor, application_ids: list[str], *, 
         row = store.insert("round_decisions", {
             "application_id": app["id"], "version": version, "decision": decision, "decided_by": decided_by, "authority": authority,
             "decided_at": decided_at, "reference": reference, "reason_note": note, "created_by": actor.user_id, "created_at": now_iso(),
+            # the marks, weights, rule pack version and total as they were now: later changes cannot rewrite this decision
+            "score_snapshot": scores.snapshot(scores.for_application(store, app), now_iso()),
         })[0]
         write_audit(store, actor, "round.decision", application_id=app["id"],
-                    details={"decision": decision, "version": version, "batch_size": len(apps), "reference": reference})
+                    details={"decision": decision, "version": version, "batch_size": len(apps), "reference": reference,
+                             "score_snapshot": row.get("score_snapshot")})
         try:
             if decision == "not_selected_competitive":
                 letters.generate_not_selected(store, actor, app["id"], [], settings)
