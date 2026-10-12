@@ -6,6 +6,7 @@ import "./tokens.css";   // tokens and theme come last, so they win over the old
 import "./theme.css";
 import "./dashboard.css";
 import "./outcomes.css";
+import "./layout.css";
 import App from "./App";
 import { AuthProvider } from "./auth";
 

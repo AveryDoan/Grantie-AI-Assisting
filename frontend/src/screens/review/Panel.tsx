@@ -282,6 +282,14 @@ export interface PanelNav { position: number; total: number; onPrev?: () => void
 
 export function ReviewPanel({ item, slots, onClose, nav, ...c }: Common & { item: PanelItem; slots: Slot[]; onClose: () => void; nav?: PanelNav }) {
   const head = useRef<HTMLDivElement>(null);
+  // Expand to about 70% of the width; the choice is remembered. (Applies to the page layout through a class.)
+  const [wide, setWide] = useState(() => { try { return localStorage.getItem("panel-wide") === "1"; } catch { return false; } });
+  useEffect(() => {
+    document.querySelector(".rv-page")?.classList.toggle("panel-wide", wide);
+    try { localStorage.setItem("panel-wide", wide ? "1" : "0"); } catch { /* ignore */ }
+    return () => document.querySelector(".rv-page")?.classList.remove("panel-wide");
+  }, [wide]);
+  const toggleWide = () => setWide((w) => !w);
   const key = item.kind === "rule" ? item.code : item.key;
   useEffect(() => { head.current?.focus(); }, [key]);
   let body: ReactNode = null;
@@ -299,7 +307,10 @@ export function ReviewPanel({ item, slots, onClose, nav, ...c }: Common & { item
     <aside className="rv-panel sec-elig" aria-label={`Details: ${title}`}>
       <div className="rv-panel-head">
         <div ref={head} tabIndex={-1}><p className="eyebrow">Details</p><h2>{title}</h2></div>
-        <button className="icon-button" onClick={onClose} aria-label="Close details (Esc)"><Icon name="close" /></button>
+        <span className="rv-head-btns">
+          <button className="icon-button rv-expand" onClick={toggleWide} aria-pressed={wide} aria-label={wide ? "Make the panel narrower" : "Expand the panel"} title={wide ? "Narrower" : "Expand"}><Icon name={wide ? "collapse" : "external"} /></button>
+          <button className="icon-button" onClick={onClose} aria-label="Close details (Esc)"><Icon name="close" /></button>
+        </span>
       </div>
       {nav && (
         <div className="rv-panel-nav" role="group" aria-label="Move between rules">

@@ -160,9 +160,12 @@ def view(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
     by_slot, dec = assign(docs), decisions(store, application_id)
     need = set(required_slots(store, app))
     by_id = {d["id"]: d for d in docs}
+    open_reqs = [r for r in store.select("clarification_requests", eq={"application_id": application_id})
+                 if r.get("status") == "sent" and not r.get("resubmitted_at")]
     slots = []
     for key in by_slot:
         d = by_slot[key]
+        req = max((r for r in open_reqs if any(i.get("slot") == key for i in r.get("items") or [])), key=lambda r: r.get("sent_at") or "", default=None)
         issue = _issue(key, d, dec.get(key), docs)
         old = by_id.get(d["replaces_id"]) if d and d.get("replaces_id") else None
         slots.append({
@@ -170,6 +173,8 @@ def view(store: Store, actor: Actor, application_id: str) -> dict[str, Any]:
             "file_name": d["file_name"] if d else None, "decision": dec[key]["decision"] if key in dec else None,
             "reason": dec[key].get("reason") if key in dec else None,
             "issue": {"kind": issue[0], "reason": issue[1]} if issue else None,
+            "requested": None if not req else {"request_id": req["id"], "sent_at": req.get("sent_at"), "due_date": req.get("due_date"),
+                                               "subject": req.get("subject"), "message_text": req["message_text"]},
             "replaces": None if not old else {
                 "old": {"file_name": old["file_name"], "text": old.get("extracted_text"), "fields": old.get("extracted_fields") or {}},
                 "new": {"file_name": d["file_name"], "text": d.get("extracted_text"), "fields": d.get("extracted_fields") or {}},

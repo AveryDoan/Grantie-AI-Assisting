@@ -69,7 +69,7 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
                 "checks_passed": False, "template": False, "signed_off_by": None, "signed_off_at": None, "released_at": None, "released_by": None},
     "steps_not_assessed": {"cleared_at": None, "cleared_by": None},
     "round_decisions": {"reason_note": None, "version": 1},
-    "clarification_requests": {"status": "draft", "sent_at": None, "kind": "finding", "items": [], "approved_by": None, "approved_at": None, "resubmitted_at": None},
+    "clarification_requests": {"subject": None, "to_email": None, "cc_email": None, "due_date": None, "delivery": None, "body_template": False, "status": "draft", "sent_at": None, "kind": "finding", "items": [], "approved_by": None, "approved_at": None, "resubmitted_at": None},
     "audit_log": {"overridden": False, "details": {}},
     "rule_packs": {"status": "draft", "letter_config": {}},
     "rules": {"params": {}, "display_order": 0},

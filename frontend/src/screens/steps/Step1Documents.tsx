@@ -1,8 +1,9 @@
 // Step 1: Documents. The overview keeps the list compact; detailed checks and decisions live in the document review panel.
 // "Ask the applicant for more" drafts a plain-English request which the officer edits and approves before sending.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { api, type DocRequest, type DocSlot, type DocumentsStep, type StepInfo } from "../../api";
+import { api, type DocSlot, type StepInfo } from "../../api";
+import Composer from "../Composer";
 import { Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../../ui";
 import { NextStep } from "./parts";
 
@@ -29,6 +30,16 @@ function Compare({ slot }: { slot: DocSlot }) {
   );
 }
 
+function TextPreview({ docId }: { docId: string }) {
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => { api.documentText(docId).then((d) => setText(d.text), setError); }, [docId]);
+  if (error) return <ErrorNotice error={error} />;
+  if (text === null) return <Loading />;
+  return text.trim() ? <pre className="dr-text" tabIndex={0} aria-label="Document text">{text}</pre>
+    : <div className="dr-empty"><Icon name="file" size={28} /><p>This file has no text to show.</p></div>;
+}
+
 function reviewStatus(slot: DocSlot) {
   if (slot.decision) return slot.decision === "confirmed" ? { tone: "ok", label: "Reviewed" } : { tone: "attention", label: DECISION_LABEL[slot.decision] };
   if (slot.issue || (slot.required && !slot.document_id)) return { tone: "attention", label: "Needs attention" };
@@ -36,8 +47,8 @@ function reviewStatus(slot: DocSlot) {
   return { tone: "neutral", label: "Optional" };
 }
 
-function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
-  appId: string; slot: DocSlot; busy: boolean; onClose: () => void; onDecide: (decision: string, reason?: string) => Promise<void>;
+function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide, onRemind }: {
+  appId: string; slot: DocSlot; busy: boolean; onClose: () => void; onDecide: (decision: string, reason?: string) => Promise<void>; onRemind: () => void;
 }) {
   const [reason, setReason] = useState(slot.reason ?? "");
   const [error, setError] = useState<unknown>(null);
@@ -73,7 +84,7 @@ function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
           <div className="dr-content">
             <div className="dr-viewer">
               <div className="dr-file-heading"><strong>{slot.file_name ?? "No file uploaded"}</strong>{hasPdf && <small>PDF document</small>}</div>
-              {hasPdf ? <PdfViewer docId={slot.document_id!} appId={appId} blur={false} height="min(66vh, 720px)" /> : <div className="dr-empty"><Icon name="file" size={28} /><p>{slot.document_id ? "This document is not a PDF and cannot be previewed here." : "No document has been uploaded for this slot."}</p></div>}
+              {hasPdf ? <PdfViewer docId={slot.document_id!} appId={appId} blur={false} height="min(66vh, 720px)" /> : slot.document_id ? <TextPreview docId={slot.document_id} /> : <div className="dr-empty"><Icon name="file" size={28} /><p>{slot.document_id ? "This document is not a PDF and cannot be previewed here." : "No document has been uploaded for this slot."}</p></div>}
             </div>
             <aside className="dr-info">
               <div className="dr-status"><span className={`dr-badge ${status.tone}`}><Icon name={status.tone === "ok" ? "check" : status.tone === "attention" ? "info" : "clock"} size={14} />{status.label}</span></div>
@@ -88,6 +99,11 @@ function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
                 <Button variant="secondary" disabled={saving || busy} onClick={() => void decide("request_again")}>Request new document</Button>
                 <Button variant="quiet" disabled={saving || busy} onClick={() => void decide("not_needed")}>Not required</Button>
               </div>
+              {slot.requested && (
+                <p className="dr-requested" role="status"><Icon name="clock" size={14} />Requested on {formatDate(slot.requested.sent_at)}{slot.requested.due_date ? `, due ${formatDate(slot.requested.due_date)}` : ""}.{" "}
+                  <details><summary>View email</summary><pre className="doc-text">{slot.requested.message_text}</pre></details>
+                  <Button variant="secondary" icon="send" onClick={onRemind}>Send reminder</Button></p>
+              )}
               {slot.decision && <p className="muted dr-existing"><Icon name="check" size={14} />Existing decision: {DECISION_LABEL[slot.decision]}{slot.reason ? ` — ${slot.reason}` : ""}</p>}
             </aside>
           </div>
@@ -98,77 +114,14 @@ function DocumentReviewPanel({ appId, slot, busy, onClose, onDecide }: {
   );
 }
 
-function RequestPanel({ id, data, onChanged }: { id: string; data: DocumentsStep; onChanged: () => void }) {
-  const open = data.requests.find((r) => r.status === "draft") ?? null;
-  const sent = data.requests.filter((r) => r.status === "sent");
-  const [picked, setPicked] = useState<Record<string, { on: boolean; note: string }>>({});
-  const [text, setText] = useState(open?.message_text ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  useEffect(() => { setText(open?.message_text ?? ""); }, [open?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const suggested = useMemo(() => new Map(data.suggested_items.map((s) => [s.slot, s])), [data]);
-  const act = async (fn: () => Promise<unknown>) => { setBusy(true); setError(null); try { await fn(); onChanged(); } catch (e) { setError(e); } setBusy(false); };
-
-  const chosen = data.slots.filter((s) => picked[s.slot]?.on ?? suggested.has(s.slot));
-  const draft = () => act(() => api.draftRequest(id, chosen.map((s) => ({ slot: s.slot, kind: suggested.get(s.slot)?.kind ?? "other", note: picked[s.slot]?.note || undefined }))));
-
-  return (
-    <section className="panel gf-request">
-      <div className="panel-heading"><div><p className="eyebrow">Ask the applicant for more</p><h2>Request more documents</h2>
-        <p>Choose what is missing or unclear. We draft a plain-English request. You edit it and approve it. <strong>Nothing is sent until you approve and send it.</strong></p></div></div>
-      <ErrorNotice error={error} />
-      {!open && (
-        <>
-          <ul className="gf-pick">
-            {data.slots.map((s) => {
-              const sug = suggested.get(s.slot);
-              const on = picked[s.slot]?.on ?? Boolean(sug);
-              return (
-                <li key={s.slot}>
-                  <label><input type="checkbox" checked={on} onChange={(e) => setPicked({ ...picked, [s.slot]: { on: e.target.checked, note: picked[s.slot]?.note ?? "" } })} />
-                    <span><strong>{s.label}</strong>{sug && <small>{sug.reason}</small>}</span></label>
-                  {on && <input className="gf-note" aria-label={`Extra words for ${s.label}`} placeholder="Add your own words (optional)" value={picked[s.slot]?.note ?? ""}
-                    onChange={(e) => setPicked({ ...picked, [s.slot]: { on: true, note: e.target.value } })} />}
-                </li>
-              );
-            })}
-          </ul>
-          <Button icon="file" disabled={busy || chosen.length === 0} onClick={() => void draft()}>Draft the request</Button>
-        </>
-      )}
-      {open && (
-        <div className="gf-draft">
-          <p className="notice"><Icon name="info" />This is a draft. The applicant has not seen it. Edit it, then approve and send it.</p>
-          <label className="field"><span>Request to the applicant</span><textarea rows={14} value={text} onChange={(e) => setText(e.target.value)} /></label>
-          <div className="rule-actions">
-            <Button variant="secondary" icon="edit" disabled={busy || text === open.message_text || !text.trim()} onClick={() => void act(() => api.editRequest(open.id, text))}>Save my edits</Button>
-            <Button icon="send" disabled={busy || text !== open.message_text} title={text !== open.message_text ? "Save your edits first" : undefined}
-              onClick={() => void act(() => api.sendRequest(open.id))}>Approve and send</Button>
-          </div>
-          <small className="muted">This prototype records the request as sent. No email is delivered.</small>
-        </div>
-      )}
-      {sent.length > 0 && (
-        <div className="gf-history"><h3>Requests sent</h3>
-          {sent.map((r: DocRequest) => (
-            <details key={r.id}>
-              <summary>Sent {formatDate(r.sent_at, true)} · {r.items.map((i) => i.label).join(", ")}
-                {r.resubmitted_at ? <span className="gf-chip resub"><Icon name="check" size={13} />Resubmitted {formatDate(r.resubmitted_at)}</span> : <span className="gf-chip wait"><Icon name="clock" size={13} />Waiting for the applicant</span>}</summary>
-              <pre className="doc-text">{r.message_text}</pre>
-            </details>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 export default function Step1Documents({ id, info, onChanged, onAdvance }: { id: string; info: StepInfo; onChanged: () => void; onAdvance: () => void }) {
   const { data, error, reload } = useLoad(() => api.documentsStep(id), [id]);
   const { data: health } = useLoad(api.health, []);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
   const [openSlot, setOpenSlot] = useState<DocSlot | null>(null);
+  const [compose, setCompose] = useState<{ slots: string[]; note: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   if (error) return <ErrorNotice error={error} />;
   if (!data) return <Loading />;
 
@@ -190,6 +143,8 @@ export default function Step1Documents({ id, info, onChanged, onAdvance }: { id:
         )}
         <p className={`rv-counter ${needs ? "on" : ""}`} role="status"><Icon name={needs ? "info" : "check"} size={16} />{needs === 0 ? "No documents need attention" : `${needs} ${needs === 1 ? "document needs" : "documents need"} attention`}</p>
         <ErrorNotice error={failure} />
+        {toast && <p className="notice ok-notice" role="status"><Icon name="check" />{toast} <button className="link-button" onClick={() => setToast(null)}>Dismiss</button></p>}
+        <div className="rv-toolrow"><Button variant="secondary" icon="send" disabled={busy || waiting} onClick={() => setCompose({ slots: [], note: "" })}>Ask applicant for more</Button></div>
         <div className="rv-table-wrap" role="region" aria-label="Documents" tabIndex={-1}>
           <table className="rv-table rv-documents-clean">
             <thead><tr><th>Document type</th><th>File name</th><th>Review status</th><th aria-label="Open document" /></tr></thead>
@@ -205,11 +160,17 @@ export default function Step1Documents({ id, info, onChanged, onAdvance }: { id:
           </table>
         </div>
       </section>
-      <RequestPanel id={id} data={data} onChanged={both} />
       <NextStep label="Next step: Redaction check" missing={waiting ? ["Waiting for the applicant to reply to your request", ...data.missing] : data.missing} busy={busy}
         note="Every required document is confirmed or has a reason. Next, the personal details are hidden and you check them." onClick={() => void (async () => { setBusy(true); setFailure(null); try { await api.completeDocuments(id); onChanged(); onAdvance(); } catch (e) { setFailure(e); } setBusy(false); })()} />
-      {openSlot && <DocumentReviewPanel appId={id} slot={openSlot} busy={busy || waiting} onClose={() => setOpenSlot(null)}
-        onDecide={async (decision, reason) => { await act(() => api.documentDecision(id, { slot: openSlot.slot, decision, reason })); }} />}
+      {openSlot && !compose && <DocumentReviewPanel appId={id} slot={openSlot} busy={busy || waiting} onClose={() => setOpenSlot(null)}
+        onRemind={() => setCompose({ slots: [openSlot.slot], note: "" })}
+        onDecide={async (decision, reason) => {
+          await act(() => api.documentDecision(id, { slot: openSlot.slot, decision, reason }));
+          // a document that needs replacing is asked for in the email composer, opened straight away
+          if (decision === "request_again" || decision === "wrong_slot") setCompose({ slots: [openSlot.slot], note: reason ?? "" });
+        }} />}
+      {compose && <Composer appId={id} slots={compose.slots} note={compose.note} onClose={() => { setCompose(null); setOpenSlot(null); }}
+        onDone={(m) => { setCompose(null); setOpenSlot(null); setToast(m); both(); }} />}
     </>
   );
 }

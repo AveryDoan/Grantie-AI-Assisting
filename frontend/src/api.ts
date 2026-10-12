@@ -507,6 +507,7 @@ export interface DocSlot {
   slot: string; label: string; required: boolean; document_id: string | null; file_name: string | null;
   decision: "confirmed" | "wrong_slot" | "request_again" | "not_needed" | null; reason: string | null;
   issue: { kind: "missing" | "wrong_slot" | "unreadable" | "differs" | "other"; reason: string } | null;
+  requested?: { request_id: string; sent_at: string | null; due_date: string | null; subject: string | null; message_text: string } | null;
   replaces: { old: { file_name: string; text: string | null; fields: Record<string, string> }; new: { file_name: string; text: string | null; fields: Record<string, string> } } | null;
 }
 export interface DocRequest { id: string; status: "draft" | "sent"; message_text: string; items: { slot: string; label: string; kind: string; reason: string; ask: string; why: string }[];
@@ -514,6 +515,18 @@ export interface DocRequest { id: string; status: "draft" | "sent"; message_text
 export interface DocumentsStep {
   slots: DocSlot[]; suggested_items: { slot: string; label: string; kind: string; reason: string }[]; requests: DocRequest[]; missing: string[];
 }
+
+// ---- The email composer (one path for every "Ask the applicant for more")
+export interface ComposerItem { key: string; kind: "document" | "finding"; slot?: string; finding_id?: string; label: string; reason: string; detail: string; ticked: boolean }
+export interface ComposerOptions { to: string; subject: string; items: ComposerItem[]; due_date: string; email_connected: boolean;
+  request: { id: string; sent_at: string; due_date: string | null; subject: string | null; message_text: string; slots: string[] } | null }
+export interface ComposerDraft { to: string; subject: string; body: string; items: Record<string, string>[]; due_date: string; template: boolean; template_note: string | null }
+export interface ComposerSave { subject: string; body: string; cc: string | null; items: Record<string, string>[]; due_date: string | null; request_id: string | null; template: boolean; mode?: "send" | "marked_sent" }
+
+export interface RedactionOption { group: string; key: string; label: string; token: string }
+export interface AddPreview { matches: number; in_this_text: number; token_preview: string; protected: string[]; warning: string | null }
+export interface CompareSpan { id: string; type: string; token: string; red: [number, number]; orig: [number, number] }
+export interface CompareText { source: string; label: string; redacted: string; original: string; original_shown: boolean; spans: CompareSpan[]; has_text: boolean; types: string[] }
 
 export interface RedactionGroup { type: string; count: number; how: string[]; where: string[] }
 export interface RedactionCheck {
@@ -641,13 +654,24 @@ export const api = {
   redactionCheck: (id: string) => request<RedactionCheck>(`/applications/${id}/redaction-check`),
   redactionItems: (id: string, type: string) => request<RedactionItem[]>(`/applications/${id}/redaction-check/items?${new URLSearchParams({ type })}`),
   revealItem: (id: string, itemId: string) => request<{ item_id: string; original: string }>(`/applications/${id}/redaction-check/reveal`, { method: "POST", body: { item_id: itemId } }),
-  addMissed: (id: string, body: { source: string; text: string; kind: string }) => request<RedactionCheck>(`/applications/${id}/redaction-check/add`, { method: "POST", body }),
+  redactionOptions: () => request<RedactionOption[]>("/redaction-options"),
+  addPreview: (id: string, body: { source: string; text: string; kind: string; match_case?: boolean; every?: boolean }) =>
+    request<AddPreview>(`/applications/${id}/redaction-check/add-preview`, { method: "POST", body }),
+  compareText: (id: string, source: string, reveal: boolean) =>
+    request<CompareText>(`/applications/${id}/redaction-check/compare?${new URLSearchParams({ source, reveal: String(reveal) })}`),
+  documentText: (docId: string) => request<{ file_name: string; text: string }>(`/documents/${docId}/text`),
+  addMissed: (id: string, body: { source: string; text: string; kind: string; description?: string; match_case?: boolean; every?: boolean }) => request<RedactionCheck>(`/applications/${id}/redaction-check/add`, { method: "POST", body }),
   unmaskItem: (id: string, itemId: string, reason: string) => request<RedactionCheck>(`/applications/${id}/redaction-check/unmask`, { method: "POST", body: { item_id: itemId, reason } }),
   approveRedaction: (id: string) => request<{ steps: StepsState }>(`/applications/${id}/redaction-check/approve`, { method: "POST" }),
   outcome: (id: string) => request<Outcome>(`/applications/${id}/outcome`),
   nextStepsLetter: (id: string) => request<Letter>(`/applications/${id}/letter/next-steps`, { method: "POST" }),
   reopen: (id: string, reason: string) => request<{ status: string }>(`/applications/${id}/reopen`, { method: "POST", body: { reason } }),
   // ---- outcomes: only an officer's click moves an application to Outcome, signs off or releases
+  composerOptions: (id: string, slots: string[] = []) => request<ComposerOptions>(`/applications/${id}/composer?slots=${slots.join(",")}`),
+  composerDraft: (id: string, body: { picked: { slot?: string; finding_id?: string }[]; custom: string[]; note: string | null; due_date: string | null }) =>
+    request<ComposerDraft>(`/applications/${id}/composer/draft`, { method: "POST", body }),
+  composerSave: (id: string, body: ComposerSave) => request<{ id: string }>(`/applications/${id}/composer/save`, { method: "POST", body }),
+  composerSend: (id: string, body: ComposerSave) => request<{ id: string }>(`/applications/${id}/composer/send`, { method: "POST", body }),
   goToOutcome: (id: string, continueAnyway = false) =>
     request<{ not_assessed: string[] }>(`/applications/${id}/outcome/go-now`, { method: "POST", body: { continue_anyway: continueAnyway } }),
   letterViewed: (letterId: string) => request<Letter>(`/letters/${letterId}/viewed`, { method: "POST" }),

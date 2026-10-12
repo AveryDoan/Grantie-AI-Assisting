@@ -21,6 +21,8 @@ from app.api.auth import current_actor, get_store_dep
 from app.api.ratelimit import rate_limit
 from app.api.schemas import (
     AssessRequest,
+    ComposerDraftIn,
+    ComposerSaveIn,
     GoToOutcomeIn,
     NotSelectedLetterIn,
     ReleaseManyIn,
@@ -57,7 +59,7 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import ai_use, audit, consistency, dashboard, doc_step, outcome_flow, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
+from app.services import ai_use, audit, composer, consistency, dashboard, doc_step, outcome_flow, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
 from app.services.errors import NotFound, ServiceError, ValidationFailed
 from app.store.base import Store, StoreError, one
@@ -400,7 +402,33 @@ def create_app(
 
     @r.post("/applications/{application_id}/redaction-check/add")
     def redaction_add(application_id: str, body: AddMissedIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
-        return redaction_check.add_missed(s, actor, application_id, body.source, body.text, body.kind, settings)
+        return redaction_check.add_missed(s, actor, application_id, body.source, body.text, body.kind, settings, body.description)
+
+    @r.get("/redaction-options")
+    def redaction_options(actor: Actor = Depends(current_actor)) -> list[dict[str, str]]:
+        require_role(actor, "officer", "admin")
+        return redaction_check.OPTIONS
+
+    @r.post("/applications/{application_id}/redaction-check/add-preview")
+    def redaction_add_preview(application_id: str, body: AddMissedIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return redaction_check.preview_missed(s, actor, application_id, body.source, body.text, body.kind, body.match_case, body.every, settings)
+
+    @r.get("/applications/{application_id}/redaction-check/compare")
+    def redaction_compare(application_id: str, source: str, reveal: bool = False, actor: Actor = Depends(current_actor),
+                          s: Store = Depends(get_store)) -> dict[str, Any]:
+        """Original (masked unless reveal=true, which is logged once) beside the redacted text the AI sees."""
+        return redaction_check.compare(s, actor, application_id, source, reveal, settings)
+
+    @r.get("/documents/{document_id}/text")
+    def document_text(document_id: str, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The text of an uploaded file, for the document review preview (.txt and other non-PDF files). Logged."""
+        require_role(actor, "officer", "admin")
+        d = one(s.select("documents", eq={"id": document_id}, limit=1))
+        if not d:
+            raise NotFound("Document not found")
+        application_for_staff(s, actor, d["application_id"])
+        audit.write_audit(s, actor, "document.text_viewed", application_id=d["application_id"], details={"document_id": document_id})
+        return {"file_name": d["file_name"], "text": d.get("extracted_text") or ""}
 
     @r.post("/applications/{application_id}/redaction-check/unmask")
     def redaction_unmask(application_id: str, body: UnmaskIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
@@ -427,6 +455,31 @@ def create_app(
     @r.post("/applications/{application_id}/reopen")
     def reopen_application(application_id: str, body: ReopenIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
         return review.reopen(s, actor, application_id, body.reason)
+
+    # ------------------------------------------ the email composer (one path for every "Ask the applicant for more")
+    @r.get("/applications/{application_id}/composer")
+    def composer_options(application_id: str, slots: str = "", actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return composer.options(s, actor, application_id, [x for x in slots.split(",") if x])
+
+    @r.post("/applications/{application_id}/composer/draft")
+    def composer_draft(application_id: str, body: ComposerDraftIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        try:
+            llm = make_llm(s, settings)
+        except LLMError:
+            llm = None
+        return composer.draft(s, actor, application_id, picked=[p.model_dump() for p in body.picked], custom=body.custom, note=body.note,
+                              due_date=body.due_date, llm=llm)
+
+    @r.post("/applications/{application_id}/composer/save")
+    def composer_save(application_id: str, body: ComposerSaveIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        return composer.save(s, actor, application_id, subject=body.subject, body=body.body, cc=body.cc, items=body.items, due_date=body.due_date,
+                             request_id=body.request_id, template=body.template)
+
+    @r.post("/applications/{application_id}/composer/send")
+    def composer_send(application_id: str, body: ComposerSaveIn, actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The only action that records a request as sent."""
+        return composer.send(s, actor, application_id, subject=body.subject, body=body.body, cc=body.cc, items=body.items, due_date=body.due_date,
+                             request_id=body.request_id, mode=body.mode, template=body.template)
 
     # ------------------------------------------ outcomes: ineligible path, round decisions, sign-off and release
     @r.post("/applications/{application_id}/outcome/go-now")

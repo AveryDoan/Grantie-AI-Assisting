@@ -127,7 +127,10 @@ class RevealIn(BaseModel):
 class AddMissedIn(BaseModel):
     source: str = Field(..., max_length=200)
     text: str = Field(..., max_length=300)
-    kind: str = Field(..., max_length=40)
+    kind: str = Field(..., max_length=80)
+    description: str | None = Field(None, max_length=200)   # required for "Other personal information"
+    match_case: bool = False
+    every: bool = True
 
 
 class UnmaskIn(BaseModel):
@@ -191,3 +194,26 @@ class RoundDecisionIn(BaseModel):
 
 class NotSelectedLetterIn(BaseModel):
     criteria: list[str] = Field(default_factory=list, max_length=20)   # merit criteria whose officer reason goes in as feedback
+
+
+class ComposerPick(BaseModel):
+    slot: str | None = Field(None, max_length=40)
+    finding_id: str | None = Field(None, max_length=60)
+
+
+class ComposerDraftIn(BaseModel):
+    picked: list[ComposerPick] = Field(default_factory=list, max_length=30)
+    custom: list[str] = Field(default_factory=list, max_length=10)
+    note: str | None = Field(None, max_length=2000)
+    due_date: str | None = Field(None, max_length=10)
+
+
+class ComposerSaveIn(BaseModel):
+    subject: str = Field(..., max_length=300)
+    body: str = Field(..., max_length=20000)
+    cc: str | None = Field(None, max_length=300)
+    items: list[dict] = Field(default_factory=list, max_length=40)
+    due_date: str | None = Field(None, max_length=10)
+    request_id: str | None = Field(None, max_length=60)
+    template: bool = False
+    mode: str = "marked_sent"

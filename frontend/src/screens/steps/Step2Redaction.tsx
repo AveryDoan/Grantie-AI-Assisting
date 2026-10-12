@@ -7,8 +7,9 @@ import { api, type RedactionCheck, type RedactionGroup, type RedactionItem, type
 import { Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../../ui";
 import { NextStep } from "./parts";
 import { PdfModal } from "../review/PdfModal";
+import { MarkPersonal } from "./MarkPersonal";
+import { CompareViewer } from "./CompareViewer";
 
-const ADD_TYPES = ["Name", "Email", "Phone", "Address", "ID number", "Date of birth"];
 
 function Items({ id, type, onChanged }: { id: string; type: string; onChanged: () => void }) {
   const { data, error, reload } = useLoad(() => api.redactionItems(id, type), [id, type]);
@@ -62,35 +63,28 @@ function AddMissed({ id, data, onChanged }: { id: string; data: RedactionCheck; 
   const keys = Object.keys(data.texts);
   const [source, setSource] = useState(keys[0] ?? "application_text");
   const [selected, setSelected] = useState("");
-  const [kind, setKind] = useState("Name");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [open, setOpen] = useState(false);
   const box = useRef<HTMLPreElement>(null);
   const capture = () => {
     const sel = window.getSelection();
-    const text = sel && box.current && sel.anchorNode && box.current.contains(sel.anchorNode) ? sel.toString().trim() : "";
-    setSelected(text);
-  };
-  const add = async () => {
-    setBusy(true); setError(null);
-    try { await api.addMissed(id, { source, text: selected, kind }); setSelected(""); onChanged(); } catch (e) { setError(e); }
-    setBusy(false);
+    setSelected(sel && box.current && sel.anchorNode && box.current.contains(sel.anchorNode) ? sel.toString().trim() : "");
   };
   return (
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">Missed something?</p><h2>Add a missed item</h2>
-        <p>Select text in the redacted version below that should have been hidden, choose what it is, and mark it. Redaction then runs again.</p></div></div>
-      <ErrorNotice error={error} />
+        <p>Select text in the redacted version below that should have been hidden, then mark it as personal. Redaction then runs again.</p></div></div>
       <div className="rv-tabs" role="tablist" aria-label="Texts">
         {keys.map((k) => <button key={k} role="tab" aria-selected={k === source} className={k === source ? "active" : ""} onClick={() => { setSource(k); setSelected(""); }}>{data.texts[k].label}</button>)}
       </div>
-      <pre className="doc-text gf-redtext" ref={box} onMouseUp={capture} onKeyUp={capture} tabIndex={0} aria-label="Redacted text. Select words to mark them.">{data.texts[source]?.redacted}</pre>
-      <div className="gf-add">
-        <span>{selected ? <>Selected: <strong>“{selected.slice(0, 80)}”</strong></> : "Nothing selected"}</span>
-        <label className="sr-only" htmlFor="gf-kind">What is it?</label>
-        <select id="gf-kind" value={kind} onChange={(e) => setKind(e.target.value)}>{ADD_TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-        <Button variant="secondary" disabled={busy || selected.length < 2} onClick={() => void add()}>Mark as personal</Button>
+      <div className="gf-redtext-wrap">
+        <pre className="doc-text gf-redtext" ref={box} onMouseUp={capture} onKeyUp={capture} tabIndex={0} aria-label="Redacted text. Select words to mark them.">{data.texts[source]?.redacted}</pre>
       </div>
+      <div className="gf-add">
+        <span>{selected ? <>Selected: <strong>“{selected}”</strong></> : "Nothing selected"}</span>
+        <Button variant="secondary" disabled={selected.length < 2} onClick={() => setOpen(true)}>Mark as personal</Button>
+      </div>
+      {open && <MarkPersonal appId={id} source={source} text={selected} onReselect={() => setOpen(false)} onClose={() => setOpen(false)}
+        onDone={() => { setOpen(false); setSelected(""); onChanged(); }} />}
     </section>
   );
 }
@@ -101,6 +95,7 @@ export default function Step2Redaction({ id, info, onChanged, onAdvance, onBack 
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
   const [pdfDoc, setPdfDoc] = useState<RedactionCheck["documents"][number] | null>(null);
+  const [compare, setCompare] = useState<{ source: string; title: string } | null>(null);
   if (error) return <ErrorNotice error={error} />;
   if (!data) return <Loading />;
   const both = () => { reload(); onChanged(); };
@@ -154,12 +149,14 @@ export default function Step2Redaction({ id, info, onChanged, onAdvance, onBack 
           <tbody>{data.documents.map((d) => (
             <tr key={d.id}><td><strong>{d.file_name}</strong></td><td>{d.redacted_spans}</td>
               <td><div className="gf-actions">
+                <Button variant="secondary" icon="eye" onClick={() => setCompare({ source: `document:${d.id}`, title: d.file_name })}>Compare</Button>
                 {d.is_pdf && <Button variant="secondary" onClick={() => setPdfDoc(d)}>View PDF with blur</Button>}
                 <Button variant="quiet" icon="download" disabled={!d.redacted_spans && !d.is_pdf} onClick={() => void api.downloadPdf(`/documents/${d.id}/redacted.pdf`, `redacted-${d.file_name}`).catch(setFailure)}>Download redacted copy</Button>
               </div></td></tr>))}</tbody>
         </table></div>
       </section>
       {pdfDoc && <PdfModal appId={id} title={pdfDoc.file_name} targets={[{ docId: pdfDoc.id, title: pdfDoc.file_name, items: [] }]} blur onClose={() => setPdfDoc(null)} />}
+      {compare && <CompareViewer appId={id} source={compare.source} title={compare.title} onClose={() => setCompare(null)} onChanged={both} />}
       <AddMissed id={id} data={data} onChanged={both} />
       <ErrorNotice error={failure} />
       <div className="gf-approve">

@@ -13,7 +13,8 @@ import type { SubStep, SubStepKey } from "../api";
 import { isRule } from "../counts";
 import { Button, ErrorNotice, Icon, StatusChip, effectiveStatus, isDecided } from "../ui";
 import { ConsistencyPanel, ConsistencyTable } from "./review/ConsistencyTab";
-import { AskDialog, DecisionDialog, type DialogState } from "./review/Dialogs";
+import { DecisionDialog, type DialogState } from "./review/Dialogs";
+import Composer from "./Composer";
 import { CRITERIA, MeritViewer } from "./review/MeritViewer";
 import { MeritWorkspace } from "./review/MeritWorkspace";
 import { AiUseCheck } from "./review/AiUseCheck";
@@ -248,7 +249,8 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
                       <button key={st} className={`rv-filter ${status === st ? "on" : ""}`} aria-pressed={status === st} onClick={() => setStatus(status === st ? null : st)}>{label} <strong>{count(st)}</strong></button>
                     ))}
                   </div>
-                  <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>Esc</kbd> close</small>
+                  <details className="rv-shortcuts"><summary><Icon name="info" size={14} />Shortcuts</summary>
+                    <small className="rv-hints" aria-label="Keyboard shortcuts"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>J</kbd><kbd>K</kbd> next · <kbd>C</kbd> confirm · <kbd>O</kbd> Outcome · <kbd>Esc</kbd> close</small></details>
                   <div className="rv-toolbtns">
                     <Button variant="secondary" icon="arrow" disabled={!elig?.count} onClick={reviewNext}>Review next</Button>
                     <Button variant="secondary" icon="send" disabled={locked || pickedFindings.length === 0}
@@ -336,7 +338,8 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
         : viewer && <MeritViewer f={viewer} detail={detail} mode={item?.kind === "referee" ? "referee" : "criterion"} locked={locked} onClose={closePanel} onChanged={reload} onTrace={scopedTrace} />}
 
       {dialog && dialog.kind === "ask" && (
-        <AskDialog detail={detail} findings={dialog.more ?? [dialog.finding]} close={() => setDialog(null)} onDone={() => { setDialog(null); setPicked(new Set()); reload(); }} />
+        <Composer appId={id} prepare={async () => { for (const f of dialog.more ?? [dialog.finding]) await api.review(f.id, { action: "ask_applicant" }); }}
+          onClose={() => setDialog(null)} onDone={() => { setDialog(null); setPicked(new Set()); reload(); }} />
       )}
       {dialog && dialog.kind !== "ask" && <DecisionDialog state={dialog} close={() => setDialog(null)} onDone={() => { setDialog(null); reload(); }} />}
     </div>

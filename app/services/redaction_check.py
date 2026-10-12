@@ -21,9 +21,56 @@ from app.services.errors import Conflict, NotFound, ValidationFailed
 from app.services.redaction_service import APPLICATION_SOURCE, _cipher, load_edits, run_and_store
 from app.store.base import Store, one
 
-CATEGORY = {"PERSON": "Name", "REFEREE": "Name", "EMAIL": "Email", "PHONE": "Phone", "ADDRESS": "Address", "ID": "ID number", "DOB": "Date of birth"}
-ORDER = ["Name", "Email", "Phone", "Address", "ID number", "Date of birth", "Location", "Other"]
+# What the officer can add, grouped. Each option makes a token of its own type, so the redacted text reads naturally ([PASSPORT_1]).
+OPTIONS: list[dict[str, str]] = [
+    {"group": "Identity", "key": "full_name", "label": "Full name", "token": "PERSON"},
+    {"group": "Identity", "key": "first_name", "label": "First name only", "token": "PERSON"},
+    {"group": "Identity", "key": "family_name", "label": "Family name only", "token": "PERSON"},
+    {"group": "Identity", "key": "nickname", "label": "Preferred name or nickname", "token": "PERSON"},
+    {"group": "Identity", "key": "referee_name", "label": "Referee name", "token": "REFEREE"},
+    {"group": "Identity", "key": "family_member", "label": "Family member name", "token": "FAMILY"},
+    {"group": "Identity", "key": "signature", "label": "Signature or initials", "token": "SIGNATURE"},
+    {"group": "Contact", "key": "email", "label": "Email address", "token": "EMAIL"},
+    {"group": "Contact", "key": "phone", "label": "Phone number", "token": "PHONE"},
+    {"group": "Contact", "key": "social", "label": "Social media handle or profile URL", "token": "HANDLE"},
+    {"group": "Contact", "key": "website", "label": "Website that identifies the person", "token": "URL"},
+    {"group": "Location", "key": "street", "label": "Street address", "token": "ADDRESS"},
+    {"group": "Location", "key": "suburb", "label": "Suburb or town", "token": "SUBURB"},
+    {"group": "Location", "key": "postcode", "label": "Postcode", "token": "POSTCODE"},
+    {"group": "Location", "key": "site", "label": "Specific school or workplace location (not the provider)", "token": "SITE"},
+    {"group": "Location", "key": "country", "label": "Country (only if the grant rules don't need it)", "token": "COUNTRY"},
+    {"group": "Identifiers", "key": "dob", "label": "Date of birth", "token": "DOB"},
+    {"group": "Identifiers", "key": "passport", "label": "Passport number", "token": "PASSPORT"},
+    {"group": "Identifiers", "key": "student_id", "label": "Student ID", "token": "STUDENT_ID"},
+    {"group": "Identifiers", "key": "visa_no", "label": "Visa or grant number", "token": "VISA_NO"},
+    {"group": "Identifiers", "key": "tfn", "label": "Tax file number", "token": "TFN"},
+    {"group": "Identifiers", "key": "licence", "label": "Driver licence", "token": "LICENCE"},
+    {"group": "Identifiers", "key": "medicare", "label": "Medicare number", "token": "MEDICARE"},
+    {"group": "Identifiers", "key": "bank", "label": "Bank account or BSB", "token": "BANK"},
+    {"group": "Identifiers", "key": "other_ref", "label": "Application reference number from another system", "token": "REF_NO"},
+    {"group": "Identifiers", "key": "other_id", "label": "Other ID number", "token": "ID"},
+    {"group": "Organisations", "key": "employer", "label": "Employer name", "token": "EMPLOYER"},
+    {"group": "Organisations", "key": "club", "label": "Organisation or club name (when it identifies the person)", "token": "ORG"},
+    {"group": "Organisations", "key": "referee_org", "label": "Referee's organisation", "token": "REFEREE_ORG"},
+    {"group": "Sensitive", "key": "health", "label": "Health information", "token": "HEALTH"},
+    {"group": "Sensitive", "key": "disability", "label": "Disability", "token": "DISABILITY"},
+    {"group": "Sensitive", "key": "religion", "label": "Religion", "token": "RELIGION"},
+    {"group": "Sensitive", "key": "ethnicity", "label": "Ethnicity or cultural background", "token": "ETHNICITY"},
+    {"group": "Sensitive", "key": "hardship", "label": "Family or personal hardship detail", "token": "HARDSHIP"},
+    {"group": "Sensitive", "key": "legal", "label": "Legal matter", "token": "LEGAL"},
+    {"group": "Other", "key": "other", "label": "Other personal information (describe it in one line)", "token": "OTHER_INFO"},
+]
+BY_KEY = {o["key"]: o for o in OPTIONS}
+_GROUP_CATEGORY = {"Identity": "Name", "Contact": "Email", "Location": "Address", "Identifiers": "ID number", "Organisations": "Organisation",
+                   "Sensitive": "Sensitive", "Other": "Other"}
+CATEGORY = {"PERSON": "Name", "REFEREE": "Name", "EMAIL": "Email", "PHONE": "Phone", "ADDRESS": "Address", "ID": "ID number", "DOB": "Date of birth",
+            **{o["token"]: _GROUP_CATEGORY[o["group"]] for o in OPTIONS if o["token"] not in ("PERSON", "REFEREE", "EMAIL", "PHONE", "ADDRESS", "ID", "DOB")}}
+CATEGORY.update({"PLACE": "Location", "HANDLE": "Email", "URL": "Email", "SUBURB": "Address", "POSTCODE": "Address", "SITE": "Address", "COUNTRY": "Address"})
+ORDER = ["Name", "Email", "Phone", "Address", "ID number", "Date of birth", "Organisation", "Sensitive", "Location", "Other"]
+# The older, shorter list still works (tests and old callers).
 ADD_TYPES = {"Name": "PERSON", "Email": "EMAIL", "Phone": "PHONE", "Address": "ADDRESS", "ID number": "ID", "Date of birth": "DOB"}
+# Rule inputs: the provider, the course, visa subclass, key dates and the country class. Hiding one can stop a check from working.
+PROTECTED_FIELDS = ("education_provider", "course_name", "visa_subclass", "course_start_date", "arrival_date", "study_load", "country", "country_of_residence")
 CONTEXT = 48
 
 
@@ -145,24 +192,81 @@ def _rerun(store: Store, actor: Actor, app: dict[str, Any], settings: Settings) 
     steps.touch(store, actor, store.select("applications", eq={"id": app["id"]})[0], 2, settings)
 
 
-def add_missed(store: Store, actor: Actor, application_id: str, source: str, text: str, kind: str, settings: Settings) -> dict[str, Any]:
-    """The officer selected text that was not redacted. It is stored encrypted and redaction runs again."""
+def _protected(app: dict[str, Any], text: str) -> list[str]:
+    """Typed rule inputs that this selection overlaps. A warning, not a block: the officer decides."""
+    f = _fields_of(app)
+    t = text.strip().casefold()
+    return [k.replace("_", " ") for k in PROTECTED_FIELDS if str(f.get(k) or "").strip() and len(t) >= 3
+            and (t in str(f[k]).casefold() or str(f[k]).casefold() in t)]
+
+
+def _fields_of(app: dict[str, Any]) -> dict[str, Any]:
+    return (app.get("application_text") or {}).get("fields") or {}
+
+
+def _resolve_kind(kind: str, description: str | None) -> tuple[str, str]:
+    """(token type, label for the audit log). Accepts an option key, an option label or one of the older short names."""
+    if kind in BY_KEY:
+        o = BY_KEY[kind]
+    elif kind in ADD_TYPES:
+        return ADD_TYPES[kind], kind
+    else:
+        o = next((x for x in OPTIONS if x["label"] == kind), None)
+    if o is None:
+        raise ValidationFailed("Choose what kind of detail this is")
+    if o["key"] == "other" and not (description or "").strip():
+        raise ValidationFailed("Describe the personal information in one line")
+    return o["token"], o["key"]
+
+
+def preview_missed(store: Store, actor: Actor, application_id: str, source: str, text: str, kind: str, match_case: bool,
+                   every: bool, settings: Settings) -> dict[str, Any]:
+    """Before confirming: how many places change, what the placeholder will look like, and whether a rule needs this value."""
+    require_role(actor, "officer")
+    app = application_for_staff(store, actor, application_id)
+    token, _ = _resolve_kind(kind, "x")
+    text = text.strip()
+    texts = _texts(store, app)
+    flags = 0 if match_case else re.IGNORECASE
+    pat = re.compile(re.escape(text), flags)
+    here = len(pat.findall(texts.get(source, ("", ""))[0]))
+    total = sum(len(pat.findall(v[0])) for v in texts.values())
+    from redaction.storage import load_token_map
+
+    n = _load_counter(store, app, settings, token)
+    protected = _protected(app, text) + (["country"] if token == "COUNTRY" else [])
+    return {"matches": total if every else min(here, 1), "in_this_text": here, "token_preview": f"[{token}_{n + 1}]", "protected": sorted(set(protected)),
+            "warning": "The rules need this value. Hiding it may stop a check from working." if protected else None}
+
+
+def _load_counter(store: Store, app: dict[str, Any], settings: Settings, token: str) -> int:
+    from redaction.storage import load_token_map
+
+    tokens = load_token_map(store, app["id"], _cipher(settings))
+    return int(getattr(tokens, "_counters", {}).get(token, 0))
+
+
+def add_missed(store: Store, actor: Actor, application_id: str, source: str, text: str, kind: str, settings: Settings,
+               description: str | None = None) -> dict[str, Any]:
+    """The officer selected text that was not redacted. It is stored encrypted and redaction (and the leak scan) runs again.
+    Every matching occurrence in this application is replaced."""
     require_role(actor, "officer")
     app = application_for_staff(store, actor, application_id)
     if app["status"] == "signed_off":
         raise Conflict("This application has been signed off")
     texts = _texts(store, app)
     text = text.strip()
-    if kind not in ADD_TYPES:
-        raise ValidationFailed("Choose what kind of detail this is")
+    token, label = _resolve_kind(kind, description)
     if source not in texts or len(text) < 2 or len(text) > 200:
         raise ValidationFailed("Select a short passage in the redacted text")
-    if text not in texts[source][0] or re.fullmatch(r"\[[A-Z]+_\d+\]", text):
+    if text not in texts[source][0] or re.fullmatch(r"\[[A-Z_]+_\d+\]", text):
         raise ValidationFailed("Select text that is visible in the redacted version and is not already a placeholder")
     cipher = _cipher(settings)
-    store.insert("redaction_edits", {"application_id": application_id, "kind": "add", "token_type": ADD_TYPES[kind], "source": source,
+    store.insert("redaction_edits", {"application_id": application_id, "kind": "add", "token_type": token, "source": source,
                                      "encrypted_value": cipher.encrypt(application_id, "edit:add", text), "officer_id": actor.user_id})
-    write_audit(store, actor, "redaction.added", application_id=application_id, details={"source": source, "type": kind, "characters": len(text)})
+    write_audit(store, actor, "redaction.added", application_id=application_id,
+                details={"source": source, "type": label, "token_type": token, "characters": len(text), "added_by_officer": True,
+                         "protected_warning": bool(_protected(app, text)), "described": bool((description or "").strip())})
     _rerun(store, actor, app, settings)
     return overview(store, actor, application_id, settings)
 
@@ -196,6 +300,40 @@ def unmask(store: Store, actor: Actor, application_id: str, item_id: str, reason
 
     steps.touch(store, actor, store.select("applications", eq={"id": application_id})[0], 2, settings)
     return overview(store, actor, application_id, settings)
+
+
+def compare(store: Store, actor: Actor, application_id: str, source: str, reveal_original: bool, settings: Settings) -> dict[str, Any]:
+    """Original and redacted text side by side. The redacted side is exactly what the AI sees.
+
+    The original is masked on the SERVER until the officer switches it on (one audit entry per switch-on, never the text), so
+    a blurred original is never sent to the browser. Spans carry their type and the offsets in both texts."""
+    from redaction.restore import restore
+    from redaction.storage import load_token_map
+
+    require_role(actor, "officer", "admin")
+    app = application_for_staff(store, actor, application_id)
+    texts = _texts(store, app)
+    if source not in texts:
+        raise NotFound("That text does not exist")
+    redacted, label = texts[source]
+    tokens = load_token_map(store, application_id, _cipher(settings))
+    original = restore(redacted, tokens, source)
+    spans = []
+    shift = 0   # the original is the redacted text with each token swapped for its value, so offsets follow from the redacted ones
+    for o in sorted(tokens.occurrences.get(source, []), key=lambda o: o.red_start):
+        entry = tokens.entries[o.token]
+        kind = "Location" if o.token.startswith("[LOCATION") else CATEGORY.get(entry.token_type, "Other")
+        start = o.red_start + shift
+        spans.append({"id": f"{source}|{o.red_start}", "type": kind, "token": o.token, "red": [o.red_start, o.red_end], "orig": [start, start + len(o.original)]})
+        shift += len(o.original) - (o.red_end - o.red_start)
+    if reveal_original:
+        write_audit(store, actor, "redaction.compare_original_opened", application_id=application_id, details={"source": source})
+        shown = original
+    else:   # same line breaks and length of words, nothing readable
+        shown = re.sub(r"[^\W_]", "\u2022", original)
+    return {"source": source, "label": label, "redacted": redacted, "original": shown, "original_shown": reveal_original, "spans": spans,
+            "has_text": bool(redacted.strip()),
+            "types": sorted({sp["type"] for sp in spans})}
 
 
 def approve(store: Store, actor: Actor, application_id: str, settings: Settings, llm: Any) -> dict[str, Any]:
