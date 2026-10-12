@@ -208,3 +208,81 @@ kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid 
   .oc-table .c-pick, .oc-table td:last-child, .oc-table th:last-child { display: none; }
 }
 .oc-table th button { white-space: normal; max-width: 150px; }
+
+/* ---------- Outcomes polish ---------- */
+.workspace-content > .page.oc-wide { padding-top: var(--header-h); }
+.oc-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.oc-card-btn { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 104px; padding: var(--space-card-y) var(--space-card-x); border: 1px solid var(--line-soft); border-radius: var(--r-card);
+  background: var(--card); text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color var(--t), background var(--t); }
+.oc-card-btn:hover, .oc-card-btn:focus-visible { border-color: var(--sec-outcome); background: var(--sec-outcome-tint); }
+.oc-card-btn b { font-size: 28px; line-height: 32px; color: var(--ink); }
+.oc-card-btn span { font-size: 14px; line-height: 20px; color: var(--ink-soft); font-weight: 600; }
+.oc-how .link-button { color: var(--ink-soft); text-decoration: underline; }
+.oc-steps { flex-wrap: nowrap; overflow-x: auto; }
+.oc-steps li { white-space: nowrap; }
+
+/* toolbar: one row; filters left, actions right (wraps only on narrow screens) */
+.oc-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-gap); }
+.oc-tl, .oc-tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.oc-field { height: 40px; box-sizing: border-box; }
+.oc-field.search { display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line-soft); border-radius: var(--r-control); background: var(--card); min-width: 220px; }
+.oc-field.search input { border: 0; outline: 0; background: none; font: inherit; height: 100%; width: 100%; padding: 0; }
+.oc-sel select { height: 40px; padding: 0 12px; border: 1px solid var(--line-soft); border-radius: var(--r-control); background: var(--card); color: var(--ink); font: inherit; }
+.oc-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 1px solid var(--line-soft); border-radius: var(--r-control); background: var(--card); color: var(--ink);
+  font: inherit; font-size: 14px; cursor: pointer; list-style: none; white-space: nowrap; }
+.oc-btn::-webkit-details-marker { display: none; }
+.oc-btn:hover, .oc-btn[aria-pressed="true"] { border-color: var(--sec-outcome); background: var(--sec-outcome-tint); }
+.oc-menu summary.oc-btn { min-height: 40px; padding: 0 12px; }
+.oc-switch { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+.oc-switch input { position: absolute; opacity: 0; width: 44px; height: 44px; margin: 0; cursor: pointer; }
+.oc-switch i { position: relative; width: 40px; height: 22px; flex: none; border-radius: var(--r-chip); background: var(--line); transition: background var(--t); }
+.oc-switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform var(--t); }
+.oc-switch input:checked + i { background: var(--sec-outcome); }
+.oc-switch input:checked + i::after { transform: translateX(18px); }
+.oc-switch input:focus-visible + i { outline: 3px solid var(--sec-outcome); outline-offset: 2px; }
+
+/* table: fixed widths, 52px rows, plain numbers */
+.oc-table { table-layout: fixed; min-width: 880px; }
+.oc-table .w-pick { width: 56px; } .oc-table .w-ref { width: 150px; } .oc-table .w-mark { width: 120px; } .oc-table .w-total { width: 140px; }
+.oc-table .w-status { width: 210px; } .oc-table .w-decision { width: 210px; } .oc-table .w-go { width: 56px; }
+.oc-table td { height: 52px; box-sizing: border-box; padding: 0 12px; border-bottom: 1px solid var(--line-soft); }
+.oc-scroll.dense td { height: 36px; }
+.oc-table th { vertical-align: bottom; padding: 8px 12px; }
+.oc-table th.num button { text-align: right; width: 100%; }
+.oc-table td.num, .oc-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.oc-w { display: block; font-style: normal; font-weight: 600; font-size: 11px; line-height: 16px; color: var(--sec-merit-ink); background: var(--sec-merit-tint); border-radius: var(--r-chip); padding: 0 6px; width: fit-content; margin: 2px 0 0 auto; }
+.oc-table .ref-only { color: var(--muted-ink); background: var(--surface-subtle); }
+.oc-table th.ref-only { font-weight: 500; font-size: var(--fs-small); }
+.oc-table th.ref-only .oc-w { color: var(--muted-ink); background: var(--line-soft); }
+.oc-table th.c-ref, .oc-table td.c-ref { text-align: left; }
+.oc-bar { display: none; }
+.oc-pickbar-inline { padding-top: 4px; }
+.oc-pickbar-inline .link-button { color: var(--ink-soft); }
+
+/* the drawer overlays the table (never squeezes it): below the header, clamp(480px, 44vw, 760px), Expand to 70vw */
+.od-page.open, .od-page:has(.od.wide) { display: block; }
+.od { position: fixed; top: var(--header-h); right: 0; bottom: 0; width: var(--drawer-w); max-height: none; border-radius: 0; z-index: 60; box-shadow: -12px 0 32px rgba(23, 31, 85, .18); }
+.od.wide { width: min(70vw, 100%); }
+.od-body .od-sec { padding: 0; }
+.od-inline { display: flex; align-items: center; gap: 8px; margin: 0; }
+.od-inline svg { flex: none; color: var(--st-met); }
+.od-actions { position: relative; flex: none; }
+@media (max-width: 1100px) { .oc-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .oc-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .od, .od.wide { width: 100%; }
+  .oc-table { min-width: 0; table-layout: auto; }
+  .oc-table td { height: auto; }
+}
+.oc-btn.oc-icon { width: 40px; padding: 0; justify-content: center; }
+.oc-field.search { min-width: 170px; flex: 0 1 190px; }
+.oc-sel select { max-width: 170px; }
+.oc-menu > div { right: 0; left: auto; }
+.oc-toolbar { flex-wrap: nowrap; }
+@media (max-width: 1180px) { .oc-toolbar { flex-wrap: wrap; } }
+@media (min-width: 1181px) { .oc-tl, .oc-tr { flex-wrap: nowrap; } .oc-sel select { max-width: 150px; } }
+@media (max-width: 720px) {
+  .od-table th, .od-table td { padding: 8px 6px; font-size: 13px; }
+  .od-table th:nth-child(2) { font-size: 12px; }
+  .od-head { gap: 8px; }
+}

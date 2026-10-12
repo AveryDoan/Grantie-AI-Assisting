@@ -27,6 +27,7 @@ export default function Outcomes() {
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [lists, setLists] = useState<OutcomeLists | null>(null);
+  const [filters, setFilters] = useState<Filters>({ search: "", decision: "all", marks: "all" });
   const load = () => {
     api.outcomeScores(names).then((s) => { setScores(s); setDenied(false); }, (e) => (e instanceof ApiError && e.status === 403 ? setDenied(true) : setError(e)));
     api.outcomeLists().then(setLists, setError);
@@ -35,25 +36,27 @@ export default function Outcomes() {
 
   const rows = scores?.rows ?? [];
   const decided = rows.filter((r) => r.decision).length;
-  const strip: [string, string | number][] = [
-    ["Scored and ready", denied ? "–" : rows.filter((r) => r.ready).length],
-    ["Waiting for marks", denied ? "–" : rows.filter((r) => r.status !== "complete" && !r.decision).length],
-    ["Decided", denied ? "–" : decided],
-    ["Ineligible", lists?.ineligible.length ?? "–"],
-    ["Letters to release", lists?.held.length ?? "–"],
+  // each card filters the table (or opens its tab)
+  const go = (f: Partial<Filters>) => { setTab("scores"); setFilters({ search: "", decision: "all", marks: "all", ...f }); };
+  const strip: [string, string | number, () => void][] = [
+    ["Scored and ready", denied ? "–" : rows.filter((r) => r.ready).length, () => go({ marks: "complete", decision: "none" })],
+    ["Waiting for marks", denied ? "–" : rows.filter((r) => r.status !== "complete" && !r.decision).length, () => go({ marks: "waiting", decision: "none" })],
+    ["Decided", denied ? "–" : decided, () => go({ decision: "decided" })],
+    ["Ineligible", lists?.ineligible.length ?? "–", () => setTab("ineligible")],
+    ["Letters to release", lists?.held.length ?? "–", () => setTab("release")],
   ];
   return (
     <main className="page oc-wide">
       <div className="page-heading"><div><h1>Outcomes</h1>
         <p>Scores, the panel’s decisions and the letters that follow. People decide; this page records it.</p></div></div>
       <div className="oc-strip" role="list" aria-label="Summary">
-        {strip.map(([label, n]) => <div key={label} role="listitem"><b>{n}</b><span>{label}</span></div>)}
+        {strip.map(([label, n, onClick]) => <button key={label} role="listitem" className="oc-card-btn" onClick={onClick}><b>{n}</b><span>{label}</span></button>)}
       </div>
       <div className="oc-tabs" role="tablist" aria-label="Outcomes">
         {TABS.map((t) => <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? "on" : ""} onClick={() => setTab(t.key)}>{t.label}</button>)}
       </div>
       <ErrorNotice error={error} />
-      {tab === "scores" && (denied ? <NoPermission /> : !scores ? <Loading /> : <Scores data={scores} names={names} setNames={setNames} onChanged={load} />)}
+      {tab === "scores" && (denied ? <NoPermission /> : !scores ? <Loading /> : <Scores data={scores} names={names} setNames={setNames} onChanged={load} filters={filters} setFilters={setFilters} />)}
       {tab === "ineligible" && <Ineligible lists={lists} />}
       {tab === "release" && <BatchRelease held={lists?.held ?? null} onDone={load} />}
       {tab === "released" && <Released lists={lists} />}
@@ -70,10 +73,11 @@ function NoPermission() {
 
 // ------------------------------------------------------------------ tab 1: scores and decisions
 
-function Scores({ data, names, setNames, onChanged }: { data: ScoreTable; names: boolean; setNames: (v: boolean) => void; onChanged: () => void }) {
+function Scores({ data, names, setNames, onChanged, filters, setFilters }: {
+  data: ScoreTable; names: boolean; setNames: (v: boolean) => void; onChanged: () => void; filters: Filters; setFilters: (f: Filters) => void;
+}) {
   const [help, setHelp] = usePersisted("outcomes.howto", true);
   const [sort, setSort] = useState<Sort | null>(null);
-  const [filters, setFilters] = useState<Filters>({ search: "", decision: "all", marks: "all" });
   const [hidden, setHidden] = usePersisted<string[]>("outcomes.hidden", []);
   const [dense, setDense] = usePersisted("outcomes.dense", false);
   const [picked, setPicked] = usePersisted<string[]>("outcomes.picked", []);
@@ -86,11 +90,14 @@ function Scores({ data, names, setNames, onChanged }: { data: ScoreTable; names:
   const ready = rows.filter((r) => r.ready);
   const chosen = data.rows.filter((r) => picked.includes(r.application_id) && r.ready);
   const line = placesLine(sort, data.places_available, rows.length);
-  const crit = data.criteria.filter((c) => !hidden.includes(c.code));
+  const scored = data.criteria.filter((c) => c.weight);
+  const refOnly = data.criteria.filter((c) => !c.weight);
+  const crit = scored.filter((c) => !hidden.includes(c.code));
+  const weightSum = scored.reduce((n, c) => n + Number(c.weight), 0);
   const toggleSort = (key: SortKey) => setSort(nextSort(sort, key));
   const arrow = (key: SortKey) => (sort?.key === key ? (sort.dir === "asc" ? "▲" : "▼") : "");
   const ariaSort = (key: SortKey) => (sort?.key === key ? (sort.dir === "asc" ? "ascending" : "descending") : "none");
-  const cols = 5 + crit.length + 2;
+  const cols = 3 + crit.length + 1 + (refOnly.length ? 1 : 0) + 2;
 
   const csv = async () => {
     try {
@@ -109,39 +116,45 @@ function Scores({ data, names, setNames, onChanged }: { data: ScoreTable; names:
           {help && <ol className="oc-steps"><li><b>1</b> Review the scores</li><li><b>2</b> The panel decides</li><li><b>3</b> Record the decision</li><li><b>4</b> Check and release letters</li></ol>}
         </section>
         {data.weights_error && <p className="notice error-notice" role="alert"><Icon name="info" /><span><b>Totals cannot be calculated.</b> {data.weights_error}. Fix the weights in the rule pack.</span></p>}
-        {data.normalised && !data.weights_error && <p className="notice"><Icon name="info" />The weights add up to {data.weight_sum}, not 100, so each total is divided by {data.weight_sum} (normalised).</p>}
+        {!data.weights_error && weightSum !== 100 && <p className="notice error-notice" role="alert" data-weights-error><Icon name="info" /><span><b>The weights add up to {weightSum}, not 100.</b> Each total is divided by {weightSum} (normalised). Check the rule pack.</span></p>}
         {saved && <p className="notice ok-notice" role="status"><Icon name="check" />{saved}</p>}
         <ErrorNotice error={error} />
 
         <section className="panel oc-table-card" aria-labelledby="oc-scores">
           <div className="oc-toolbar">
-            <h2 id="oc-scores">Scores <span className="pill">{rows.length}</span></h2>
-            <label className="search"><Icon name="search" /><input aria-label="Search by reference" placeholder="Search reference" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} /></label>
-            <label className="oc-select"><span>Decision</span><select value={filters.decision} onChange={(e) => setFilters({ ...filters, decision: e.target.value as Filters["decision"] })}>
-              <option value="all">All</option><option value="none">Not decided</option><option value="selected">Selected</option><option value="not_selected_competitive">Not selected (competitive)</option></select></label>
-            <label className="oc-select"><span>Marks</span><select value={filters.marks} onChange={(e) => setFilters({ ...filters, marks: e.target.value as Filters["marks"] })}>
-              <option value="all">All</option><option value="complete">Complete</option><option value="waiting">Waiting for marks</option></select></label>
-            <details className="oc-menu"><summary>Columns</summary><div>
-              {data.criteria.map((c) => <label key={c.code}><input type="checkbox" checked={!hidden.includes(c.code)} onChange={(e) => setHidden(e.target.checked ? hidden.filter((h) => h !== c.code) : [...hidden, c.code])} />{c.code} {c.title}</label>)}
-            </div></details>
-            <button className="button button-quiet" aria-pressed={dense} onClick={() => setDense(!dense)}>{dense ? "Comfortable" : "Compact"}</button>
-            <Button variant="quiet" icon="eye" onClick={() => setNames(!names)} title="Names are hidden to keep a competitive decision blind. Showing them is logged.">{names ? "Hide applicant names" : "Show applicant names"}</Button>
-            <Button variant="secondary" icon="download" onClick={() => void csv()}>Export CSV</Button>
-            <Button variant="secondary" icon="file" onClick={() => window.print()}>Print for the panel</Button>
-            <Formula data={data} />
+            <div className="oc-tl">
+              <label className="search oc-field"><Icon name="search" /><input aria-label="Search by reference" placeholder="Search reference" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} /></label>
+              <label className="oc-field oc-sel"><span className="sr-only">Decision</span><select aria-label="Decision" value={filters.decision} onChange={(e) => setFilters({ ...filters, decision: e.target.value as Filters["decision"] })}>
+                <option value="all">Decision: all</option><option value="none">Not decided</option><option value="decided">Decided</option><option value="selected">Selected</option><option value="not_selected_competitive">Not selected (competitive)</option></select></label>
+              <label className="oc-field oc-sel"><span className="sr-only">Marks</span><select aria-label="Marks" value={filters.marks} onChange={(e) => setFilters({ ...filters, marks: e.target.value as Filters["marks"] })}>
+                <option value="all">Marks: all</option><option value="complete">Complete</option><option value="waiting">Waiting for marks</option></select></label>
+            </div>
+            <div className="oc-tr">
+              <details className="oc-menu"><summary className="oc-btn"><Icon name="grid" size={16} />Columns</summary><div>
+                {data.criteria.map((c) => <label key={c.code}><input type="checkbox" checked={!hidden.includes(c.code)} onChange={(e) => setHidden(e.target.checked ? hidden.filter((h) => h !== c.code) : [...hidden, c.code])} />{c.code} {c.title}</label>)}
+              </div></details>
+              <button className="oc-btn oc-icon" aria-pressed={dense} onClick={() => setDense(!dense)} aria-label={dense ? "Comfortable rows" : "Compact rows"} title={dense ? "Comfortable rows" : "Compact rows"}><Icon name="list" size={16} /></button>
+              <label className="oc-switch" title="Names are hidden to keep a competitive decision blind. Showing them is logged.">
+                <input type="checkbox" role="switch" aria-checked={names} checked={names} onChange={(e) => setNames(e.target.checked)} /><i aria-hidden="true" /><span>Show names (logged)</span></label>
+              <button className="oc-btn" onClick={() => void csv()}><Icon name="download" size={16} />CSV</button>
+              <button className="oc-btn oc-icon" onClick={() => window.print()} aria-label="Print for the panel" title="Print for the panel"><Icon name="file" size={16} /></button>
+              <Formula data={data} />
+            </div>
           </div>
-          <p className="oc-note">Rows are in reference order. Sorting is your choice (click a heading). Totals are plain numbers: they select nothing and rank nothing.{names ? " Names are showing (logged)." : " Applicant names are hidden."}</p>
+          <p className="oc-note">Rows are in reference order. Sorting is your choice (click a heading).{names ? " Names are showing (logged)." : " Applicant names are hidden."}</p>
 
           <div className={`oc-scroll ${dense ? "dense" : ""}`}>
             <table className="oc-table">
+              <colgroup><col className="w-pick" /><col className="w-ref" />{crit.map((c) => <col key={c.code} className="w-mark" />)}<col className="w-total" />{refOnly.length > 0 && <col className="w-mark" />}<col className="w-status" /><col className="w-decision" /><col className="w-go" /></colgroup>
               <thead><tr>
                 <th className="c-pick"><span className="sr-only">Choose</span></th>
                 <th className="c-ref" aria-sort={ariaSort("reference")}><button onClick={() => toggleSort("reference")}>Reference {arrow("reference")}</button></th>
                 {crit.map((c) => (
-                  <th key={c.code} aria-sort={ariaSort(`m:${c.code}`)}><button onClick={() => toggleSort(`m:${c.code}`)}>
-                    <b>{c.code}</b> {c.title} · {c.weight ? `${c.weight}%` : "not scored"} {arrow(`m:${c.code}`)}</button></th>
+                  <th key={c.code} className="num" aria-sort={ariaSort(`m:${c.code}`)}><button onClick={() => toggleSort(`m:${c.code}`)} title={c.title}>
+                    <b>{c.code}</b> {short(c.title)} {arrow(`m:${c.code}`)}<em className="oc-w">{c.weight}%</em></button></th>
                 ))}
-                <th aria-sort={ariaSort("total")}><button onClick={() => toggleSort("total")}>Weighted total (0 to 100) {arrow("total")}</button></th>
+                <th className="num" aria-sort={ariaSort("total")}><button onClick={() => toggleSort("total")}>Weighted total {arrow("total")}<em className="oc-w">of 100</em></button></th>
+                {refOnly.map((c) => <th key={c.code} className="num ref-only" title={`${c.code} ${c.title}: reference only, not part of the total`}><span><b>{c.code}</b> {short(c.title)}<em className="oc-w">Reference only</em></span></th>)}
                 <th aria-sort={ariaSort("status")}><button onClick={() => toggleSort("status")}>Marks {arrow("status")}</button></th>
                 <th aria-sort={ariaSort("decision")}><button onClick={() => toggleSort("decision")}>Decision {arrow("decision")}</button></th>
                 <th><span className="sr-only">Open breakdown</span></th>
@@ -157,8 +170,8 @@ function Scores({ data, names, setNames, onChanged }: { data: ScoreTable; names:
                       </td>
                       <td className="c-ref" data-label="Reference"><button className="table-link" onClick={(e) => { e.stopPropagation(); setOpen(r.application_id); }}>{r.reference}</button>{r.name && <small>{r.name}</small>}</td>
                       {crit.map((c) => <td key={c.code} data-label={c.code} className="num">{r.marks[c.code] === "NA" ? "Not assessed" : r.marks[c.code] ?? "–"}</td>)}
-                      <td data-label="Weighted total" className="num total">{r.total ? <><b>{r.total}</b><i className="oc-bar" aria-hidden="true" style={{ width: `${Math.min(100, Number(r.total))}%` }} /></>
-                        : <span className="muted">{r.status === "cannot" ? "Cannot calculate" : "Not yet"}</span>}</td>
+                      <td data-label="Weighted total" className="num total">{r.total ? <b>{r.total}</b> : <span className="muted">{r.status === "cannot" ? "Cannot calculate" : "Not yet"}</span>}</td>
+                      {refOnly.map((c) => <td key={c.code} className="num ref-only" data-label={c.code}>{r.marks[c.code] === "NA" ? "n/a" : r.marks[c.code] ?? "–"}</td>)}
                       <td data-label="Marks"><span className={`oc-st ${r.status}`}><Icon name={r.status === "complete" ? "check" : "clock"} size={14} />{r.status === "complete" ? "Complete" : r.status === "cannot" ? "Cannot calculate" : `Waiting for marks (${r.marked} of ${r.of} marked)`}</span></td>
                       <td data-label="Decision"><span className={`oc-st ${r.decision ? "decided" : ""}`}><Icon name={r.decision ? "check" : "clock"} size={14} />{decisionLabel(r.decision)}</span></td>
                       <td><button className="icon-button" aria-label={`Open the breakdown for ${r.reference}`} onClick={(e) => { e.stopPropagation(); setOpen(r.application_id); }}><Icon name="chevron" /></button></td>
@@ -170,8 +183,8 @@ function Scores({ data, names, setNames, onChanged }: { data: ScoreTable; names:
             </table>
           </div>
           <div className="oc-pickbar-inline">
-            <Button variant="quiet" disabled={!ready.length} onClick={() => setPicked([...new Set([...picked, ...ready.map((r) => r.application_id)])])}>Select visible ({ready.length} ready)</Button>
-            <small className="muted">There is no “select all”. Saving more than one decision at a time needs the count typed.</small>
+            <button className="link-button" disabled={!ready.length} onClick={() => setPicked([...new Set([...picked, ...ready.map((r) => r.application_id)])])}
+              title="There is no “select all”. Saving more than one decision at a time needs the count typed.">Select visible ({ready.length} ready)</button>
           </div>
         </section>
       </div>
@@ -190,9 +203,12 @@ function Scores({ data, names, setNames, onChanged }: { data: ScoreTable; names:
   );
 }
 
+/** A short column name: "Academic merit", "Supporting evidence"... (the full name is in the tooltip). */
+const short = (t: string) => (t.length > 22 ? `${t.slice(0, 20).trimEnd()}…` : t);
+
 function Formula({ data }: { data: ScoreTable }) {
   return (
-    <details className="oc-menu"><summary>How is this calculated?</summary>
+    <details className="oc-menu"><summary className="oc-btn oc-icon" aria-label="How is this calculated?" title="How is this calculated?"><Icon name="info" size={16} /></summary>
       <div className="oc-formula">
         <p><b>{data.formula}</b></p>
         <p>Marks are 0 to 100, entered by officers with a reason. Weights come from the approved rule pack: {data.criteria.map((c) => `${c.code} ${c.weight ? c.weight + "%" : "not scored"}`).join(", ")}.</p>
@@ -263,7 +279,7 @@ function Drawer({ id, names, data, nav, setOpen, onDecide, onChanged }: {
                     <tr className="od-crit" tabIndex={0} aria-expanded={expanded === r.code} onClick={() => setExpanded(expanded === r.code ? null : r.code)}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(expanded === r.code ? null : r.code); } }}>
                       <td><b>{r.code}</b> {r.title}</td><td className="num">{r.not_assessed ? "Not assessed" : r.mark ?? "–"}</td>
-                      <td className="num">{r.weight ? `${r.weight}%` : "not scored"}</td><td className="num">{r.points ?? "–"}</td>
+                      <td className="num">{r.weight ? `${r.weight}%` : <span className="oc-st">Not part of the total</span>}</td><td className="num">{r.points ?? "–"}</td>
                     </tr>
                     {expanded === r.code && (
                       <tr className="od-why"><td colSpan={4}>
@@ -278,15 +294,15 @@ function Drawer({ id, names, data, nav, setOpen, onDecide, onChanged }: {
               </tbody>
             </table>
             {b.worked_example && <p className="od-example"><b>Worked example</b> {b.worked_example}</p>}
-            <section><h3>Eligibility</h3><p><Icon name="check" size={14} /> {b.eligibility}. <a href={b.deep_link.replace("sub=merit", "sub=eligibility")}>See the findings</a></p></section>
-            <section><h3>History of marks</h3>
+            <section className="od-sec"><h3>Eligibility</h3><p className="od-inline"><Icon name="check" size={16} /><span>{b.eligibility}.</span> <a href={b.deep_link.replace("sub=merit", "sub=eligibility")}>See the findings</a></p></section>
+            <section className="od-sec" id="od-history"><h3>History</h3>
               {b.history.length === 0 ? <p className="muted">No mark changes yet.</p> : (
                 <ul className="od-history">{b.history.map((h, i) => (
                   <li key={i}><b>{h.rule_code}</b> {h.not_assessed ? "set to Not assessed" : `${h.old_mark ?? "–"} → ${h.new_mark}`} · {h.by} · {formatDate(h.at, true)}{h.reason ? <small>{h.reason}</small> : null}</li>
                 ))}</ul>
               )}
             </section>
-            <section><h3>Decision</h3>
+            <section className="od-sec"><h3>Decision</h3>
               {!b.decision ? <p>Not decided.</p> : (
                 <dl className="rv-facts">
                   <div><dt>Decision</dt><dd>{decisionLabel(b.decision.decision)}{b.decision.stands ? "" : " (being reconsidered)"}</dd></div>

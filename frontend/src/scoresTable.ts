@@ -28,12 +28,12 @@ export function nextSort(current: Sort | null, key: SortKey): Sort | null {
   return current.dir === "asc" ? { key, dir: "desc" } : null;
 }
 
-export interface Filters { search: string; decision: "all" | "none" | "selected" | "not_selected_competitive"; marks: "all" | "complete" | "waiting" }
+export interface Filters { search: string; decision: "all" | "none" | "decided" | "selected" | "not_selected_competitive"; marks: "all" | "complete" | "waiting" }
 
 export function filterRows(rows: ScoreRow[], f: Filters): ScoreRow[] {
   const q = f.search.trim().toLowerCase();
   return rows.filter((r) => (!q || r.reference.toLowerCase().includes(q) || (r.name ?? "").toLowerCase().includes(q))
-    && (f.decision === "all" || (f.decision === "none" ? r.decision === null : r.decision === f.decision))
+    && (f.decision === "all" || (f.decision === "none" ? r.decision === null : f.decision === "decided" ? r.decision !== null : r.decision === f.decision))
     && (f.marks === "all" || (f.marks === "complete" ? r.status === "complete" : r.status !== "complete")));
 }
 
