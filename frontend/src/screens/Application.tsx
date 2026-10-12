@@ -89,7 +89,7 @@ export default function Application({ id, step, sub, navigate }: { id: string; s
               <Button disabled={!ready} onClick={() => advance(4)} title={ready ? undefined : blocker?.missing ?? undefined}>
                 Continue to Outcome <Icon name="arrow" />
               </Button>
-              <small className="gf-missing-line">{missing ?? (ready ? "Eligibility and merit are complete." : blocker?.missing)}</small>
+              <small className="gf-missing-line">{missing ?? (ready ? (subs.some((x) => x.status === "not_assessed") ? "Not eligible (your decision). The other checks are not assessed." : "Eligibility and merit are complete.") : blocker?.missing)}</small>
             </div>
           ) : missing ? <small className="gf-missing-line">{missing}</small> : null}
         </div>

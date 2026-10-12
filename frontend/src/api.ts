@@ -121,6 +121,7 @@ export interface Dashboard {
            decisions_due: string | null; days_left?: number; closed?: boolean; elapsed?: number } | null;
   rule_packs: { id: string; label: string; applications: number }[];
   tiles: Record<DashTile, number>;
+  outcome_tiles: { ineligible_to_sign: number; round_ready: number; not_selected_to_release: number };
   pipeline: { stage: DashStage; title: string; count: number; needs_you: number; waiting_applicant: number; enabled: boolean; never_blocks: boolean; preview: boolean }[];
   attention: { application_id: string; ref: string; applicant_name: string | null; stage: DashStage; stage_title: string; needed: string;
                waiting_days: number | null; deep_link: string }[];
@@ -288,7 +289,15 @@ export interface QualityChecks {
 
 export interface Letter {
   id: string;
-  kind?: "decline" | "next_steps";
+  kind?: "decline" | "next_steps" | "not_selected";
+  letter_viewed_at?: string | null;
+  viewed_by?: string | null;
+  checks_passed?: boolean;
+  template?: boolean;
+  signed_off_at?: string | null;
+  released_at?: string | null;
+  updated_at?: string;
+  edited_by?: string | null;
   version: number;
   body_text: string;
   status: "draft" | "edited" | "approved";
@@ -489,7 +498,8 @@ export interface StepInfo {
 export type SubStepKey = "eligibility" | "consistency" | "ai_use" | "merit";
 export interface SubStep {
   key: SubStepKey; number: string; title: string; count: number; total: number;
-  status: "not_started" | "in_progress" | "done" | "reviewed"; blocking: boolean; unlocked: boolean; missing: string | null;
+  status: "not_started" | "in_progress" | "done" | "reviewed" | "not_assessed"; blocking: boolean; unlocked: boolean; missing: string | null;
+  label?: string;          // "Not assessed (ineligible)" after the officer went to Outcome on a confirmed Not met
 }
 export interface StepsState { steps: StepInfo[]; current: number; legacy: boolean }
 
@@ -514,11 +524,24 @@ export interface RedactionCheck {
 }
 export interface RedactionItem { id: string; type: string; token: string; source: string; where: string; before: string; after: string }
 
-export interface OutcomeUnmet { rule_code: string; rule_text: string; final_status: string; reason: string; quote: string | null; what_would_change: string }
+export interface OutcomeUnmet { rule_code: string; rule_text: string; final_status: string; reason: string; quote: string | null; what_would_change: string;
+  finding_id?: string; fixable_by_document?: boolean }
+export interface SignOffCondition { key: string; label: string; ok: boolean }
+export interface RoundDecision { decision: "selected" | "not_selected_competitive"; decided_by: string; authority: string; decided_at: string;
+  reference: string; reason_note: string | null; version: number }
+export interface RoundRow { application_id: string; reference: string; program_name: string | null; deep_link: string; why?: string[];
+  decision?: RoundDecision["decision"]; decided_at?: string; reference_minute?: string; signed_off?: boolean }
+export interface RoundList { ready: RoundRow[]; decided: RoundRow[]; not_ready: RoundRow[]; note: string }
+export interface HeldLetter { letter_id: string; application_id: string; reference: string; kind: string; viewed_by_me: boolean }
 export interface Outcome {
   application_id: string; statement: string; signed_off: boolean;
   result: "not_assessed" | "undecided" | "decline" | "needs_information" | "eligible";
-  unmet: OutcomeUnmet[]; needs_information: OutcomeUnmet[]; letter: Letter | null; letter_kind?: "decline" | "next_steps" | null;
+  unmet: OutcomeUnmet[]; needs_information: OutcomeUnmet[]; letter: Letter | null; letter_kind?: "decline" | "next_steps" | "not_selected" | null;
+  outcome_status?: string; not_assessed?: string[]; not_assessed_label?: string; could_change?: string[];
+  awaiting_round_decision?: boolean; round_decision?: RoundDecision | null; include_marks_in_letter?: boolean;
+  feedback_options?: { rule_code: string; criterion: string; reason: string }[]; feedback_chosen?: string[];
+  letter_matches_findings?: boolean | null;
+  conditions?: { kind: string | null; letter_id: string | null; items: SignOffCondition[]; ready: boolean; reason: string | null } | null;
   summary: { marks: { rule_code: string; criterion: string; mark: number | null; not_assessed: boolean; reason: string | null }[]; signals_kept: { label: string; note: string | null }[]; note: string } | null;
   record: { outcome: string; officer: string; signed_at: string; version: number; letter_version: number | null; letter_status: string | null;
     decisions: { rule_code: string; rule_text: string; decision: string; ai_status: string; reason: string | null; overridden?: boolean }[];
@@ -551,7 +574,7 @@ async function request<T>(path: string, init: { method?: string; body?: unknown;
     } catch {
       /* non-JSON error */
     }
-    const message = payload.message ?? payload.detail ?? `Request failed (${res.status})`;
+    const message = payload.message ?? payload.detail ?? `Something went wrong (${res.status})`;
     throw new ApiError(res.status, payload.error ?? "error", typeof message === "string" ? message : JSON.stringify(message), payload.details);
   }
   return (init.raw ? res.text() : res.json()) as Promise<T>;
@@ -624,6 +647,20 @@ export const api = {
   outcome: (id: string) => request<Outcome>(`/applications/${id}/outcome`),
   nextStepsLetter: (id: string) => request<Letter>(`/applications/${id}/letter/next-steps`, { method: "POST" }),
   reopen: (id: string, reason: string) => request<{ status: string }>(`/applications/${id}/reopen`, { method: "POST", body: { reason } }),
+  // ---- outcomes: only an officer's click moves an application to Outcome, signs off or releases
+  goToOutcome: (id: string, continueAnyway = false) =>
+    request<{ not_assessed: string[] }>(`/applications/${id}/outcome/go-now`, { method: "POST", body: { continue_anyway: continueAnyway } }),
+  letterViewed: (letterId: string) => request<Letter>(`/letters/${letterId}/viewed`, { method: "POST" }),
+  notSelectedLetter: (id: string, criteria: string[]) => request<Letter>(`/applications/${id}/letter/not-selected`, { method: "POST", body: { criteria } }),
+  signoffRelease: (id: string, releaseNow = true) =>
+    request<{ outcome_status: string; letter: Letter }>(`/applications/${id}/signoff-release`, { method: "POST", body: { statement_acknowledged: true, release_now: releaseNow } }),
+  heldLetters: () => request<HeldLetter[]>("/letters/held"),
+  releaseLetters: (letterIds: string[], typedCount: number) =>
+    request<Letter[]>("/letters/release", { method: "POST", body: { letter_ids: letterIds, typed_count: typedCount } }),
+  roundDecisions: () => request<RoundList>("/round-decisions"),
+  recordRoundDecisions: (body: { application_ids: string[]; decision: RoundDecision["decision"]; decided_by: string; authority: string;
+    decided_at: string; reference: string; reason_note: string | null; typed_count: number | null }) =>
+    request<unknown[]>("/round-decisions", { method: "POST", body }),
   reviewFlag: (flagId: string, body: { action: "confirm" | "dismiss"; note?: string }) =>
     request<ConsistencyFlag>(`/consistency-flags/${flagId}/review`, { method: "POST", body }),
   referenceLists: () => request<ReferenceListSummary[]>("/reference-lists"),

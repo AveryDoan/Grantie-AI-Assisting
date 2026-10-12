@@ -21,10 +21,18 @@ export const TILES: { key: DashTile; label: string; line: string; icon: string; 
   { key: "not_started", label: "Not started", line: "No step opened yet", icon: "clock", sec: "sec-consistency" },
 ];
 
+// Outcome letters: counts only, never a judgement. Each opens the queue with the same filter the count used.
+export const OUTCOME_TILES: { key: "ineligible_to_sign" | "round_ready" | "not_selected_to_release"; label: string; line: string; icon: string; sec: string; href?: string }[] = [
+  { key: "ineligible_to_sign", label: "Not eligible, letters to sign off", line: "A rule confirmed Not met by an officer", icon: "file", sec: "sec-outcome" },
+  { key: "round_ready", label: "Ready for round decision", line: "Eligible, merit marked", icon: "check", sec: "sec-merit", href: "#/round-decisions" },
+  { key: "not_selected_to_release", label: "Not selected, letters to release", line: "After the round decision", icon: "mail", sec: "sec-consistency" },
+];
+
 export const FILTER_LABEL: Record<string, string> = {
   received: "Received", need_action: "Need an officer's action", waiting_applicant: "Waiting on applicant",
   ready_signoff: "Ready for sign-off", signed_off: "Signed off", not_started: "Not started",
   "signal:consistency": "Differences to check (Consistency)", "signal:ai_use": "AI-use signals",
+  ineligible_to_sign: "Not eligible, letters to sign off", round_ready: "Ready for round decision", not_selected_to_release: "Not selected, letters to release",
   ...Object.fromEntries(Object.entries(STAGE_TITLE).map(([k, t]) => [`stage:${k}`, `Stage: ${t}`])),
 };
 

@@ -8,7 +8,8 @@ export const SUB_SEC: Record<SubStepKey, string> = { eligibility: "sec-elig", co
 
 export function subStatusLine(s: SubStep): string {
   if (!s.unlocked) return "Locked";
-  if (s.status === "done") return "Complete";
+  if (s.status === "not_assessed") return s.label ?? "Not assessed (ineligible)";
+  if (s.status === "done") return s.label ?? "Complete";
   if (s.status === "reviewed") return "Reviewed";
   if (!s.blocking) return "Optional";
   return s.count ? `${s.count} to do` : "Not started";
@@ -19,13 +20,14 @@ export function SubStepBar({ subs, shown, onGo }: { subs: SubStep[]; shown: SubS
     <nav className="ss-bar" aria-label="Assessment sub-steps">
       <ol style={{ gridTemplateColumns: `repeat(${subs.length}, minmax(0, 1fr))` }}>
         {subs.map((s) => {
-          const state = !s.unlocked ? "locked" : shown === s.key ? "active" : s.status === "done" || s.status === "reviewed" ? "done" : "todo";
+          const state = !s.unlocked ? "locked" : shown === s.key ? "active" : s.status === "not_assessed" ? "na"
+            : s.status === "done" || s.status === "reviewed" ? "done" : "todo";
           return (
             <li key={s.key} className={`ss-card ${SUB_SEC[s.key]} ${state}`} data-substep={s.key}>
               <button onClick={() => onGo(s.key)} disabled={!s.unlocked} aria-current={shown === s.key ? "step" : undefined}
                 title={s.unlocked ? undefined : "Run the AI check first"} data-count={s.count}>
                 <span className="ss-badge" aria-hidden="true">
-                  {state === "locked" ? <Icon name="lock" size={18} /> : state === "done" ? <Icon name="check" size={20} /> : s.number}
+                  {state === "locked" ? <Icon name="lock" size={18} /> : state === "done" ? <Icon name="check" size={20} /> : state === "na" ? "–" : s.number}
                 </span>
                 <span className="ss-text"><strong>{s.title}</strong><small>{subStatusLine(s)}</small></span>
                 {s.count > 0 && <span className="ss-count" aria-label={`${s.count} open`}>{s.count}</span>}

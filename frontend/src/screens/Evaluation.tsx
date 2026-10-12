@@ -28,7 +28,7 @@ export default function Evaluation() {
     [pct(s.accuracy), "Accuracy against answer key", "check", `${s.rule_checks} rule checks across ${s.cases} cases`, s.accuracy],
     [pct(s.quote_validity_rate), "Quoted passages verified", "check", `${s.quotes_checked} quoted findings checked by code`, s.quote_validity_rate],
     [pct(s.twin_consistency_rate), "Language-fairness (twins)", "shield", "Same facts, three writing styles", s.twin_consistency_rate],
-    [injection.length ? (injectionPass ? "Pass" : "Fail") : "n/a", "Injection test", "shield",
+    [injection.length ? (injectionPass ? "Pass" : "Did not pass") : "n/a", "Injection test", "shield",
       injection.length ? `${injection.length} case(s): flagged and not obeyed` : "No injection cases", injection.length ? (injectionPass ? 1 : 0) : null],
   ];
 

@@ -149,7 +149,7 @@ function ApplicantSignIn({ onHome }: { onHome: () => void }) {
   const [failure, setFailure] = useState<string | null>(null);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setFailure(null);
-    try { await fn(); } catch (e) { setFailure(e instanceof Error ? e.message : "Sign-in failed"); } finally { setBusy(false); }
+    try { await fn(); } catch (e) { setFailure(e instanceof Error ? e.message : "Could not sign in"); } finally { setBusy(false); }
   };
   return <div className="af-app"><ApplicantHeader onHome={onHome} onResume={() => undefined} />
     <main className="af-resume"><span><Icon name="lock" size={28} /></span><p className="eyebrow">Applicant sign-in</p><h1>Sign in to apply</h1>
@@ -567,7 +567,7 @@ function CheckStep({ go, check, uploads, form, arrivalWarning, personOnly, setPe
 }
 
 function SubmittedStep({ onHome, name, reference, personOnly }: { onHome: () => void; name: string; reference: string; personOnly: boolean }) {
-  return <div className="af-step af-submitted"><span className="af-success-mark"><Icon name="check" size={34} /></span><p className="eyebrow">Application submitted</p><h1>Thank you{name ? `, ${name}` : ""}</h1><p>Your application number is:</p><strong className="af-reference">{reference}</strong><Notice><strong>A person makes every decision.</strong><p>{personOnly ? "You asked for a person-only assessment. AI tools will not be used to check your application." : "The automated check does not approve or reject an application."}</p></Notice>
+  return <div className="af-step af-submitted"><span className="af-success-mark"><Icon name="check" size={34} /></span><p className="eyebrow">Application submitted</p><h1>Thank you{name ? `, ${name}` : ""}</h1><p>Your application number is:</p><strong className="af-reference">{reference}</strong><Notice><strong>A person makes every decision.</strong><p>{personOnly ? "You asked for a person-only assessment. AI tools will not be used to check your application." : "The automated check does not decide an application. A person does."}</p></Notice>
     <section className="af-card"><h2>What happens next</h2><ol className="af-next-steps"><li><span>1</span><div><strong>Staff check your application</strong><p>A grants officer checks your answers and documents.</p></div></li><li><span>2</span><div><strong>We may contact you</strong><p>You may be asked for more information.</p></div></li><li><span>3</span><div><strong>You will be told by letter</strong><p>Study NT will write to you with the outcome.</p></div></li></ol></section>
     <div className="af-submitted-actions"><FlowButton icon="download" onClick={() => window.print()}>Download a copy</FlowButton><FlowButton variant="secondary" icon="person" onClick={() => { window.location.href = "tel:1800193111"; }}>Ask a question</FlowButton></div><div className="af-contact-card"><Icon name="phone" /><div><strong>Ask a question</strong><p>Call <a href="tel:1800193111">1800 193 111</a> or email the Study NT team.</p></div></div><button className="af-text-button" onClick={onHome}>Return to Study NT grant home</button>
   </div>;

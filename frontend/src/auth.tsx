@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     if (!supabase) throw new Error("Supabase sign-in is not configured (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).");
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
-    if (err || !data.session) throw new Error(err?.message ?? "Sign-in failed");
+    if (err || !data.session) throw new Error(err?.message ?? "Could not sign in");
     await activate(data.session.access_token, allowed);
   };
 

@@ -42,7 +42,7 @@ export default function PublicHome({ onApply, onOfficer }: { onApply: () => void
       </section>
 
       <section className="public-section features-section">
-        <div className="section-intro"><p className="eyebrow">A clearer application</p><h2>Helpful checks. Plain answers. Human decisions.</h2><p>The check points you to details worth another look. It never approves or rejects your application.</p></div>
+        <div className="section-intro"><p className="eyebrow">A clearer application</p><h2>Helpful checks. Plain answers. Human decisions.</h2><p>The check points you to details worth another look. It never decides your application. A person does.</p></div>
         <div className="feature-grid">
           <article className="feature-card"><span><Icon name="search" size={23} /></span><p className="feature-number">01</p><h3>Find problems before you submit</h3><p>See missing fields and documents while there is still time to fix them.</p><button onClick={onApply}>Start the application <Icon name="arrow" /></button></article>
           <article className="feature-card ochre"><span><Icon name="file" size={23} /></span><p className="feature-number">02</p><h3>Clear reasons, not generic emails</h3><p>If we need more information, we tell you what is missing and what can help.</p></article>

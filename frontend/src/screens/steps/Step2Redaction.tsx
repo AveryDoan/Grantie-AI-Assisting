@@ -117,7 +117,7 @@ export default function Step2Redaction({ id, info, onChanged, onAdvance, onBack 
       <section className="panel">
         <div className="panel-heading"><div><p className="eyebrow">Step 2 of 4</p><h2>Redaction check</h2>
           <p>Personal details are replaced with placeholders before the AI reads anything. Check what was hidden, then approve. The AI is blocked until you do.</p></div>
-          <div className="gf-leak"><span className={`gf-chip ${data.leak_scan.passed ? "ok" : "bad"}`}><Icon name={data.leak_scan.passed ? "check" : "close"} size={14} />Leak scan {data.leak_scan.passed ? "passed" : "failed"}</span>
+          <div className="gf-leak"><span className={`gf-chip ${data.leak_scan.passed ? "ok" : "bad"}`}><Icon name={data.leak_scan.passed ? "check" : "close"} size={14} />Leak scan {data.leak_scan.passed ? "passed" : "found something to fix"}</span>
             {data.run && <small className="muted">Run {formatDate(data.run.finished_at ?? data.run.started_at, true)}</small>}</div></div>
         {!data.leak_scan.passed && (
           <div className="notice error-notice" role="alert"><Icon name="info" /><span><strong>The leak scan found something that looks personal in the redacted text.</strong>{" "}

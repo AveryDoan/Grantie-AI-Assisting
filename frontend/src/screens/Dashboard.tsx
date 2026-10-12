@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { api, type Dashboard as Data, type DashQuery } from "../api";
-import { STAGE_SEC, TILES, plural, queueHref, reminderText, updatedAgo } from "../dashboard";
+import { OUTCOME_TILES, STAGE_SEC, TILES, plural, queueHref, reminderText, updatedAgo } from "../dashboard";
 import { Button, Icon, formatDate } from "../ui";
 
 type Theme = "light" | "dark";
@@ -125,6 +125,21 @@ function Body({ data, officer, pack }: { data: Data; officer: "me" | "all"; pack
           ))}
         </div>
       </section>
+
+      {data.outcome_tiles && (
+        <section aria-label="Outcome letters" className="db-section">
+          <div className="db-tiles db-tiles-3">
+            {OUTCOME_TILES.map((t) => (
+              <a key={t.key} className={`db-tile ${t.sec}`} href={t.href ?? href(t.key)} aria-label={`${t.label}: ${data.outcome_tiles[t.key]}`}>
+                <span className="db-tile-icon"><Icon name={t.icon} /></span>
+                <b className="db-tile-n">{data.outcome_tiles[t.key]}</b>
+                <span className="db-tile-label">{t.label}</span>
+                <small>{t.line}</small>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <Pipeline data={data} href={href} />
 

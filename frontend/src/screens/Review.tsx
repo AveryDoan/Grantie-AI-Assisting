@@ -5,6 +5,7 @@
 //   Merit: the criteria cards, each opening the grading workspace, and the officer's marks.
 // Every count comes from the backend (steps endpoint, step 3 "substeps"), so the pills, cards and header always agree.
 // No overall score, ranking or recommendation is shown. Merit marks belong to the officer and are never totalled.
+import { IneligibleChoice } from "./steps/IneligibleChoice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type AIStatus, type Detail, type Finding, type OverviewRow } from "../api";
 import type { Navigate } from "../App";
@@ -260,11 +261,20 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
                   ? <p className="empty-state">{notChecked ? "Not checked yet. Run the AI check to see the rules." : "No eligibility rules."}</p>
                   : <EligibilityTable list={model.rules} chip={chip} status={status} picked={picked} setPicked={setPicked} selectedKey={selectedKey} locked={locked}
                       onOpen={(f) => openRule(f.rule_code)} />}
+                <IneligibleChoice detail={detail} onPath={subs.some((s) => s.status === "not_assessed")} onKeepChecking={reviewNext} onOutcome={onOutcome} reload={reload}
+                  onAsk={(codes) => { const fs = model.rules.filter((f) => codes.includes(f.rule_code)); if (fs[0]) setDialog({ kind: "ask", finding: fs[0], more: fs }); }} />
               </div>
             </section>
           )}
 
-          {current?.key === "consistency" && (
+          {current && current.status === "not_assessed" && (
+            <section className="rv-section ie-na" aria-label={current.title}>
+              <p><Icon name="lock" /> <strong>{current.label ?? "Not assessed (ineligible)"}.</strong> You confirmed a rule as Not met and went to Outcome,
+                so this check is not needed and is not run. Nothing from it goes into the letter.</p>
+            </section>
+          )}
+
+          {current?.key === "consistency" && current.status !== "not_assessed" && (
             <section className="rv-section" aria-label="Consistency of information">
               <div className="rv-section-body">
                 {detail.consistency?.enabled === false ? <p className="empty-state">The consistency check is switched off for this site.</p>
@@ -276,9 +286,9 @@ export default function Review({ detail, reload, sub, setSub, subs, onOutcome, n
             </section>
           )}
 
-          {current?.key === "ai_use" && <AiUseCheck detail={detail} locked={locked} onChanged={reload} />}
+          {current?.key === "ai_use" && current.status !== "not_assessed" && <AiUseCheck detail={detail} locked={locked} onChanged={reload} />}
 
-          {current?.key === "merit" && (
+          {current?.key === "merit" && current.status !== "not_assessed" && (
             <section className="rv-section" aria-label="Merit">
               {model.merit.length === 0 ? <p className="empty-state">{notChecked ? "Not checked yet." : "This grant has no merit criteria."}</p> : (
                 <div className="rv-mcards rv-mcards-grid">
