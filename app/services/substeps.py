@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.audit import write_audit
-from app.store.base import Store, one
+from app.store.base import Store, StoreError, one
 
 ELIGIBILITY, CONSISTENCY, AI_USE, MERIT = "eligibility", "consistency", "ai_use", "merit"
 TITLES = {ELIGIBILITY: "Eligibility", CONSISTENCY: "Consistency", AI_USE: "AI-use check", MERIT: "Merit"}
@@ -64,8 +64,11 @@ def _counts(store: Store, app: dict[str, Any], run: dict[str, Any] | None, pendi
     merit_codes = {r["rule_code"] for r in rules if (r.get("params") or {}).get("section") == "merit"}
     rule_codes = {r["rule_code"] for r in rules} - merit_codes
     # Consistency of information only (cross-document, timeline, document metadata, narrative). Linked applications are not counted.
-    flags = [r for r in store.select("consistency_flags", eq={"application_id": app["id"]})
-             if r.get("status") == "open" and r.get("verification") == "verified" and r.get("check_type") != "cross_application"]
+    try:
+        rows = store.select("consistency_flags", eq={"application_id": app["id"]})
+    except StoreError:  # the consistency tables are not migrated yet: nothing to count
+        rows = []
+    flags = [r for r in rows if r.get("status") == "open" and r.get("verification") == "verified" and r.get("check_type") != "cross_application"]
     return {
         ELIGIBILITY: {"open": len([c for c in pending if c in rule_codes]), "total": len(rule_codes)},
         MERIT: {"open": len([c for c in pending if c in merit_codes]), "total": len(merit_codes)},

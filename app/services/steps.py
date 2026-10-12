@@ -150,6 +150,23 @@ def state(store: Store, app: dict[str, Any], settings: Any = None) -> dict[str, 
     return {"steps": out, "current": current, "legacy": legacy}
 
 
+def stage_of(app: dict[str, Any], st: dict[str, Any]) -> str:
+    """The one stage an application is in, from `state` (the same logic as the step bar): documents, redaction, eligibility, merit,
+    outcome or signed_off. Never a judgement of the applicant."""
+    if app["status"] == "signed_off":
+        return "signed_off"
+    current = st["current"]
+    if current == 1:
+        return "documents"
+    if current == 2:
+        return "redaction"
+    if current == 3:
+        subs = {s["key"]: s for s in st["steps"][2].get("substeps") or []}
+        elig = subs.get("eligibility")
+        return "merit" if elig and elig["status"] == "done" else "eligibility"
+    return "outcome"
+
+
 def require_unlocked(store: Store, app: dict[str, Any], step: int, settings: Any = None) -> None:
     st = state(store, app, settings)["steps"][step - 1]
     if not st["unlocked"]:

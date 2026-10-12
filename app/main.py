@@ -52,9 +52,9 @@ from app.llm import LLMClient, LLMError, build_llm_client
 from app.llm.cache import StoreCache
 from app.logging_utils import configure_logging, get_logger
 from app.pipeline.orchestrator import run_assessment
-from app.services import ai_use, audit, consistency, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
+from app.services import ai_use, audit, consistency, dashboard, doc_step, evidence_request, intake, letters, merit, merit_summary, outcome, pdf_view, precheck, queue, redaction_check, redaction_service, reference_lists, review, steps, substeps
 from app.services.access import Actor, application_for_staff, require_role
-from app.services.errors import NotFound, ServiceError
+from app.services.errors import NotFound, ServiceError, ValidationFailed
 from app.store.base import Store, StoreError, one
 
 log = get_logger(__name__)
@@ -166,8 +166,22 @@ def create_app(
 
     # ---------------------------------------------------------------- queue
     @r.get("/applications")
-    def list_applications(actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
-        return queue.list_queue(s, actor, settings)
+    def list_applications(filter: str | None = None, officer: str = "all", rule_pack: str | None = None,
+                          actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> list[dict[str, Any]]:
+        """The work queue. `filter` (and `officer`, `rule_pack`) apply the overview's filters, so a tile opens exactly its rows."""
+        if not filter and officer == "all" and not rule_pack:
+            return queue.list_queue(s, actor, settings)
+        if officer not in ("me", "all"):
+            raise ValidationFailed("officer must be me or all")
+        return dashboard.filter_rows(dashboard.rows(s, actor, settings, rule_pack=rule_pack, officer=officer), filter)
+
+    @r.get("/dashboard")
+    def get_dashboard(rule_pack: str | None = None, round_id: str | None = None, officer: str = "all",
+                      from_: str | None = Query(None, alias="from"), to: str | None = None, refresh: bool = False,
+                      actor: Actor = Depends(current_actor), s: Store = Depends(get_store)) -> dict[str, Any]:
+        """The officer's overview: counts only, from the same code as the queue. Reading it writes nothing. Cached 30 seconds."""
+        return dashboard.overview(s, actor, settings, rule_pack=rule_pack or round_id, officer=officer, date_from=from_, date_to=to,
+                                  refresh=refresh)
 
     @r.post("/applications/precheck")
     def precheck_application(

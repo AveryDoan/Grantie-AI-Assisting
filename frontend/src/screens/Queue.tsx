@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { api, type QueueItem } from "../api";
 import type { Navigate } from "../App";
 import { STAGES, stageCounts, stageOf, type Stage } from "../stages";
+import { filterLabel } from "../dashboard";
 import { APP_STATUS_LABEL, AppStatus, Button, ErrorNotice, Icon, Loading, formatDate, useLoad } from "../ui";
 
 function statusLabel(item: QueueItem): string {
@@ -13,8 +14,12 @@ function statusLabel(item: QueueItem): string {
 }
 const daysSince = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 
-export default function Queue({ navigate, initialSearch = "" }: { navigate: Navigate; initialSearch?: string }) {
-  const { data, error } = useLoad(api.queue, []);
+export default function Queue({ navigate, initialSearch = "", filter, officer, pack }: {
+  navigate: Navigate; initialSearch?: string; filter?: string; officer?: "me"; pack?: string;
+}) {
+  // A filter from the overview: the backend returns exactly the rows that tile or card counted.
+  const scoped = Boolean(filter || officer || pack);
+  const { data, error } = useLoad(() => (scoped ? api.queueFiltered(filter, officer ?? "all", pack) : api.queue()), [filter, officer, pack]);
   const [search, setSearch] = useState(initialSearch);
   const [stage, setStage] = useState<Stage | "all">("all");
   const filtered = search !== "" || stage !== "all";
@@ -45,6 +50,12 @@ export default function Queue({ navigate, initialSearch = "" }: { navigate: Navi
           </button>
         ))}
       </nav>
+      {scoped && (
+        <div className="filter-note" role="status">
+          <Icon name="info" /><span>Showing <b>{filter ? filterLabel(filter) : "All"}</b>{officer === "me" ? ", my applications" : ""} from the overview ({data ? data.length : "…"}).</span>
+          <Button variant="quiet" onClick={() => navigate({ name: "queue" })}>Clear filter</Button>
+        </div>
+      )}
       <ErrorNotice error={error} />
       <section className="panel">
         <div className="toolbar">

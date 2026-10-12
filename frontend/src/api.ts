@@ -105,8 +105,39 @@ export interface QueueItem {
   current_step_title: string;
   next_action: string;            // "Continue at Assessment", "Waiting for applicant", "View record"
   phase: "mine" | "waiting" | "outcome" | "done";
+  stage?: DashStage;              // the overview's stage, from the same step logic as the step bar
   flags_to_check: number;   // a count only: shown when at least one open flag is strong; never used to sort
 }
+
+// ---- Officer Overview. Counts of applications only: no score, rank, mark or comparison, nothing per officer.
+export type DashStage = "documents" | "redaction" | "eligibility" | "consistency" | "ai_use" | "merit" | "outcome" | "signed_off";
+export type DashTile = "received" | "need_action" | "waiting_applicant" | "ready_signoff" | "signed_off" | "not_started";
+export interface DashRef { application_id: string; ref: string }
+export interface Dashboard {
+  generated_at: string;
+  cache_seconds: number;
+  officer: "me" | "all";
+  round: { id: string; program: string | null; name: string | null; rule_pack_version: string | null; opens_at: string | null; closes_at: string | null;
+           decisions_due: string | null; days_left?: number; closed?: boolean; elapsed?: number } | null;
+  rule_packs: { id: string; label: string; applications: number }[];
+  tiles: Record<DashTile, number>;
+  pipeline: { stage: DashStage; title: string; count: number; needs_you: number; waiting_applicant: number; enabled: boolean; never_blocks: boolean; preview: boolean }[];
+  attention: { application_id: string; ref: string; applicant_name: string | null; stage: DashStage; stage_title: string; needed: string;
+               waiting_days: number | null; deep_link: string }[];
+  attention_total: number;
+  next_deadline: string | null;
+  documents_missing: { slot: string; type: string; reason: string; reason_label: string; count: number; applications: DashRef[] }[];
+  waiting: { count: number; oldest_days: number | null; longest: (DashRef & { days: number | null; deep_link: string })[] };
+  findings: { confirmed: { not_met_apps: number; all_met_apps: number }; suggested_pending: number;
+              by_status: { met: number; not_met: number; needs_evidence: number; unclear: number; officer_judgement: number } };
+  signals: { consistency_pending: number; ai_use_enabled: boolean; ai_use_pending?: number; ai_use_preview?: boolean };
+  merit_progress: { criterion: string; title: string; marked: number; total: number }[];
+  outcomes: { declines_drafted: number; next_steps_drafted: number; requests_drafted: number; released: number; avg_days_to_signoff: number | null;
+              signed_off_per_day: { date: string; count: number }[] };
+  trust: { overrides_by_rule: { rule: string; count: number }[]; quotes_verified: number; quotes_not_found: number; ai_failures: number;
+           redaction_approved: number; leak_stops: number; language_flags: number; provider: { name: string; offline: boolean; demo: boolean } };
+}
+export interface DashQuery { rule_pack?: string; officer?: "me" | "all"; refresh?: boolean }
 
 export interface Review {
   id: string;
@@ -532,6 +563,11 @@ export const api = {
     request<{ access_token: string; display_name: string }>("/demo/login", { method: "POST", body: { role } }),
   me: () => request<{ user_id: string; role: string; display_name: string | null }>("/me"),
   queue: () => request<QueueItem[]>("/applications"),
+  /** The queue with one of the overview's filters applied: exactly the rows a tile or card counted. */
+  queueFiltered: (filter: string | undefined, officer: "me" | "all" = "all", rulePack?: string) =>
+    request<QueueItem[]>(`/applications?${new URLSearchParams({ ...(filter ? { filter } : {}), officer, ...(rulePack ? { rule_pack: rulePack } : {}) })}`),
+  dashboard: (q: DashQuery = {}) =>
+    request<Dashboard>(`/dashboard?${new URLSearchParams({ officer: q.officer ?? "all", ...(q.rule_pack ? { rule_pack: q.rule_pack } : {}), ...(q.refresh ? { refresh: "true" } : {}) })}`),
   detail: (id: string) => request<Detail>(`/applications/${id}`),
   assess: (id: string) => request<{ id: string; reused: boolean }>(`/applications/${id}/assess`, { method: "POST", body: {} }),
   review: (findingId: string, body: { action: Review["action"]; final_status?: Decision; reason?: string }) =>

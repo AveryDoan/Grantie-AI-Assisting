@@ -3,6 +3,7 @@ import { api } from "./api";
 import { useAuth } from "./auth";
 import { Button, ErrorNotice, Icon, Loading } from "./ui";
 import Queue from "./screens/Queue";
+import Dashboard from "./screens/Dashboard";
 import Application from "./screens/Application";
 import Signoff from "./screens/Signoff";
 import LetterScreen from "./screens/Letter";
@@ -17,12 +18,13 @@ import studyNtLogo from "./assets/study-nt-logo.svg";
 
 // Hash routes keep deep links working without server configuration:
 //   public:  #/  #/apply
-//   officer: #/queue[?q=]  #/applications/:id  #/applications/:id/trace
+//   officer: #/dashboard  #/queue[?q=][&filter=&officer=&pack=]  #/applications/:id  #/applications/:id/trace
 //            #/applications/:id/signoff  #/applications/:id/letter  #/audit  #/evaluation
 export type Route =
   | { name: "home" }
   | { name: "apply" }
-  | { name: "queue"; q?: string }
+  | { name: "dashboard" }
+  | { name: "queue"; q?: string; filter?: string; officer?: "me"; pack?: string }
   | { name: "lists" }
   | { name: "review"; id: string; step?: number; sub?: string }
   | { name: "trace"; id: string; item?: string }
@@ -42,7 +44,12 @@ function parse(hash: string): Route {
     const sub = q.get("sub") ?? undefined;   // step 3 sub-step: eligibility, consistency, ai_use or merit
     return { name: "review", id: parts[1], step: stepParam >= 1 && stepParam <= 4 ? stepParam : undefined, sub: stepParam === 3 ? sub : undefined };
   }
-  if (parts[0] === "queue") return { name: "queue", q: new URLSearchParams(query).get("q") ?? undefined };
+  if (parts[0] === "dashboard") return { name: "dashboard" };
+  if (parts[0] === "queue") {
+    const q = new URLSearchParams(query);
+    return { name: "queue", q: q.get("q") ?? undefined, filter: q.get("filter") ?? undefined, officer: q.get("officer") === "me" ? "me" : undefined,
+             pack: q.get("pack") ?? undefined };
+  }
   if (parts[0] === "apply") return { name: "apply" };
   if (parts[0] === "lists") return { name: "lists" };
   if (parts[0] === "audit") return { name: "audit" };
@@ -55,7 +62,12 @@ export function href(route: Route): string {
     case "home": return "#/";
     case "apply": return "#/apply";
     case "lists": return "#/lists";
-    case "queue": return route.q ? `#/queue?q=${encodeURIComponent(route.q)}` : "#/queue";
+    case "dashboard": return "#/dashboard";
+    case "queue": {
+      const q = new URLSearchParams({ ...(route.q ? { q: route.q } : {}), ...(route.filter ? { filter: route.filter } : {}),
+        ...(route.officer ? { officer: route.officer } : {}), ...(route.pack ? { pack: route.pack } : {}) }).toString();
+      return q ? `#/queue?${q}` : "#/queue";
+    }
     case "review": return route.step ? `#/applications/${route.id}?step=${route.step}${route.step === 3 && route.sub ? `&sub=${route.sub}` : ""}` : `#/applications/${route.id}`;
     case "trace": return `#/applications/${route.id}/trace${route.item ? `?item=${encodeURIComponent(route.item)}` : ""}`;
     case "signoff": return `#/applications/${route.id}/signoff`;
@@ -81,7 +93,7 @@ function useRoute(): [Route, Navigate] {
 }
 
 const TITLES: Record<Route["name"], string> = {
-  home: "", apply: "", queue: "Applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
+  home: "", apply: "", dashboard: "Overview", queue: "Applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
   letter: "Outcome letter", audit: "Audit trail", evaluation: "Evaluation",
 };
 
@@ -94,9 +106,23 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
   useEffect(() => {
     api.queue().then((q) => setAttention(q.filter((i) => i.status !== "signed_off" && i.open_items > 0).length)).catch(() => setAttention(null));
   }, [route]);
+  // Keyboard: G then D opens the overview; / focuses search (not while typing in a field).
+  useEffect(() => {
+    let g = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+      if (e.key === "/") { e.preventDefault(); document.querySelector<HTMLInputElement>(".global-search input")?.focus(); return; }
+      if (e.key === "g" || e.key === "G") { g = Date.now(); return; }
+      if ((e.key === "d" || e.key === "D") && Date.now() - g < 1500) { g = 0; navigate({ name: "dashboard" }); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [navigate]);
   const toggle = () => setCollapsed((c) => { try { localStorage.setItem("sidebar-collapsed", c ? "0" : "1"); } catch { /* ignore */ } return !c; });
 
   const nav: { route: Route; label: string; icon: string; active: boolean; badge?: number | null }[] = [
+    { route: { name: "dashboard" }, label: "Overview", icon: "grid", active: route.name === "dashboard" },
     { route: { name: "queue" }, label: "Applications", icon: "list", active: ["queue", "review", "signoff", "letter", "trace"].includes(route.name), badge: attention },
     { route: { name: "audit" }, label: "Audit trail", icon: "clock", active: route.name === "audit" },
   ];
@@ -108,7 +134,7 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
   return (
     <div className={collapsed ? "officer-shell sidebar-collapsed" : "officer-shell"}>
       <aside className={open ? "workspace-sidebar open" : "workspace-sidebar"} aria-label="Workspace navigation">
-        <button className="workspace-brand brand-grantie" onClick={() => go({ name: "queue" })} aria-label="Grantie – go to applications">
+        <button className="workspace-brand brand-grantie" onClick={() => go({ name: "dashboard" })} aria-label="Grantie – go to the overview">
           <img src={grantieLogo} alt="Grantie – AI solution for grants in NT" />
         </button>
         <nav className="workspace-nav" aria-label="Officer navigation">
@@ -194,12 +220,13 @@ export default function App() {
   const { me, ready } = useAuth();
   const [route, navigate] = useRoute();
   if (!ready) return <main className="page narrow"><Loading label="Connecting…" /></main>;
-  if (route.name === "home") return <PublicHome onApply={() => navigate({ name: "apply" })} onOfficer={() => navigate({ name: "queue" })} />;
+  if (route.name === "home") return <PublicHome onApply={() => navigate({ name: "apply" })} onOfficer={() => navigate({ name: "dashboard" })} />;
   if (route.name === "apply") return <ApplicantFlow onHome={() => navigate({ name: "home" })} />;
   if (!me || (me.role !== "officer" && me.role !== "admin")) return <Login />;
   return (
     <Shell route={route} navigate={navigate}>
-      {route.name === "queue" && <Queue key={route.q ?? ""} navigate={navigate} initialSearch={route.q} />}
+      {route.name === "dashboard" && <Dashboard />}
+      {route.name === "queue" && <Queue key={href(route)} navigate={navigate} initialSearch={route.q} filter={route.filter} officer={route.officer} pack={route.pack} />}
       {/* A new key per application: the screen never shows one application's content (or buttons) under another's address. */}
       {route.name === "review" && <Application key={route.id} id={route.id} step={route.step} sub={route.sub} navigate={navigate} />}
       {route.name === "trace" && <AiTrace key={`${route.id}-${route.item ?? ""}`} id={route.id} item={route.item} navigate={navigate} />}

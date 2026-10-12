@@ -71,6 +71,8 @@ CBF_PROGRAM = sid("program:cbf")
 SNT_PACK = sid("pack:snt:v2")
 CBF_PACK = sid("pack:cbf:v1")
 SNT_ROUND = "Study NT Round 1 2026"
+# Fictional round dates for the overview's deadline strip (demo data, not real policy).
+SNT_ROUND_DATES = {"name": "Round 1 2026", "opens_at": "2026-09-01", "closes_at": "2026-11-30", "decisions_due": "2026-12-18"}
 
 LETTER_CONFIG = {
     "review_process": "[review process text]",
@@ -122,7 +124,7 @@ PACKS = [
     {"id": SNT_PACK, "grant_program_id": SNT_PROGRAM, "version": "v2",
      "source_notes": "Study NT rules S1-S16, document requirements D1-D7 and merit criteria M1-M5 as supplied by the "
                      "project owner (8 Oct 2026). Interpretations to confirm are listed in seed/data.py ASSUMPTIONS.",
-     "letter_config": {**LETTER_CONFIG, **SNT_AI_USE}},
+     "letter_config": {**LETTER_CONFIG, **SNT_AI_USE, "round": SNT_ROUND_DATES}},
     {"id": CBF_PACK, "grant_program_id": CBF_PROGRAM, "version": "v1",
      "source_notes": "Synthetic rule pack written for the demo. Placeholders mark details not supplied.",
      "letter_config": LETTER_CONFIG},

@@ -4,6 +4,7 @@ import "./index.css";
 import "./officer.css";
 import "./tokens.css";   // tokens and theme come last, so they win over the older sheets
 import "./theme.css";
+import "./dashboard.css";
 import App from "./App";
 import { AuthProvider } from "./auth";
 

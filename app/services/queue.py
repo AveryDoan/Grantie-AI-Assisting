@@ -116,29 +116,25 @@ def _group(rows: list[dict[str, Any]], key: str) -> dict[str, list[dict[str, Any
 _STEP_TITLE = {1: "Documents", 2: "Redaction check", 3: "Assessment", 4: "Outcome"}
 
 
-def _where(app: dict[str, Any], steps: dict[int, str], has_run: bool, open_items: int) -> dict[str, Any]:
-    """Which step the officer is on and what the next action is. Same rules as steps.state, from rows already loaded."""
+def _where(app: dict[str, Any], st: dict[str, Any]) -> dict[str, Any]:
+    """Which step the officer is on, the stage and the next action. Read from steps.state, so the queue, the overview and the
+    application's step bar always agree."""
+    from app.services import steps as steps_service
+
+    stage = steps_service.stage_of(app, st)
     if app["status"] == "signed_off":
-        return {"current_step": 4, "current_step_title": "Outcome", "next_action": "View record", "phase": "done"}
-    legacy = not steps and has_run
-    s1 = "done" if legacy else steps.get(1, "not_started")
-    s2 = "done" if legacy else steps.get(2, "not_started")
+        return {"current_step": 4, "current_step_title": "Outcome", "next_action": "View record", "phase": "done", "stage": stage}
+    step = st["current"]
     if app["status"] == "awaiting_applicant":
-        return {"current_step": 1, "current_step_title": "Documents", "next_action": "Waiting for applicant", "phase": "waiting"}
-    if s1 != "done":
-        step = 1
-    elif s2 != "done":
-        step = 2
-    elif not has_run or open_items > 0:
-        step = 3
-    else:
-        step = 4
+        return {"current_step": step, "current_step_title": _STEP_TITLE[step], "next_action": "Waiting for applicant", "phase": "waiting",
+                "stage": stage}
     action = {1: "Continue at Documents", 2: "Continue at Redaction check", 3: "Continue at Assessment", 4: "Continue at Outcome"}[step]
-    return {"current_step": step, "current_step_title": _STEP_TITLE[step], "next_action": action, "phase": "outcome" if step == 4 else "mine"}
+    return {"current_step": step, "current_step_title": _STEP_TITLE[step], "next_action": action, "phase": "outcome" if step == 4 else "mine",
+            "stage": stage}
 
 
 def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> list[dict[str, Any]]:
-    """Batched: a fixed number of queries however many applications there are."""
+    """Counts are batched; where each application is comes from steps.state (one source for the queue, overview and step bar)."""
     if not actor.is_staff:
         raise Forbidden("Officers only")
     apps = [a for a in store.select("applications") if a["status"] != "draft"]
@@ -167,7 +163,8 @@ def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> 
 
     to_check = consistency_service.flags_to_check(store, ids, settings or get_settings())
 
-    step_rows = _group(store.select("application_steps", in_={"application_id": ids}), "application_id")
+    from app.services import steps as steps_service
+
     out = []
     for app in apps:
         attention = _compute_attention(app, runs.get(app["id"], []), docs.get(app["id"], []),
@@ -188,8 +185,7 @@ def list_queue(store: Store, actor: Actor, settings: Settings | None = None) -> 
                 "flags_to_check": to_check.get(app["id"], 0) if app["status"] != "signed_off" else 0,
                 # When the officer's request for more documents was sent (only while the application waits for the applicant).
                 "waiting_since": waiting.get(app["id"]) if app["status"] == "awaiting_applicant" else None,
-                **_where(app, {r["step"]: r["status"] for r in step_rows.get(app["id"], [])}, bool(latest.get(app["id"])),
-                         _open_items(attention) if app["status"] != "signed_off" else 0),
+                **_where(app, steps_service.state(store, app, settings)),
             }
         )
     # Oldest received first. Not a ranking of applicants.
