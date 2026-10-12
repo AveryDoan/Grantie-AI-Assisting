@@ -56,8 +56,10 @@ def criteria(store: Store, pack_id: str) -> dict[str, Any]:
                     raise ValueError
             except Exception:
                 w, error = Decimal(0), f"{r['rule_code']} has a weight that is not a positive number"
-        title = (r.get("params") or {}).get("title") or r["rule_text"].split(" (")[0].split(".")[0]
-        out.append({"code": r["rule_code"], "title": title.strip(), "weight": w})
+        title = ((r.get("params") or {}).get("title") or r["rule_text"].split(" (")[0].split(".")[0]).strip()
+        if len(title) > 40:
+            title = title[:38].rsplit(" ", 1)[0] + "…"
+        out.append({"code": r["rule_code"], "title": title, "weight": w})
     total = sum((c["weight"] or Decimal(0) for c in out), Decimal(0))
     if not out:
         error = "This rule pack has no merit criteria"

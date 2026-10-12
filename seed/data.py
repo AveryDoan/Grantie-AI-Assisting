@@ -256,7 +256,7 @@ RULES = [
        {"section": "merit", "weight": 10, "required_fields": ["community_engagement"]}),
     _s("M5", 28, "The “How will studying in the NT contribute?” question is answered (4,000 characters maximum).",
        "factual", "code",
-       {"section": "merit", "check": "text_length", "field": "nt_contribution", "max_chars": 4000,
+       {"section": "merit", "title": "NT contribution", "check": "text_length", "field": "nt_contribution", "max_chars": 4000,
         "required_fields": ["nt_contribution"]}),
     # ---- NT Community Benefit Fund Minor Grants-style ------------------------
     _rule(CBF_PACK, "C1", 1,

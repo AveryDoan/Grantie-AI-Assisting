@@ -60,7 +60,7 @@ def test_sql_and_python_totals_agree(db):  # noqa: F811
                 assert (got is None) == (py is None), f"{policy}/{name}: SQL {got} vs Python {py}"
                 if py is not None:
                     assert Decimal(got) == py or abs(Decimal(got) - py) < Decimal("1e-12"), f"{policy}/{name}: SQL {got} vs Python {py}"
-                    assert round(Decimal(got), 1) == scores.show(py)
+                    assert str(Decimal(got).quantize(Decimal('0.1'), rounding='ROUND_HALF_UP')) == scores.show(py)
         # a weight that is present but not positive makes the total impossible, in SQL as in Python
         c.execute("insert into rule_packs (id, grant_program_id, version) values ('30000000-0000-0000-0000-00000000e0ff', '20000000-0000-0000-0000-00000000e00a', 'bad')")
         c.execute("insert into rules (rule_pack_id, rule_code, rule_text, rule_type, check_method, params) values ('30000000-0000-0000-0000-00000000e0ff', 'M1', 'x', 'judgement', 'llm', '{\"section\": \"merit\", \"weight\": 0}')")

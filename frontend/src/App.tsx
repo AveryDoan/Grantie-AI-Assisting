@@ -4,7 +4,7 @@ import { useAuth } from "./auth";
 import { Button, ErrorNotice, Icon, Loading } from "./ui";
 import Queue from "./screens/Queue";
 import Dashboard from "./screens/Dashboard";
-import RoundDecisions from "./screens/RoundDecisions";
+import Outcomes from "./screens/Outcomes";
 import Application from "./screens/Application";
 import Signoff from "./screens/Signoff";
 import LetterScreen from "./screens/Letter";
@@ -25,7 +25,7 @@ export type Route =
   | { name: "home" }
   | { name: "apply" }
   | { name: "dashboard" }
-  | { name: "rounds" }
+  | { name: "outcomes" }
   | { name: "queue"; q?: string; filter?: string; officer?: "me"; pack?: string }
   | { name: "lists" }
   | { name: "review"; id: string; step?: number; sub?: string }
@@ -47,7 +47,7 @@ function parse(hash: string): Route {
     return { name: "review", id: parts[1], step: stepParam >= 1 && stepParam <= 4 ? stepParam : undefined, sub: stepParam === 3 ? sub : undefined };
   }
   if (parts[0] === "dashboard") return { name: "dashboard" };
-  if (parts[0] === "round-decisions") return { name: "rounds" };
+  if (parts[0] === "outcomes" || parts[0] === "round-decisions") return { name: "outcomes" };
   if (parts[0] === "queue") {
     const q = new URLSearchParams(query);
     return { name: "queue", q: q.get("q") ?? undefined, filter: q.get("filter") ?? undefined, officer: q.get("officer") === "me" ? "me" : undefined,
@@ -66,7 +66,7 @@ export function href(route: Route): string {
     case "apply": return "#/apply";
     case "lists": return "#/lists";
     case "dashboard": return "#/dashboard";
-    case "rounds": return "#/round-decisions";
+    case "outcomes": return "#/outcomes";
     case "queue": {
       const q = new URLSearchParams({ ...(route.q ? { q: route.q } : {}), ...(route.filter ? { filter: route.filter } : {}),
         ...(route.officer ? { officer: route.officer } : {}), ...(route.pack ? { pack: route.pack } : {}) }).toString();
@@ -97,7 +97,7 @@ function useRoute(): [Route, Navigate] {
 }
 
 const TITLES: Record<Route["name"], string> = {
-  home: "", apply: "", dashboard: "Overview", rounds: "Round decisions", queue: "Applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
+  home: "", apply: "", dashboard: "Overview", outcomes: "Outcomes", queue: "Applications", lists: "Reference lists", review: "Application review", trace: "Redaction & AI trace", signoff: "Sign-off",
   letter: "Outcome letter", audit: "Audit trail", evaluation: "Evaluation",
 };
 
@@ -128,7 +128,7 @@ function Shell({ route, navigate, children }: { route: Route; navigate: Navigate
   const nav: { route: Route; label: string; icon: string; active: boolean; badge?: number | null }[] = [
     { route: { name: "dashboard" }, label: "Overview", icon: "grid", active: route.name === "dashboard" },
     { route: { name: "queue" }, label: "Applications", icon: "list", active: ["queue", "review", "signoff", "letter", "trace"].includes(route.name), badge: attention },
-    { route: { name: "rounds" }, label: "Round decisions", icon: "check", active: route.name === "rounds" },
+    { route: { name: "outcomes" }, label: "Outcomes", icon: "check", active: route.name === "outcomes" },
     { route: { name: "audit" }, label: "Audit trail", icon: "clock", active: route.name === "audit" },
   ];
   const name = me?.display_name ?? "Officer";
@@ -231,7 +231,7 @@ export default function App() {
   return (
     <Shell route={route} navigate={navigate}>
       {route.name === "dashboard" && <Dashboard />}
-      {route.name === "rounds" && <RoundDecisions />}
+      {route.name === "outcomes" && <Outcomes />}
       {route.name === "queue" && <Queue key={href(route)} navigate={navigate} initialSearch={route.q} filter={route.filter} officer={route.officer} pack={route.pack} />}
       {/* A new key per application: the screen never shows one application's content (or buttons) under another's address. */}
       {route.name === "review" && <Application key={route.id} id={route.id} step={route.step} sub={route.sub} navigate={navigate} />}

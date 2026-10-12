@@ -26,10 +26,12 @@ export function toView(r: PdfRect, W: number, H: number, scale: number, rotation
   return { left: Math.min(a[0], b[0]) * scale, top: Math.min(a[1], b[1]) * scale, width: Math.abs(b[0] - a[0]) * scale, height: Math.abs(b[1] - a[1]) * scale };
 }
 
-export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, onLocated, blur = true, height = 640 }: {
+export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, onLocated, blur = true, height = 640, aiInitial = false, scrollRatio, onScrollRatio }: {
   docId: string; appId: string; items?: PdfItem[]; selectedId?: string | null; onSelect?: (id: string) => void;
   onLocated?: (located: Record<string, PdfLocation>) => void;   // where each item was found, so the panel can say when one was not
   blur?: boolean; height?: number | string;
+  aiInitial?: boolean;                                           // start on "what the AI saw" (the redacted side of the compare view)
+  scrollRatio?: number | null; onScrollRatio?: (ratio: number) => void;   // linked scrolling between two viewers
 }) {
   const [info, setInfo] = useState<PdfViewerInfo | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -38,11 +40,16 @@ export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, onLo
   const [blurs, setBlurs] = useState<PdfBlur | null>(null);
   const [zoom, setZoom] = useState(1.1);
   const [rotation, setRotation] = useState(0);
-  const [aiView, setAiView] = useState(false);
+  const [aiView, setAiView] = useState(aiInitial);
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [ask, setAsk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+  const echo = useRef(false);
+  useEffect(() => {          // follow the other viewer
+    const el = scroller.current;
+    if (el && scrollRatio != null) { echo.current = true; el.scrollTop = scrollRatio * Math.max(1, el.scrollHeight - el.clientHeight); }
+  }, [scrollRatio]);
   const itemsKey = useMemo(() => JSON.stringify(items.map((i) => [i.id, i.start, i.end, i.text, i.kind])), [items]);
 
   // The signed link, the document, the located highlights and the blur boxes.
@@ -115,7 +122,11 @@ export function PdfViewer({ docId, appId, items = [], selectedId, onSelect, onLo
         )}
       </div>
       {missing && <p className="pv-missing" role="status"><Icon name="info" size={14} />Highlight not available for this quote. The exact text is shown in the panel.</p>}
-      <div className="pv-scroll" ref={scroller}>
+      <div className="pv-scroll" ref={scroller} onScroll={() => {
+        const el = scroller.current;
+        if (echo.current) { echo.current = false; return; }
+        if (el && onScrollRatio) onScrollRatio(el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight));
+      }}>
         {info.pages.map((pg) => (
           <PdfPage key={`${pg.page}-${zoom}-${rotation}`} pdf={pdf} meta={pg} zoom={zoom} rotation={rotation}>
             {(scale) => (

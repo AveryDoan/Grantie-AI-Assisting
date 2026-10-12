@@ -19,6 +19,13 @@ from app.services.errors import Conflict, ValidationFailed
 from app.store.base import Store, one
 
 
+def _plain(d: Any) -> str:
+    """40, not 4E+1."""
+    from decimal import Decimal
+
+    return f"{Decimal(d).normalize():f}"
+
+
 def decision_stands(store: Store, application_id: str) -> bool:
     """A round decision is in force unless an officer has since started a reconsideration (a reason, logged)."""
     dec = outcome_flow.latest_decision(store, application_id)
@@ -67,8 +74,8 @@ def table(store: Store, actor: Actor, settings: Settings | None = None, *, names
             "deep_link": f"#/applications/{a['id']}?step=3&sub=merit",
         })
     return {
-        "criteria": [{"code": c["code"], "title": c["title"], "weight": None if c["weight"] is None else str(c["weight"].normalize())} for c in crit["items"]],
-        "weights_error": crit["error"], "normalised": crit["normalised"], "weight_sum": str(crit["weight_sum"]),
+        "criteria": [{"code": c["code"], "title": c["title"], "weight": None if c["weight"] is None else _plain(c["weight"])} for c in crit["items"]],
+        "weights_error": crit["error"], "normalised": crit["normalised"], "weight_sum": _plain(crit["weight_sum"]),
         "policy": scores.policy_of(cfg), "decimals": int(cfg.get("score_decimals", 1)),
         "places_available": cfg.get("places_available"), "names_shown": names, "rows": rows,
         "can_record": scores.has_permission(store, actor, scores.RECORD),
@@ -94,7 +101,7 @@ def breakdown(store: Store, actor: Actor, application_id: str, settings: Setting
         "application_id": application_id, "reference": ref, "name": (queue._names(store, app)["applicant_name"] if names else None),
         "status": res["status"], "reason": res["reason"], "total": scores.show(res["total"], res["decimals"]), "marked": res["marked"], "of": res["of"],
         "policy": res["policy"], "worked_example": scores.worked_example(res | {"decimals": res["decimals"]}),
-        "rows": [{"code": r["code"], "title": r["title"], "weight": None if r["weight"] is None else str(r["weight"].normalize()), "mark": r["mark"], "not_assessed": r["not_assessed"],
+        "rows": [{"code": r["code"], "title": r["title"], "weight": None if r["weight"] is None else _plain(r["weight"]), "mark": r["mark"], "not_assessed": r["not_assessed"],
                   "points": None if r["points"] is None or r["weight"] is None else str((r["points"] / 100).quantize(scores.Decimal("0.01"))),
                   "reason": (marks.get(r["code"]) or {}).get("reason"),
                   "by": profiles.get((marks.get(r["code"]) or {}).get("officer_id")), "at": (marks.get(r["code"]) or {}).get("updated_at"),
@@ -126,7 +133,7 @@ def csv_export(store: Store, actor: Actor, settings: Settings | None = None) -> 
     data = table(store, actor, settings)
     out = io.StringIO()
     w = csv.writer(out)
-    w.writerow(["Reference", *[f"{c['code']} {c['title']} ({c['weight']}%)" for c in data["criteria"]], "Weighted total", "Marks status", "Decision"])
+    w.writerow(["Reference", *[f"{c['code']} {c['title']} ({c['weight']}%)" if c["weight"] else f"{c['code']} {c['title']} (not scored)" for c in data["criteria"]], "Weighted total", "Marks status", "Decision"])
     for r in data["rows"]:
         w.writerow([r["reference"], *[r["marks"].get(c["code"], "") if r["marks"].get(c["code"]) is not None else "" for c in data["criteria"]],
                     r["total"] or "Not yet", r["status"], r["decision"] or "Not decided"])

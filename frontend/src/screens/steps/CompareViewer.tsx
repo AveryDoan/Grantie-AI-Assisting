@@ -8,6 +8,7 @@ import { api, type CompareSpan, type CompareText } from "../../api";
 import { Button, ErrorNotice, Icon, Loading } from "../../ui";
 import { usePersisted } from "../../persisted";
 import { MarkPersonal } from "./MarkPersonal";
+import { PdfViewer } from "../review/PdfViewer";
 
 function Pane({ text, spans, side, active, setActive, refEl, onScroll, shown }: {
   text: string; spans: CompareSpan[]; side: "orig" | "red"; active: string | null; setActive: (id: string | null) => void;
@@ -46,6 +47,10 @@ export function CompareViewer({ appId, source, title, onClose, onChanged }: { ap
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [marking, setMarking] = useState<string | null>(null);
+  const isPdf = source.startsWith("document:") && /\.pdf$/i.test(title);
+  const [asText, setAsText] = useState(false);          // PDFs show the pages by default, like the PDF viewer; text is one click away
+  const [ratio, setRatio] = useState<{ from: "l" | "r"; v: number } | null>(null);
+  const pdfMode = isPdf && !asText;
   const left = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
@@ -99,7 +104,7 @@ export function CompareViewer({ appId, source, title, onClose, onChanged }: { ap
     const inside = (n: Node | null) => !!n && (left.current?.contains(n) || right.current?.contains(n));
     return sel && inside(sel.anchorNode) ? sel.toString().trim() : "";
   };
-  const turnOn = () => { setReveal(true); load(true); };
+  const turnOn = () => { setReveal(true); load(true); };      // load(true) writes the one audit entry
   const turnOff = () => { setReveal(false); load(false); };
   const keep = async () => {
     if (!active || !note.trim()) return;
@@ -141,14 +146,24 @@ export function CompareViewer({ appId, source, title, onClose, onChanged }: { ap
             <label className="cv-switch"><input type="checkbox" checked={reveal} onChange={(e) => (e.target.checked ? turnOn() : turnOff())} />
               <span>Show original text <small>(this is logged)</small></span></label>
             <span className="cv-legend"><Icon name="shield" size={14} />Right: exactly what the AI would see.</span>
-            {<Button variant="secondary" onClick={() => { const t = selection(); if (t.length >= 2) setMarking(t); }}>Mark selection as personal</Button>}
+            {isPdf && <button className="link-button" aria-pressed={asText} onClick={() => setAsText(!asText)}>{asText ? "View the pages" : "View as text"}</button>}
+            {pdfMode ? <small className="muted">To mark a missed item, use “View as text”.</small> : <Button variant="secondary" onClick={() => { const t = selection(); if (t.length >= 2) setMarking(t); }}>Mark selection as personal</Button>}
           </div>
+          {pdfMode ? (
+            <div className={`cv-panes show-${tab}`}>
+              <section aria-label="Original"><h3>Original {reveal ? "" : <small>(blurred)</small>}</h3>
+                <PdfViewer docId={source.slice(9)} appId={appId} blur={!reveal} height="100%" scrollRatio={ratio?.from === "r" ? ratio.v : null} onScrollRatio={(v) => setRatio({ from: "l", v })} /></section>
+              <section aria-label="Redacted"><h3>Redacted <small>(what the AI sees)</small></h3>
+                <PdfViewer docId={source.slice(9)} appId={appId} blur aiInitial height="100%" scrollRatio={ratio?.from === "l" ? ratio.v : null} onScrollRatio={(v) => setRatio({ from: "r", v })} /></section>
+            </div>
+          ) : (
           <div className={`cv-panes show-${tab}`}>
             <section aria-label="Original"><h3>Original {data.original_shown ? "" : <small>(hidden)</small>}</h3>
               <Pane text={data.original} spans={spans} side="orig" active={active} setActive={setActive} refEl={left} onScroll={link(left, right)} shown={data.original_shown} /></section>
             <section aria-label="Redacted"><h3>Redacted <small>(what the AI sees)</small></h3>
               <Pane text={data.redacted} spans={spans} side="red" active={active} setActive={setActive} refEl={right} onScroll={link(right, left)} shown /></section>
           </div>
+          )}
           {cur && (
             <div className="cv-actions" role="region" aria-label="This span">
               <span><b>{cur.type}</b> <code>{cur.token}</code></span>

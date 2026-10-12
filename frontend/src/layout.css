@@ -141,3 +141,7 @@
   .cmp-body { grid-template-columns: 1fr; }
   .cmp-fields { grid-template-columns: 1fr; }
 }
+.cv-panes .pv { flex: 1; height: auto; min-height: 0; }
+.cv-panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.cv-panes section, .cv-panes .pv { min-width: 0; }
+@media (max-width: 720px) { .cv-panes { grid-template-columns: minmax(0, 1fr); } }

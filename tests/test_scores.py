@@ -69,6 +69,7 @@ def test_the_table_is_by_reference_with_no_rank_and_names_are_hidden(store, offi
     text = json.dumps(data).lower()
     for word in ("rank", "top", "best", "strong", "weak", "percentile", "cutoff", "cut-off", "recommend"):
         assert f'"{word}' not in text and f"_{word}" not in text
+    assert [c["weight"] for c in data["criteria"]] == ["40", "30", "20", "10", None] and data["weight_sum"] == "100"      # plain, not 4E+1
     assert data["policy"] == "block" and data["decimals"] == 1 and data["weights_error"] is None
     assert not [a for a in store.select("audit_log") if a["action"] == "scores.names_shown"]
     shown = outcomes_page.table(store, officer, names=True)
@@ -130,7 +131,7 @@ def test_the_total_is_not_on_the_dashboard_in_letters_or_emails(store, officer, 
 def test_export_uses_references_only_and_is_logged(store, officer, eligible):
     names = [store.select("applicants", eq={"id": store.select("applications", eq={"id": a})[0]["applicant_id"]})[0]["display_name"] for a in eligible]
     text = outcomes_page.csv_export(store, officer)
-    assert text.splitlines()[0].startswith("Reference,M1 ") and all(n.split()[0] not in text for n in names if n)
+    assert text.splitlines()[0].startswith("Reference,M1 ") and "None" not in text.splitlines()[0] and "(not scored)" in text.splitlines()[0] and all(n.split()[0] not in text for n in names if n)
     assert [a for a in store.select("audit_log") if a["action"] == "scores.exported"][0]["details"]["rows"] == 2
 
 

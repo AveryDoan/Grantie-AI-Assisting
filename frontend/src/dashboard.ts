@@ -24,7 +24,7 @@ export const TILES: { key: DashTile; label: string; line: string; icon: string; 
 // Outcome letters: counts only, never a judgement. Each opens the queue with the same filter the count used.
 export const OUTCOME_TILES: { key: "ineligible_to_sign" | "round_ready" | "not_selected_to_release"; label: string; line: string; icon: string; sec: string; href?: string }[] = [
   { key: "ineligible_to_sign", label: "Not eligible, letters to sign off", line: "A rule confirmed Not met by an officer", icon: "file", sec: "sec-outcome" },
-  { key: "round_ready", label: "Ready for round decision", line: "Eligible, merit marked", icon: "check", sec: "sec-merit", href: "#/round-decisions" },
+  { key: "round_ready", label: "Ready for round decision", line: "Eligible, merit marked", icon: "check", sec: "sec-merit", href: "#/outcomes" },
   { key: "not_selected_to_release", label: "Not selected, letters to release", line: "After the round decision", icon: "mail", sec: "sec-consistency" },
 ];
 

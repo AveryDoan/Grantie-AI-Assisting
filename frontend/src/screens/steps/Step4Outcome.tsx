@@ -179,7 +179,7 @@ export default function Step4Outcome({ id, navigate, onChanged }: { id: string; 
             {" "}<button className="link-button" onClick={() => navigate({ name: "review", id, step: 1 })}>Draft a request for the document</button></span></div>
       )}
       {out.awaiting_round_decision && (
-        <div className="notice" role="status"><Icon name="info" /><span>Record the panel’s decision in <a href="#/round-decisions">Round decisions</a>. No ranking is shown there; it only records what people decided.</span></div>
+        <div className="notice" role="status"><Icon name="info" /><span>Record the panel’s decision in <a href="#/outcomes">Outcomes</a>. The panel decides; this tool only records it.</span></div>
       )}
       {out.result === "needs_information" && (
         <div className="notice"><Icon name="info" /><span>Go back to ask the applicant for what is missing: <button className="link-button" onClick={() => navigate({ name: "review", id, step: 1 })}>Step 1: Documents</button> or <button className="link-button" onClick={() => navigate({ name: "review", id, step: 3 })}>Step 3: Assessment</button>.</span></div>
