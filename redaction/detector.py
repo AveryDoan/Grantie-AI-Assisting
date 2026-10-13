@@ -163,8 +163,9 @@ class Detector:
             for r in self.engine.analyze(text=clean, language="en", entities=ent, score_threshold=self.cfg.flag_score):
                 token_type = self.cfg.token_type(r.entity_type)
                 for ns, ne, os_, oe in spans:
-                    if token_type and r.start < ne and ns < r.end and not any(c.start < oe and os_ < c.end for c in found):
-                        out.append(Detection(os_, oe, r.entity_type, token_type, round(r.score, 3), False, "obfuscation:cleaned"))
+                    word_end = os_ + len(text[os_:oe].rstrip(".,;:!?)\"'"))
+                    if token_type and r.start < ne and ns < r.end and not any(c.start <= os_ and word_end <= c.end for c in found):
+                        out.append(Detection(os_, word_end, r.entity_type, token_type, round(r.score, 3), False, "obfuscation:cleaned"))
         return out
 
 
