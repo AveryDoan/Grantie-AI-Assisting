@@ -27,6 +27,7 @@ from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_analyzer.predefined_recognizers import SpacyRecognizer
 
 from redaction.config import RedactionConfig, default_config
+from redaction.obfuscation import cleaned_tokens, encoded_runs
 from redaction.recognizers import (
     HONORIFICS,
     DobRecognizer,
@@ -37,7 +38,7 @@ from redaction.recognizers import (
     pattern_recognizers,
 )
 
-DETECTOR_VERSION = "presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-1"
+DETECTOR_VERSION = "presidio-2.2.364+spacy-3.8+en_core_web_lg-3.8.0+custom-2"
 
 TextKind = Literal["form", "free_text", "referee_letter", "document"]
 
@@ -149,7 +150,22 @@ class Detector:
             low = (not is_known) and r.score < self.cfg.min_score(r.entity_type)
             candidates.append(Detection(start, end, r.entity_type, token_type, round(r.score, 3), low,
                                         meta.get("recognizer_name", "?"), meta.get("source"), meta.get("group")))
+        candidates += self._obfuscated(text, entities, candidates)
         return _resolve_overlaps(candidates)
+
+    def _obfuscated(self, text: str, entities: list[str], found: list[Detection]) -> list[Detection]:
+        """Encoded runs are redacted outright; dirty words are cleaned, re-analysed, and the original word redacted."""
+        out = [Detection(s, e, "ENCODED", "ID", 0.9, False, "obfuscation:" + kind)
+               for s, e, kind in encoded_runs(text)]
+        clean, spans = cleaned_tokens(text)
+        if clean:
+            ent = [x for x in entities if x != KnownValueRecognizer.ENTITY and x not in ("PERSON", "LOCATION", "NRP")]
+            for r in self.engine.analyze(text=clean, language="en", entities=ent, score_threshold=self.cfg.flag_score):
+                token_type = self.cfg.token_type(r.entity_type)
+                for ns, ne, os_, oe in spans:
+                    if token_type and r.start < ne and ns < r.end and not any(c.start < oe and os_ < c.end for c in found):
+                        out.append(Detection(os_, oe, r.entity_type, token_type, round(r.score, 3), False, "obfuscation:cleaned"))
+        return out
 
 
 _NAME_WORD = re.compile(r"[A-Z][A-Za-z\u00C0-\u024F'\u2019]*(?:-[A-Za-z\u00C0-\u024F]+)*")

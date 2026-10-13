@@ -23,6 +23,16 @@ _LIGATURES = {"ﬁ": "fi", "ﬂ": "fl", "ﬀ": "ff", "ﬃ": "ffi", "ﬄ": "ffl",
 _QUOTES = {"‘": "'", "’": "'", "‚": "'", "“": '"', "”": '"', "„": '"', "–": "-", "—": "-", "‐": "-", "‑": "-", " ": " ", "­": ""}
 
 
+def _top_shift(page: Any) -> float:
+    """Points to add to pdfplumber's `top`/`bottom`. pdfminer reads a page box whose lower edge is above 0 (e.g. /MediaBox
+    [0 7.83 595.5 850.08]) as -7.83..834.42, so every word sits that much too high against the page a viewer draws.
+    For an ordinary box (lower edge 0) the shift is 0."""
+    try:
+        return round(float(page.height) - float(page.bbox[3]), 4) if int(page.rotation or 0) % 360 == 0 else 0.0
+    except Exception:
+        return 0.0
+
+
 def extract_layout(extracted: ExtractedDocument, data: bytes) -> dict[str, Any] | None:
     if extracted.file_kind != "pdf" or not extracted.pages:
         return None
@@ -43,6 +53,7 @@ def extract_layout(extracted: ExtractedDocument, data: bytes) -> dict[str, Any] 
             text = by_number.get(i)
             if text is None:
                 continue
+            dy = _top_shift(page)
             marker = f"[page {i}]\n"
             cursor = 0
             try:
@@ -56,8 +67,8 @@ def extract_layout(extracted: ExtractedDocument, data: bytes) -> dict[str, Any] 
                     # A wrapped hyphenated word: pdfplumber gives "wonder-" then "ful"; the text has the same pieces, so this is
                     # only reached for a rewritten ligature. Leave it out rather than guess where it is.
                     continue
-                words.append([i, round(float(w["x0"]), 2), round(float(w["top"]), 2), round(float(w["x1"]), 2),
-                              round(float(w["bottom"]), 2), base + len(marker) + at, base + len(marker) + at + len(token)])
+                words.append([i, round(float(w["x0"]), 2), round(float(w["top"]) + dy, 2), round(float(w["x1"]), 2),
+                              round(float(w["bottom"]) + dy, 2), base + len(marker) + at, base + len(marker) + at + len(token)])
                 cursor = at + len(token)
             base += len(marker) + len(text) + 1   # the "\n" that joins the page blocks
     return {"pages": pages_meta, "words": words}
